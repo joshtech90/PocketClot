@@ -120,7 +120,57 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     # zu Google öffnen — spart 200-500ms beim ersten echten TTS-Tap.
     import asyncio as _asyncio
     _asyncio.create_task(_tts_prewarm())
+    _asyncio.create_task(_migrate_tts_to_gemini_web())
     yield
+
+
+async def _migrate_tts_to_gemini_web() -> None:
+    """Stellt jeden Nutzer einmalig auf den Vorlese-Dienst um.
+
+    Der neue Anbieter soll für alle gelten, auch für die, die früher schon
+    bewusst etwas anderes gewählt hatten. Damit das nicht bei jedem Neustart
+    eine spätere Entscheidung wieder überschreibt, merkt sich jeder Nutzer die
+    erfolgte Umstellung; danach bleibt seine Wahl unangetastet.
+
+    Läuft der Dienst nicht, passiert gar nichts: dann gäbe es nach der
+    Umstellung keine Sprachausgabe mehr, und das wäre schlimmer als der alte
+    Anbieter. Beim nächsten Start wird es erneut versucht.
+    """
+    import asyncio as _asyncio
+    try:
+        # Kurz Luft lassen: beim Booten kann der Vorlese-Dienst ein paar
+        # Sekunden nach dem Server oben sein.
+        await _asyncio.sleep(5)
+        if not await _asyncio.to_thread(tts.gemini_web_available, True):
+            log.info("TTS-Umstellung übersprungen — Vorlese-Dienst antwortet nicht (%s)",
+                     tts.GEMINI_WEB_TTS_URL)
+            return
+        users = await db.list_users()
+        umgestellt = 0
+        for u in users:
+            uid = u.get("id")
+            if not uid:
+                continue
+            kv = await db.kv_get_all(scope=uid)
+            if (kv.get(_KV_TTS_WEB_MIGRATED) or "").strip() == "1":
+                continue
+            vorher = (kv.get(_KV_TTS_PROVIDER) or "").strip() or "(Vorgabe)"
+            await db.kv_set_many({
+                _KV_TTS_PROVIDER: tts.PROVIDER_GEMINI_WEB,
+                # Die Web-UI merkt sich ihre Stimme im selben Speicher. Eine
+                # Edge- oder Cloud-Stimme stünde sonst weiter in der Auswahl,
+                # obwohl sie zum neuen Anbieter nicht passt.
+                "ttsVoice": tts.DEFAULT_VOICE_GEMINI_WEB,
+                _KV_TTS_WEB_MIGRATED: "1",
+            }, scope=uid)
+            umgestellt += 1
+            log.info("TTS-Umstellung: Nutzer %s von %s auf %s",
+                     uid, vorher, tts.PROVIDER_GEMINI_WEB)
+        if umgestellt:
+            log.info("TTS-Umstellung abgeschlossen: %d von %d Nutzern umgestellt",
+                     umgestellt, len(users))
+    except Exception as exc:  # noqa: BLE001 - darf den Start nie verhindern
+        log.warning("TTS-Umstellung fehlgeschlagen (nicht kritisch): %s", exc)
 
 
 async def _tts_prewarm() -> None:
@@ -1099,7 +1149,11 @@ async def export_markdown(cid: str, user=Depends(require_user)):
 # ---------- TTS (Dual-Provider: Cloud TTS + Gemini API) ----------
 
 # Per-User-Settings (in DB-KV abgelegt, scope=user_id):
-_KV_TTS_PROVIDER = "tts_provider"   # "cloud_tts" | "gemini_api" | "edge_tts"
+_KV_TTS_PROVIDER = "tts_provider"   # "gemini_web" | "cloud_tts" | "gemini_api" | "edge_tts"
+# Merker für die einmalige Umstellung auf den Vorlese-Dienst (Gemini-Web).
+# Ohne diesen Merker würde die Umstellung bei jedem Serverstart eine bewusste
+# spätere Wahl des Users wieder überschreiben.
+_KV_TTS_WEB_MIGRATED = "tts_provider_geminiweb_migrated"
 # Per-User Chunking-Override: "1" = an, "0" = aus, leer/unset = Provider-Default
 # (cloud_tts → an, gemini_api/edge_tts → aus). User mit Multi-Key-Pool kann das
 # Setting manuell wieder aktivieren wenn sein Pool die RPD-Last verträgt.
@@ -1405,9 +1459,14 @@ async def _resolve_provider_with_kv(kv: dict, user_id: str) -> tuple[str, str | 
     KV eh schon hat).
 
     Smart-Default-Logik wenn der User noch keinen Provider gesetzt hat:
-      1. Service-Account vorhanden → cloud_tts (beste Voice-Quality + Free-Tier)
-      2. Gemini-API-Key vorhanden → gemini_api (Multi-Key-Pool nutzbar)
-      3. Sonst                    → edge_tts (Zero-Setup, immer verfügbar)
+      1. Vorlese-Dienst erreichbar → gemini_web (gratis, kein Setup, schnellster)
+      2. Service-Account vorhanden → cloud_tts (beste Voice-Quality + Free-Tier)
+      3. Gemini-API-Key vorhanden → gemini_api (Multi-Key-Pool nutzbar)
+      4. Sonst                    → edge_tts (Zero-Setup, immer verfügbar)
+
+    Gemini-Web steht bewusst vorne: kostenlos, ohne Einrichtung und deutlich
+    schneller als alle anderen. Läuft der Dienst nicht, ändert sich gegenüber
+    früher nichts — die Reihenfolge dahinter ist unverändert.
 
     Bei explizit gesetztem KV-Wert wird der respektiert (egal ob das Setup
     dazu passt — der User soll merken wenn er was Falsches gewählt hat).
@@ -1420,6 +1479,8 @@ async def _resolve_provider_with_kv(kv: dict, user_id: str) -> tuple[str, str | 
             log.warning("Ungültiger TTS-Provider %r in user-settings, fallback auf Smart-Default",
                         raw)
         # Smart-Default basierend auf vorhandenem Setup
+        if await asyncio.to_thread(tts.gemini_web_available):
+            return tts.PROVIDER_GEMINI_WEB, None
         cloud_ok = tts.get_config() is not None
         if cloud_ok:
             provider = tts.PROVIDER_CLOUD_TTS
@@ -1489,6 +1550,11 @@ async def _build_tts_status(user_id: str) -> TtsStatusDto:
         configured = gemini_ok
     elif provider == tts.PROVIDER_EDGE_TTS:
         configured = True  # Edge-TTS braucht keine Credentials
+    elif provider == tts.PROVIDER_GEMINI_WEB:
+        # Hier heisst "eingerichtet": der Dienst läuft UND seine Google-Sitzung
+        # trägt noch. Beides zusammen, sonst meldet die App alles in Ordnung,
+        # während jeder Vorlese-Versuch scheitert.
+        configured = await asyncio.to_thread(tts.gemini_web_available)
     else:
         configured = cloud_ok
     # Chunking-Setting (explicit vs. provider-default)
@@ -1549,7 +1615,11 @@ async def tts_set_provider(body: TtsProviderRequest, user=Depends(require_user))
     if prov not in tts.VALID_PROVIDERS:
         raise HTTPException(400, f"Invalid provider {prov!r}. "
                                   f"Allowed: {sorted(tts.VALID_PROVIDERS)}")
-    await db.kv_set_many({_KV_TTS_PROVIDER: prov}, scope=user["id"])
+    # Den Umstellungs-Merker gleich mitsetzen: wer selbst einen Anbieter
+    # waehlt, soll beim naechsten Serverstart nicht wieder umgestellt werden.
+    await db.kv_set_many(
+        {_KV_TTS_PROVIDER: prov, _KV_TTS_WEB_MIGRATED: "1"}, scope=user["id"]
+    )
     log.info("TTS-Provider von user=%s auf %s gesetzt", user["id"], prov)
     # Provider-Wechsel ist user-spezifisch und sagt nichts über den globalen
     # Cloud-TTS-Setup-Status aus → nicht den Cache leeren.
@@ -1967,6 +2037,21 @@ async def tts_message_audio(
             },
         )
 
+    # Erst hier prüfen, ob der Vorlese-Dienst überhaupt antwortet: oberhalb
+    # stünde die Prüfung vor dem Zwischenspeicher, und dann bekäme der Nutzer
+    # einen Fehler für Audio, das längst fertig auf der Platte liegt.
+    if provider == tts.PROVIDER_GEMINI_WEB and not await asyncio.to_thread(
+        tts.gemini_web_available
+    ):
+        raise HTTPException(
+            503,
+            "Der Vorlese-Dienst antwortet nicht oder seine Google-Sitzung ist "
+            "abgelaufen. Auf dem Server prüfen: "
+            "curl http://127.0.0.1:8811/health — und bei Bedarf neu anmelden "
+            "(~/gemini-tts/login.py). Bis dahin lässt sich in den Einstellungen "
+            "ein anderer Anbieter wählen.",
+        )
+
     # Multi-Key-Picker (nur wenn Pool >1 Keys; sonst Single-Key-Pfad).
     # `max_chunks` ist abhängig von Pool-Größe + Provider:
     #  - Cloud TTS: keine Per-Minute-Limits → unbeschränkt (= None)
@@ -2031,6 +2116,16 @@ async def tts_message_audio(
                 "TTS-Stream beendet: Pool erschöpft (%s). Tipp: morgen wieder "
                 "verfügbar (RPD-Reset bei Mitternacht UTC), oder mehr Keys "
                 "hinzufügen.", e,
+            )
+            return
+        except tts.TtsSessionExpiredError as e:
+            # Nur dieser eine Anbieter ist betroffen. Bewusst OHNE die
+            # serverweite Cloud-TTS-Sperre: die gilt einem anderen Anbieter und
+            # wuerde hier den Ausweg mit abschneiden.
+            log.warning(
+                "TTS-Stream beendet: Google-Sitzung des Vorlese-Dienstes "
+                "abgelaufen (%s). Auf dem Server neu anmelden: "
+                "~/gemini-tts/login.py", str(e)[:160],
             )
             return
         except tts.TtsCloudTtsUnavailableError as e:
@@ -3607,6 +3702,10 @@ async def settings_import(body: SettingsImportRequest,
         if prov and prov not in tts.VALID_PROVIDERS:
             raise HTTPException(400, f"Invalid tts_provider: {prov!r}")
         updates[_KV_TTS_PROVIDER] = prov
+        if prov:
+            # Wie bei PUT /tts/provider: eine eigene Wahl schuetzt vor der
+            # einmaligen Umstellung beim Serverstart.
+            updates[_KV_TTS_WEB_MIGRATED] = "1"
 
     if body.tts_model is not None:
         mid = body.tts_model.strip()

@@ -99,9 +99,36 @@ class ChatRepository(
 
     // TTS
     suspend fun ttsStatus(): TtsStatusDto = api.getTtsStatus()
+
+    // Welcher Vorlese-Anbieter aktiv ist, braucht der Chat bei jedem Tippen auf
+    // "Vorlesen" — aber nur, um zu entscheiden, wer die Geschwindigkeit macht.
+    // Deshalb einmal holen und ein paar Minuten behalten, statt vor jedem
+    // Abspielen eine zusaetzliche Anfrage zu schicken.
+    private var cachedTtsProvider: String? = null
+    private var cachedTtsProviderAt: Long = 0L
+
+    suspend fun ttsProviderCached(): String {
+        val jetzt = System.currentTimeMillis()
+        val gemerkt = cachedTtsProvider
+        if (gemerkt != null && jetzt - cachedTtsProviderAt < 5 * 60_000L) return gemerkt
+        return try {
+            val p = api.getTtsStatus().provider
+            cachedTtsProvider = p
+            cachedTtsProviderAt = jetzt
+            p
+        } catch (e: Exception) {
+            // Kein Status erreichbar: der alte Weg (Server macht das Tempo) ist
+            // die sichere Annahme, sonst klingt Audio unerwartet beschleunigt.
+            gemerkt ?: ""
+        }
+    }
+
     suspend fun setTtsCredentials(json: String): TtsStatusDto = api.setTtsCredentials(json)
     suspend fun deleteTtsCredentials() = api.deleteTtsCredentials()
-    suspend fun setTtsProvider(provider: String): TtsStatusDto = api.setTtsProvider(provider)
+    suspend fun setTtsProvider(provider: String): TtsStatusDto {
+        cachedTtsProvider = null
+        return api.setTtsProvider(provider)
+    }
     suspend fun setTtsModel(modelId: String): TtsStatusDto = api.setTtsModel(modelId)
     suspend fun setTtsChunking(enabled: Boolean?): TtsStatusDto = api.setTtsChunking(enabled)
     suspend fun setTtsApiKey(key: String): TtsStatusDto = api.setTtsApiKey(key)

@@ -26,6 +26,7 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import random
 import re
 import struct
@@ -83,6 +84,18 @@ class TtsCloudTtsUnavailableError(RuntimeError):
     deterministisch wieder failed."""
     pass
 
+class TtsSessionExpiredError(RuntimeError):
+    """Die Google-Sitzung des Vorlese-Dienstes traegt nicht mehr.
+
+    Bewusst eine eigene Klasse und nicht TtsCloudTtsUnavailableError: die setzt
+    im Stream-Endpunkt eine serverweite Sperre fuer Cloud-TTS. Ein abgelaufener
+    Gemini-Web-Login wuerde damit ausgerechnet den Anbieter lahmlegen, auf den
+    die Fehlermeldung zum Ausweichen verweist.
+
+    Erneut versuchen ist sinnlos, es hilft nur eine neue Anmeldung auf dem
+    Server."""
+
+
 # Provider-Konstanten
 PROVIDER_CLOUD_TTS = "cloud_tts"
 PROVIDER_GEMINI_API = "gemini_api"
@@ -91,7 +104,27 @@ PROVIDER_GEMINI_API = "gemini_api"
 # deutlich schwächer als Gemini/Studio/Chirp, dafür Zero-Effort-Default für
 # User die TTS einfach mal ausprobieren wollen.
 PROVIDER_EDGE_TTS = "edge_tts"
-VALID_PROVIDERS = {PROVIDER_CLOUD_TTS, PROVIDER_GEMINI_API, PROVIDER_EDGE_TTS}
+# Gemini-Web: die Vorlesefunktion von gemini.google.com. Das ist ein eigener
+# Aufruf, der beliebigen Text annimmt — kein Chat, kein Modell, keine
+# Oberfläche. Ein kleiner Dienst auf demselben Rechner hält die angemeldete
+# Google-Sitzung und liefert Ogg/Opus zurück (siehe GEMINI_WEB_TTS_URL).
+#
+# Warum das der beste Default ist: kostenlos, keine Einrichtung in der App,
+# keine Rate-Limit-Fallen, und rund 40-mal schneller als Echtzeit (gemessen:
+# 1140 Zeichen ergaben 70 s Audio in 1,5 s). Nachteil: die Stimme ist nicht
+# wählbar, und die Sprechgeschwindigkeit kann der Dienst nicht ändern — die
+# stellt der Client beim Abspielen ein.
+PROVIDER_GEMINI_WEB = "gemini_web"
+VALID_PROVIDERS = {PROVIDER_CLOUD_TTS, PROVIDER_GEMINI_API, PROVIDER_EDGE_TTS,
+                   PROVIDER_GEMINI_WEB}
+
+# Adresse des Vorlese-Dienstes. Läuft er nicht (etwa auf einem Server ohne
+# angemeldete Sitzung), verhält sich alles wie vorher: der Provider taucht
+# nicht als verfügbar auf und niemand wird darauf umgestellt.
+GEMINI_WEB_TTS_URL = os.environ.get("GEMINI_WEB_TTS_URL", "http://127.0.0.1:8811").rstrip("/")
+# Der Dienst deckelt selbst bei 20.000 Zeichen; hier etwas darunter bleiben,
+# damit die Fehlermeldung bei uns entsteht und nicht dort.
+GEMINI_WEB_MAX_CHARS = 18000
 # Default ist Cloud-TTS (Service-Account-Pfad). Grund: das ist der einzige
 # Pfad mit großzügigem Free-Contingent und ohne harte Rate-Limit-Stolperfallen
 # für eine Chat-App.
@@ -113,7 +146,7 @@ VALID_PROVIDERS = {PROVIDER_CLOUD_TTS, PROVIDER_GEMINI_API, PROVIDER_EDGE_TTS}
 # switchen (in den App-Einstellungen) und einen oder mehrere AI-Studio-
 # Free-Tier-Keys eintragen — der Server verteilt Requests dann via
 # Round-Robin + Rate-Limiter auf die Keys.
-DEFAULT_PROVIDER = PROVIDER_EDGE_TTS
+DEFAULT_PROVIDER = PROVIDER_GEMINI_WEB
 
 # Modell-Name für Gemini-TTS via Cloud-TTS-API (ab google-cloud-texttospeech 2.31.0).
 # Voice-IDs mit Prefix "gemini-" routen automatisch über dieses Modell.
@@ -257,11 +290,17 @@ GEMINI_API_TTS_TEMPERATURE = 0.3
 # Media-Types die wir an die Clients zurückgeben.
 MEDIA_TYPE_MP3 = "audio/mpeg"
 MEDIA_TYPE_WAV = "audio/wav"
+MEDIA_TYPE_OGG = "audio/ogg"
 
 
 def media_type_for(provider: str) -> str:
-    # Edge-TTS + Cloud-TTS liefern MP3, Gemini-Direct-API liefert PCM/WAV.
-    return MEDIA_TYPE_WAV if provider == PROVIDER_GEMINI_API else MEDIA_TYPE_MP3
+    # Edge-TTS + Cloud-TTS liefern MP3, Gemini-Direct-API liefert PCM/WAV,
+    # Gemini-Web liefert Ogg/Opus.
+    if provider == PROVIDER_GEMINI_API:
+        return MEDIA_TYPE_WAV
+    if provider == PROVIDER_GEMINI_WEB:
+        return MEDIA_TYPE_OGG
+    return MEDIA_TYPE_MP3
 
 
 # ===== Edge-TTS — Microsoft Edge's "Read Aloud" via edge-tts-Library =====
@@ -300,10 +339,15 @@ CHIRP3HD_VOICE_PREFIX = "chirp3hd-"
 _ALL_CLOUD = ["cloud_tts", "gemini_api"]
 _CTTS_ONLY = ["cloud_tts"]
 _EDGE_ONLY = ["edge_tts"]
+_WEB_ONLY = ["gemini_web"]
 # Legacy-Alias (vor Edge-TTS existierte nur _ALL_PROVIDERS)
 _ALL_PROVIDERS = _ALL_CLOUD
 
 CURATED_VOICES = [
+    # Gemini-Web — eine einzige Stimme, die Google für das Vorlesen benutzt.
+    # Sie ist bewusst als Eintrag geführt, obwohl es nichts zu wählen gibt:
+    # sonst stünde die Stimmenliste leer da, sobald dieser Provider aktiv ist.
+    {"id": "geminiweb-standard", "label": "Gemini (Standard, keine Auswahl)", "gender": "FEMALE", "tier": "geminiweb", "compatible_providers": _WEB_ONLY},
     # Edge-TTS — Microsoft Edge's "Read Aloud". KOSTENLOS, OHNE Setup.
     # Klangqualität schwächer als Gemini/Chirp, dafür Zero-Effort-Default.
     {"id": "edge-de-DE-KatjaNeural", "label": "Edge Katja — weiblich (gratis)", "gender": "FEMALE", "tier": "edge", "compatible_providers": _EDGE_ONLY},
@@ -364,6 +408,10 @@ CURATED_VOICES = [
 DEFAULT_VOICE_CLOUD_TTS = "chirp3hd-Algenib"
 DEFAULT_VOICE_GEMINI_API = "gemini-Algenib"
 DEFAULT_VOICE_EDGE_TTS = "edge-de-DE-KatjaNeural"
+# Gemini-Web kennt keine Stimmauswahl (geprüft: der Aufruf hat schlicht keinen
+# Parameter dafür). Die ID ist trotzdem nötig, damit Cache-Schlüssel und
+# Stimmenliste einen stabilen Wert haben.
+DEFAULT_VOICE_GEMINI_WEB = "geminiweb-standard"
 
 # Globaler Fallback (für Call-Sites die keinen Provider kennen). Wir nehmen
 # Edge-TTS-Variante weil das der UNIVERSAL-Pfad ist — funktioniert für jeden
@@ -381,6 +429,8 @@ def default_voice_for(provider: str | None) -> str:
         return DEFAULT_VOICE_GEMINI_API
     if provider == PROVIDER_EDGE_TTS:
         return DEFAULT_VOICE_EDGE_TTS
+    if provider == PROVIDER_GEMINI_WEB:
+        return DEFAULT_VOICE_GEMINI_WEB
     return DEFAULT_VOICE_CLOUD_TTS
 
 
@@ -395,6 +445,11 @@ def chunking_default_for(provider: str | None) -> bool:
       Bei Multi-Key-Pool kann der User das manuell wieder einschalten.
     - edge_tts: FALSE — Edge-TTS macht single-WebSocket-Session pro Request,
       Chunking erzeugt unnötig viele Connections ohne Latency-Vorteil.
+    - gemini_web: FALSE — und das ist hier keine Abwägung, sondern Pflicht:
+      der Dienst liefert Ogg/Opus, und Ogg-Ströme lassen sich nicht einfach
+      aneinanderhängen (jeder bringt eigene Kopfdaten und eine eigene Kennung
+      mit). Gechunkt käme beim Abspielen nur der erste Teil an. Nötig ist es
+      ohnehin nicht: 1140 Zeichen ergaben gemessen 70 s Audio in 1,5 s.
     """
     if provider == PROVIDER_CLOUD_TTS:
         return True
@@ -1126,6 +1181,90 @@ def _synthesize_edge_tts(
         ) from exc
 
 
+# Erreichbarkeit des Vorlese-Dienstes. Wird bei jedem Statusabruf gebraucht,
+# darf aber keine Anfrage aufhalten: deshalb ein kurzer Zwischenspeicher und
+# ein knappes Zeitlimit. Loopback-Aufruf, der antwortet in Millisekunden oder
+# gar nicht.
+_WEB_TTS_CACHE: tuple[float, bool] = (0.0, False)
+_WEB_TTS_CACHE_SEC = 60.0
+_WEB_TTS_FEHLER_CACHE_SEC = 15.0
+
+
+def gemini_web_available(force: bool = False) -> bool:
+    """Sagt, ob der lokale Vorlese-Dienst antwortet und eine Sitzung hat."""
+    import time as _t
+    global _WEB_TTS_CACHE
+    stand, letzter = _WEB_TTS_CACHE
+    alter = _t.monotonic() - stand
+    # Ein negatives Ergebnis kürzer glauben als ein positives: startet der
+    # Dienst gerade neu, soll er nicht eine Minute lang als tot gelten.
+    gueltig = _WEB_TTS_CACHE_SEC if letzter else _WEB_TTS_FEHLER_CACHE_SEC
+    if not force and stand > 0 and alter < gueltig:
+        return letzter
+    ok = False
+    try:
+        r = httpx.get(f"{GEMINI_WEB_TTS_URL}/health", timeout=3.0)
+        ok = r.status_code == 200 and bool(r.json().get("token"))
+    except Exception as exc:  # noqa: BLE001 - jede Störung heisst schlicht "nein"
+        log.debug("gemini-web-tts /health nicht erreichbar: %s", exc)
+    _WEB_TTS_CACHE = (_t.monotonic(), ok)
+    return ok
+
+
+def _synthesize_gemini_web(text: str) -> bytes:
+    """Synthese über den lokalen Vorlese-Dienst (Gemini-Web-Sitzung).
+
+    Ausgabe ist Ogg/Opus, rund 60 kbit/s. Die Sprechgeschwindigkeit kann der
+    Dienst nicht beeinflussen, deshalb nimmt diese Funktion auch keine
+    entgegen: der Client stellt sie beim Abspielen ein.
+    """
+    log.info("gemini-web-tts: synthesizing %d chars via %s",
+             len(text), GEMINI_WEB_TTS_URL)
+    try:
+        resp = httpx.post(
+            f"{GEMINI_WEB_TTS_URL}/tts",
+            json={"text": text, "lang": "de-DE"},
+            # Grosszügig: 18.000 Zeichen brauchten gemessen rund 11 s, ein
+            # langsames Netz zu Google darf das nicht sofort abwürgen.
+            timeout=httpx.Timeout(90.0, connect=5.0),
+        )
+    except httpx.RequestError as exc:
+        # Dienst nicht erreichbar (nicht gestartet, falscher Port). Als
+        # transient melden: ein Neuversuch kann klappen, wenn er gerade neu
+        # startet.
+        raise TtsTransientError(
+            api_key="",
+            message=f"Vorlese-Dienst nicht erreichbar ({GEMINI_WEB_TTS_URL}): {exc}",
+            kind="5xx",
+        ) from exc
+
+    if resp.status_code == 503:
+        # Der Dienst lebt, aber die Google-Sitzung trägt nicht mehr. Ein
+        # Neuversuch würde deterministisch wieder scheitern, deshalb ein
+        # Dauerfehler mit einer Meldung, die sagt was zu tun ist.
+        raise TtsSessionExpiredError(
+            "Die Google-Sitzung des Vorlese-Dienstes ist abgelaufen. "
+            "Auf dem Server neu anmelden: ~/gemini-tts/login.py"
+        )
+    if resp.status_code != 200:
+        kurz = resp.text[:200].replace("\n", " ")
+        raise TtsTransientError(
+            api_key="",
+            message=f"Vorlese-Dienst antwortete mit HTTP {resp.status_code}: {kurz}",
+            kind="5xx",
+        )
+    audio = resp.content
+    # Kopfdaten prüfen, bevor das an einen Player geht: eine JSON-Fehlermeldung
+    # mit Statuscode 200 wäre sonst eine stumme, nie endende Wiedergabe.
+    if not audio.startswith(b"OggS"):
+        raise TtsTransientError(
+            api_key="",
+            message=f"Vorlese-Dienst lieferte kein Ogg ({len(audio)} Bytes)",
+            kind="5xx",
+        )
+    return audio
+
+
 def synthesize(
     text: str,
     voice: str = DEFAULT_VOICE,
@@ -1150,8 +1289,12 @@ def synthesize(
     cleaned = _strip_for_tts(text)
     if not cleaned:
         raise ValueError("Leerer Text nach Aufräumen — nichts zum Vorlesen.")
-    if len(cleaned) > MAX_SYNTH_CHARS:
-        cleaned = cleaned[:MAX_SYNTH_CHARS] + " … Rest gekürzt."
+    # Gemini-Web verträgt ein Vielfaches dessen, was die anderen Anbieter in
+    # einem Aufruf schaffen. Ihm die enge Grenze aufzuzwingen würde lange
+    # Antworten mitten im Satz abschneiden, obwohl nichts dagegen spricht.
+    grenze = GEMINI_WEB_MAX_CHARS if provider == PROVIDER_GEMINI_WEB else MAX_SYNTH_CHARS
+    if len(cleaned) > grenze:
+        cleaned = cleaned[:grenze] + " … Rest gekürzt."
 
     rate = _clamp_speed(speaking_rate)
 
@@ -1163,6 +1306,10 @@ def synthesize(
                 "Kein TTS-API-Key verfügbar (alle Keys im Pool burned/erschöpft)."
             )
         return _synthesize_gemini_api(cleaned, voice, rate, api_key, model_id=model_id)
+
+    if provider == PROVIDER_GEMINI_WEB:
+        # Weder Stimme noch Geschwindigkeit sind hier einstellbar.
+        return _synthesize_gemini_web(cleaned)
 
     if provider == PROVIDER_EDGE_TTS:
         # Idempotent: synthesize_chunked normalisiert die Voice bereits einmal
@@ -1188,6 +1335,8 @@ def synthesize_audio_file(
     raw = synthesize(text, voice, speaking_rate, provider, api_key, model_id=model_id)
     if provider == PROVIDER_GEMINI_API:
         return rebuild_wav(raw), MEDIA_TYPE_WAV
+    if provider == PROVIDER_GEMINI_WEB:
+        return raw, MEDIA_TYPE_OGG
     return raw, MEDIA_TYPE_MP3
 
 
@@ -1632,6 +1781,11 @@ async def synthesize_chunked(
 
     is_gemini_api = (provider == PROVIDER_GEMINI_API)
     is_edge_tts = (provider == PROVIDER_EDGE_TTS)
+    # Ogg-Ströme lassen sich nicht aneinanderhängen, siehe chunking_default_for.
+    # Das ist bewusst eine harte Sperre und keine Voreinstellung: eine von Hand
+    # eingeschaltete Stückelung würde hier stumm kaputtes Audio erzeugen.
+    if provider == PROVIDER_GEMINI_WEB:
+        chunking_enabled = False
 
     # Voice EINMAL pro Stream auf den jeweiligen Provider mappen — sonst
     # spammt jeder der 12 Chunk-Calls denselben Voice-Fallback-Warning-Log.
@@ -1714,7 +1868,7 @@ async def synthesize_chunked(
         # Input-Tokens), Edge-TTS macht intern eigenes Chunking via
         # WebSocket — kein hartes Limit. Wir cappen daher nur für Cloud
         # und Gemini, NICHT für Edge.
-        if not chunking_enabled and provider != PROVIDER_EDGE_TTS:
+        if not chunking_enabled and provider not in (PROVIDER_EDGE_TTS, PROVIDER_GEMINI_WEB):
             # Konservatives Soft-Limit (3500 Zeichen ≈ ~4900 UTF-8-Bytes für DE).
             # Sicher unter dem Cloud-TTS-5000-Byte-API-Hard-Limit.
             _NO_CHUNK_CHAR_LIMIT = 3500

@@ -557,6 +557,12 @@
     <string name="settings_tts_provider_setup_title">服务提供方 &amp; 配置</string>
     <string name="settings_tts_provider_label">服务提供方</string>
     <string name="settings_tts_provider_info_title">TTS 服务提供方 — 三种选择</string>
+    <string name="settings_tts_provider_web_short">Gemini Web</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (默认，无需设置):</string>
+    <string name="settings_tts_provider_web_body">gemini.google.com 的朗读语音，由你服务器上保持 Google 登录状态的小型服务提供。免费、无需 API 密钥、无需服务账号，速度约为实时的 40 倍。声音不可自选。</string>
+    <string name="settings_tts_status_web_active">✓ Gemini Web 已激活 — 免费、无需设置、速度遥遥领先。声音固定不可选。</string>
+    <string name="settings_tts_status_web_down">⚠ 朗读服务未响应，或其 Google 会话已过期。请在服务器上重新登录，或先在此处选择其他提供商。</string>
+    <string name="settings_tts_voice_web_fixed">Gemini Web 只有一种声音。Google 的朗读调用根本没有提供相关参数。</string>
     <string name="settings_tts_provider_edge_label">Edge(默认,无需配置):</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edge 的朗读语音。完全免费,无需 API 密钥,无需服务账户。质量比 Gemini/Chirp 弱,但满足快速朗读需求。</string>
     <string name="settings_tts_provider_gemini_label">Gemini API:</string>

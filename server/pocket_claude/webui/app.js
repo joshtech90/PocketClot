@@ -2194,9 +2194,12 @@ els.settingsModal.addEventListener('click', (e) => {
 
 function _renderTtsProviderHint(status) {
   if (!els.ttsProviderHint) return;
-  const p = status.provider || 'edge_tts';
+  const p = status.provider || 'gemini_web';
   const lines = [];
-  if (p === 'edge_tts') {
+  if (p === 'gemini_web') {
+    // `configured` heisst hier: Dienst laeuft UND Google-Sitzung traegt noch.
+    lines.push(status.configured ? t('tts_hint_web_ok') : t('tts_hint_web_down'));
+  } else if (p === 'edge_tts') {
     lines.push(t('tts_hint_edge_ok'));
   } else if (p === 'gemini_api') {
     if (status.gemini_api_configured) {
@@ -2237,8 +2240,9 @@ async function openSettings() {
       // wir haben sie hier aber rausgefiltert und stille im Dropdown
       // verschwinden lassen. Default-Voice für frisch eingerichtete Server
       // ist `edge-de-DE-KatjaNeural` — die war damit gar nicht wählbar.
-      const tiers = ['edge','gemini','chirp3hd','studio','neural2','wavenet','standard'];
+      const tiers = ['geminiweb','edge','gemini','chirp3hd','studio','neural2','wavenet','standard'];
       const labels = {
+        geminiweb:'Gemini Web (gratis, keine Auswahl)',
         edge:'Edge (gratis)',
         gemini:'Gemini 3.1 Flash',
         chirp3hd:'Chirp 3 HD (1 Mio Zeichen/Monat gratis)',
@@ -2310,7 +2314,13 @@ if (els.ttsProvider) {
       const s = await api('PUT', '/tts/provider', { provider: newProvider });
       state.ttsProvider = newProvider;
       _renderTtsProviderHint(s);
-      toast(t('toast_provider_changed', newProvider === 'gemini_api' ? t('tts_provider_label_gemini') : t('tts_provider_label_cloud')), { ok: true });
+      const providerNamen = {
+        gemini_web: 'Gemini Web',
+        edge_tts: 'Microsoft Edge',
+        gemini_api: t('tts_provider_label_gemini'),
+        cloud_tts: t('tts_provider_label_cloud'),
+      };
+      toast(t('toast_provider_changed', providerNamen[newProvider] || newProvider), { ok: true });
     } catch (e) {
       toast(t('toast_provider_switch_failed', e.message), { error: true });
     }

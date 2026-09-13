@@ -560,6 +560,12 @@
     <string name="settings_tts_provider_setup_title">Provider &amp; setup</string>
     <string name="settings_tts_provider_label">Provider</string>
     <string name="settings_tts_provider_info_title">TTS provider — three options</string>
+    <string name="settings_tts_provider_web_short">Gemini Web</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (default, no setup):</string>
+    <string name="settings_tts_provider_web_body">The read-aloud voice of gemini.google.com, delivered by a small service on your server that keeps a signed-in Google session. Free, no API key, no service account, and around 40 times faster than real time. The voice cannot be chosen.</string>
+    <string name="settings_tts_status_web_active">✓ Gemini Web active — free, no setup, by far the fastest. The voice is fixed.</string>
+    <string name="settings_tts_status_web_down">⚠ The read-aloud service is not answering, or its Google session has expired. Sign in again on the server, or pick another provider here in the meantime.</string>
+    <string name="settings_tts_voice_web_fixed">Gemini Web has exactly one voice. Google\'s read-aloud call simply has no parameter for it.</string>
     <string name="settings_tts_provider_edge_label">Edge (default, no setup):</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edge\'s reading voices. Completely free, no API key, no service account. Quality weaker than Gemini/Chirp but fine for fast read-aloud.</string>
     <string name="settings_tts_provider_gemini_label">Gemini API:</string>

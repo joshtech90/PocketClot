@@ -560,6 +560,12 @@
     <string name="settings_tts_provider_setup_title">Provider &amp; Setup</string>
     <string name="settings_tts_provider_label">Provider</string>
     <string name="settings_tts_provider_info_title">TTS-Provider — drei Optionen</string>
+    <string name="settings_tts_provider_web_short">Gemini Web</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (Standard, kein Setup):</string>
+    <string name="settings_tts_provider_web_body">Die Vorlese-Stimme von gemini.google.com, geliefert von einem kleinen Dienst auf deinem Server, der eine angemeldete Google-Sitzung hält. Kostenlos, kein API-Key, kein Service-Account, und rund 40-mal schneller als Echtzeit. Die Stimme ist nicht wählbar.</string>
+    <string name="settings_tts_status_web_active">✓ Gemini Web aktiv — kostenlos, kein Setup, mit Abstand am schnellsten. Die Stimme ist fest vorgegeben.</string>
+    <string name="settings_tts_status_web_down">⚠ Der Vorlese-Dienst antwortet nicht, oder seine Google-Sitzung ist abgelaufen. Auf dem Server neu anmelden, oder hier solange einen anderen Anbieter wählen.</string>
+    <string name="settings_tts_voice_web_fixed">Gemini Web hat genau eine Stimme. Der Vorlese-Aufruf von Google kennt dafür schlicht keinen Parameter.</string>
     <string name="settings_tts_provider_edge_label">Edge (Standard, kein Setup):</string>
     <string name="settings_tts_provider_edge_body">Vorlese-Stimmen von Microsoft Edge. Komplett kostenlos, kein API-Key, kein Service-Account. Qualität schwächer als Gemini/Chirp, aber gut für schnelles Vorlesen.</string>
     <string name="settings_tts_provider_gemini_label">Gemini API:</string>

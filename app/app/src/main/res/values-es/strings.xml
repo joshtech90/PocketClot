@@ -557,6 +557,12 @@
     <string name="settings_tts_provider_setup_title">Proveedor y configuración</string>
     <string name="settings_tts_provider_label">Proveedor</string>
     <string name="settings_tts_provider_info_title">Proveedor TTS — tres opciones</string>
+    <string name="settings_tts_provider_web_short">Gemini Web</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (predeterminado, sin configuración):</string>
+    <string name="settings_tts_provider_web_body">La voz de lectura de gemini.google.com, proporcionada por un pequeño servicio en tu servidor que mantiene una sesión iniciada de Google. Gratis, sin clave de API, sin cuenta de servicio y unas 40 veces más rápida que el tiempo real. La voz no se puede elegir.</string>
+    <string name="settings_tts_status_web_active">✓ Gemini Web activo — gratis, sin configuración, de lejos el más rápido. La voz es fija.</string>
+    <string name="settings_tts_status_web_down">⚠ El servicio de lectura no responde o su sesión de Google ha caducado. Vuelve a iniciar sesión en el servidor o elige otro proveedor aquí mientras tanto.</string>
+    <string name="settings_tts_voice_web_fixed">Gemini Web tiene exactamente una voz. La llamada de lectura de Google simplemente no tiene parámetros para ello.</string>
     <string name="settings_tts_provider_edge_label">Edge (predeterminado, sin configuración):</string>
     <string name="settings_tts_provider_edge_body">Voces de lectura de Microsoft Edge. Completamente gratis, sin clave API, sin cuenta de servicio. Calidad inferior a Gemini/Chirp pero bien para lectura rápida en voz alta.</string>
     <string name="settings_tts_provider_gemini_label">API de Gemini:</string>

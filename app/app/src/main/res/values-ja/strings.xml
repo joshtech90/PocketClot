@@ -557,6 +557,12 @@
     <string name="settings_tts_provider_setup_title">プロバイダー &amp; セットアップ</string>
     <string name="settings_tts_provider_label">プロバイダー</string>
     <string name="settings_tts_provider_info_title">TTSプロバイダー — 3つの選択肢</string>
+    <string name="settings_tts_provider_web_short">Gemini Web</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (デフォルト、設定不要):</string>
+    <string name="settings_tts_provider_web_body">gemini.google.com の読み上げ音声です。お使いのサーバー上の小さなサービスがログイン済みの Google セッションを保持して提供します。無料、API キー不要、サービスアカウント不要で、リアルタイムの約40倍高速です。音声は選択できません。</string>
+    <string name="settings_tts_status_web_active">✓ Gemini Web 有効 — 無料、設定不要、圧倒的に最速。音声は固定です。</string>
+    <string name="settings_tts_status_web_down">⚠ 読み上げサービスが応答しないか、Google セッションの有効期限が切れています。サーバーで再度ログインするか、それまでの間はここで別のプロバイダーを選択してください。</string>
+    <string name="settings_tts_voice_web_fixed">Gemini Web の音声は1種類のみです。Google の読み上げ呼び出しには、そのためのパラメーターが存在しません。</string>
     <string name="settings_tts_provider_edge_label">Edge（デフォルト、設定不要）:</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edgeの読み上げ音声。完全無料、APIキーやサービスアカウント不要。品質はGemini/Chirpより劣りますが、高速な読み上げには十分です。</string>
     <string name="settings_tts_provider_gemini_label">Gemini API:</string>

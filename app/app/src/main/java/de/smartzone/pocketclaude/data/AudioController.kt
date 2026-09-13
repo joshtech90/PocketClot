@@ -143,6 +143,7 @@ class AudioController(
         url: String,
         cacheKey: String? = null,
         headers: Map<String, String> = emptyMap(),
+        speed: Float = 1.0f,
     ) {
         // headers wird inzwischen ignoriert — Token sitzt in der URL als
         // ?token=…, weil ExoPlayer keine eigenen Auth-Header mitschicken kann.
@@ -155,7 +156,7 @@ class AudioController(
         currentJob = scope.launch {
             try {
                 withContext(Dispatchers.Main) {
-                    startPlayback(messageId, url, cacheKey)
+                    startPlayback(messageId, url, cacheKey, speed)
                 }
             } catch (e: Exception) {
                 _state.value = State(error = e.message ?: e::class.java.simpleName)
@@ -163,7 +164,13 @@ class AudioController(
         }
     }
 
-    private fun startPlayback(messageId: Long, url: String, cacheKey: String?) {
+    /**
+     * `speed` ist nur fuer Anbieter gedacht, die das Tempo NICHT selbst
+     * einstellen koennen (Gemini-Web). Alle anderen liefern das Audio bereits
+     * in der gewuenschten Geschwindigkeit, dort bleibt der Wert auf 1.0 —
+     * sonst wuerde das Tempo zweimal angewandt.
+     */
+    private fun startPlayback(messageId: Long, url: String, cacheKey: String?, speed: Float = 1.0f) {
         if (_state.value.loadingMessageId != messageId) {
             return
         }
@@ -182,6 +189,7 @@ class AudioController(
                 builder.setCustomCacheKey(cacheKey)
             }
             c.setMediaItem(builder.build())
+            c.setPlaybackSpeed(speed.coerceIn(0.25f, 2.0f))
             c.prepare()
             c.playWhenReady = true
         }

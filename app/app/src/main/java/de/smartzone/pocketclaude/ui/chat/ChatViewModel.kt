@@ -809,9 +809,16 @@ class ChatViewModel(
     fun speak(messageId: Long) = viewModelScope.launch {
         val s = settingsRepo.current()
         try {
-            val url = repo.audioUrl(messageId, s.ttsVoice, s.ttsSpeed)
-            val cacheKey = "audio-$messageId-${s.ttsVoice}-${s.ttsSpeed}"
-            audio.play(messageId, url, cacheKey)
+            // Gemini-Web kann die Sprechgeschwindigkeit nicht selbst aendern,
+            // die stellt hier der Player ein. Bei allen anderen Anbietern macht
+            // das der Server beim Erzeugen — dort waere ein zweites Mal Tempo
+            // genau ein Mal zu viel.
+            val webTts = repo.ttsProviderCached() == "gemini_web"
+            val serverRate = if (webTts) 1.0f else s.ttsSpeed
+            val playerRate = if (webTts) s.ttsSpeed else 1.0f
+            val url = repo.audioUrl(messageId, s.ttsVoice, serverRate)
+            val cacheKey = "audio-$messageId-${s.ttsVoice}-$serverRate"
+            audio.play(messageId, url, cacheKey, speed = playerRate)
         } catch (e: Exception) {
             _state.update { it.copy(errorMessage = appContext.getString(R.string.error_speak, e.message ?: "")) }
         }

@@ -453,7 +453,22 @@ class SettingsViewModel(
     fun refreshTtsStatus() = viewModelScope.launch {
         if (!settings.value.isConfigured) return@launch
         runCatching { chatRepo.ttsStatus() }
-            .onSuccess { _ttsStatus.value = it }
+            .onSuccess { status ->
+                _ttsStatus.value = status
+                // Der Anbieter kann sich auch ohne Zutun der App geaendert
+                // haben — etwa durch die einmalige Umstellung auf den
+                // Vorlese-Dienst beim Serverstart. Dann passt die hier
+                // gemerkte Stimme womoeglich nicht mehr dazu.
+                val aktuelleStimme = settings.value.ttsVoice
+                val info = status.voices.firstOrNull { it.id == aktuelleStimme }
+                val passtNicht = info == null ||
+                    status.provider !in info.compatible_providers
+                if (passtNicht && status.defaultVoice.isNotBlank() &&
+                    status.defaultVoice != aktuelleStimme
+                ) {
+                    settingsRepo.setTtsVoice(status.defaultVoice)
+                }
+            }
             .onFailure { _ttsError.value = "Status nicht lesbar: ${it.message}" }
     }
 
@@ -657,9 +672,14 @@ class SettingsViewModel(
                 )
                 return@launch
             }
-            val url = chatRepo.audioUrl(testMsgId, settings.value.ttsVoice, settings.value.ttsSpeed)
-            val cacheKey = "audio-$testMsgId-${settings.value.ttsVoice}-${settings.value.ttsSpeed}"
-            audio.play(testMsgId, url, cacheKey)
+            // Gleiche Aufteilung wie im Chat: bei Gemini-Web macht der Player
+            // das Tempo, bei allen anderen der Server.
+            val webTts = (ttsStatus.value?.provider ?: "") == "gemini_web"
+            val serverRate = if (webTts) 1.0f else settings.value.ttsSpeed
+            val playerRate = if (webTts) settings.value.ttsSpeed else 1.0f
+            val url = chatRepo.audioUrl(testMsgId, settings.value.ttsVoice, serverRate)
+            val cacheKey = "audio-$testMsgId-${settings.value.ttsVoice}-$serverRate"
+            audio.play(testMsgId, url, cacheKey, speed = playerRate)
             _ttsTest.value = TtsTestResult.Idle
         } catch (e: Exception) {
             _ttsTest.value = TtsTestResult.Failure(e.message ?: e::class.java.simpleName)

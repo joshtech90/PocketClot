@@ -1700,10 +1700,14 @@ private fun TtsSection(
     var jsonText by remember { mutableStateOf("") }
 
     // Provider-Flags auf TtsSection-Ebene, damit alle drei Cards Zugriff haben.
-    val provider = ttsStatus?.provider ?: "edge_tts"
+    val provider = ttsStatus?.provider ?: "gemini_web"
     val isGemini = provider == "gemini_api"
     val isCloud = provider == "cloud_tts"
     val isEdge = provider == "edge_tts"
+    // Gemini-Web: die Vorlesefunktion von gemini.google.com ueber einen Dienst
+    // auf dem Server. Gratis, ohne Einrichtung, und deutlich schneller als die
+    // anderen — dafuer ohne Stimmauswahl.
+    val isWeb = provider == "gemini_web"
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1737,6 +1741,10 @@ private fun TtsSection(
                         title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_info_title),
                     ) {
                         InfoBulletParagraph(
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_label),
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_body)
+                        )
+                        InfoBulletParagraph(
                             stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_label),
                             stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_body)
                         )
@@ -1752,19 +1760,29 @@ private fun TtsSection(
                 }
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     SegmentedButton(
+                        selected = isWeb,
+                        onClick = {
+                            if (!isWeb && !ttsBusy) vm.setTtsProvider("gemini_web")
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        enabled = !ttsBusy,
+                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_short)) }
+                    SegmentedButton(
                         selected = isEdge,
                         onClick = {
                             if (!isEdge && !ttsBusy) vm.setTtsProvider("edge_tts")
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         enabled = !ttsBusy,
                     ) { Text("Edge") }
+                }
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     SegmentedButton(
                         selected = isGemini,
                         onClick = {
                             if (!isGemini && !ttsBusy) vm.setTtsProvider("gemini_api")
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                         enabled = !ttsBusy,
                     ) { Text("Gemini API") }
                     SegmentedButton(
@@ -1772,7 +1790,7 @@ private fun TtsSection(
                         onClick = {
                             if (!isCloud && !ttsBusy) vm.setTtsProvider("cloud_tts")
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         enabled = !ttsBusy,
                     ) { Text("Cloud TTS") }
                 }
@@ -1789,6 +1807,14 @@ private fun TtsSection(
                 val keyCount = ttsStatus?.geminiApiKeyCount ?: 0
                 val chunkOn = ttsStatus?.chunkingEnabled ?: false
                 val hint = when {
+                    isWeb && ttsStatus?.configured == false -> Hint(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_down),
+                        emphasis = true,
+                    )
+                    isWeb -> Hint(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_active),
+                        emphasis = false,
+                    )
                     isEdge -> Hint(
                         stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_edge_active),
                         emphasis = false,
@@ -1837,8 +1863,12 @@ private fun TtsSection(
                 // Bewusst HIER in derselben Card wie der Status-Hint, weil
                 // der Hint sich auf den Chunking-Stand bezieht. Bei Edge-TTS
                 // ausgeblendet — die edge-tts-Lib chunkt intern via WebSocket,
-                // ein zusätzliches App-Chunking bringt nichts.
-                if (!isEdge) {
+                // ein zusätzliches App-Chunking bringt nichts. Bei Gemini-Web
+                // ebenfalls ausgeblendet, und dort ist es keine Frage des
+                // Nutzens: dessen Audioformat laesst sich nicht stueckweise
+                // aneinanderhaengen, ein eingeschalteter Schalter wuerde stumm
+                // kaputtes Audio erzeugen. Der Server sperrt das zusaetzlich.
+                if (!isEdge && !isWeb) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     val chunkingExplicit = ttsStatus?.chunkingExplicit ?: false
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2028,6 +2058,16 @@ private fun TtsSection(
             // Chirp/Studio/Neural2/etc.), bei `cloud_tts` ist alles möglich.
             val allVoices = ttsStatus?.voices.orEmpty()
             val voices = allVoices.filter { provider in it.compatible_providers }
+            if (isWeb) {
+                // Ehrlicher Hinweis statt einer Auswahl, die keine ist: der
+                // Vorlese-Aufruf von Gemini kennt schlicht keinen Parameter
+                // fuer die Stimme.
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_voice_web_fixed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (voices.isNotEmpty()) {
                 ExposedDropdownMenuBox(
                     expanded = voiceMenuOpen,
