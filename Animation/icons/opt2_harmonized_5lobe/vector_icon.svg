@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="clayGrad" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FFE082" />
+      <stop offset="25%" stop-color="#FFCA28" />
+      <stop offset="60%" stop-color="#FF7A00" />
+      <stop offset="85%" stop-color="#F4511E" />
+      <stop offset="100%" stop-color="#BF360C" />
+    </radialGradient>
+    <radialGradient id="specularShine" cx="30%" cy="28%" r="35%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+      <stop offset="40%" stop-color="#FFE082" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#FF9800" stop-opacity="0" />
+    </radialGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#BF360C" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  <g filter="url(#softShadow)">
+    <!-- Smooth 5-Lobe PocketClot Path -->
+    <path d="M 256,70 C 310,70 335,115 365,135 C 410,165 460,195 450,250 C 440,305 395,335 375,375 C 350,425 300,455 245,450 C 190,445 155,405 120,380 C 75,350 50,300 65,245 C 80,190 120,165 145,125 C 175,80 205,70 256,70 Z" fill="url(#clayGrad)" />
+    <path d="M 256,70 C 310,70 335,115 365,135 C 410,165 460,195 450,250 C 440,305 395,335 375,375 C 350,425 300,455 245,450 C 190,445 155,405 120,380 C 75,350 50,300 65,245 C 80,190 120,165 145,125 C 175,80 205,70 256,70 Z" fill="url(#specularShine)" />
+  </g>
+</svg>
