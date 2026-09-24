@@ -28,6 +28,8 @@ from datetime import datetime, timezone
 
 import httpx
 
+from pocket_claude import ki_modelle
+
 log = logging.getLogger(__name__)
 
 
@@ -431,7 +433,7 @@ def normalize(gw: GatewayConfig, payload: dict) -> list[ChatModel]:
                 label = name.strip()
                 break
         if not label:
-            label = make_label(base_id)
+            label = ki_modelle.pool_anzeigename(base_id) or make_label(base_id)
 
         # CodexLB meldet die Denktiefen als Metadata, dann steuern wir sie per
         # `reasoning_effort` im Request. CLIProxyAPI meldet nichts, dort steckt

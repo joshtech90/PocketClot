@@ -40,7 +40,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from pocket_claude import auth_modes, db, usage
+from pocket_claude import auth_modes, db, ki_modelle, usage
 from pocket_claude.attachments import (
     build_prompt_text as _build_prompt_text,
     has_binary_attachments as _has_binary_attachments,
@@ -100,39 +100,22 @@ def _process_error_client_message(exit_code: int | None, diagnostic: str) -> str
 
 
 # Waehlbare Claude-Modelle fuer den Modell-Picker in App und Web-UI.
-# Muss mit `ClaudeModels.kt` in der Android-App synchron bleiben: der Server ist
-# die Quelle fuer `GET /chat/models`, die App-Liste ist nur noch Offline-Fallback.
-#
-# Reihenfolge ist die Picker-Reihenfolge. Opus 5 steht oben, weil es das
-# normale Alltagsmodell ist; Fable 5 ist das teurere Modell fuer die schwersten
-# Aufgaben, Sonnet 5 das schnellere fuer den Rest.
-SELECTABLE_MODELS: list[tuple[str, str]] = [
-    ("claude-opus-5", "Opus 5"),
-    ("claude-fable-5", "Fable 5"),
-    ("claude-sonnet-5", "Sonnet 5"),
-    ("claude-haiku-4-5", "Haiku 4.5"),
-]
+# Seit 24.09.2026 aus dem Modell-Register (`ki_modelle.json`, Kopie aus dem
+# Projekt AI Worker). Schluessel sind Familien (`opus`, `fable` ...), keine
+# Versionsnummern: ein gespeichertes `opus` bekommt so immer die neueste
+# Generation, und eine neue Generation braucht hier keine Code-Aenderung.
+# Die App-Liste (`ClaudeModels.kt`) ist nur Offline-Fallback.
+SELECTABLE_MODELS: list[tuple[str, str]] = ki_modelle.picker()
 
-# Modelle, die frueher waehlbar waren. Sie tauchen im Picker NICHT mehr auf,
-# muessen aber weiter durch die Allowlist kommen: Bestandschats haben die ID in
-# `conversations.chat_model` stehen, und ein entfernter Eintrag wuerde dort
-# jeden weiteren Turn mit "Unbekanntes Modell" abbrechen.
-LEGACY_MODELS: list[tuple[str, str]] = [
-    ("claude-opus-4-8", "Opus 4.8"),
-    ("claude-opus-4-7", "Opus 4.7"),
-    ("claude-opus-4-6", "Opus 4.6"),
-    ("claude-sonnet-4-6", "Sonnet 4.6"),
-]
-
-# Alles, was der Server als Claude-Modell akzeptiert.
-ALLOWED_MODELS: frozenset[str] = frozenset(
-    mid for mid, _ in (*SELECTABLE_MODELS, *LEGACY_MODELS)
-)
+# Alles, was der Server als Claude-Modell akzeptiert: Familien, aktuelle und
+# abgeloeste IDs. Abgeloeste muessen durch, weil Bestandschats die ID in
+# `conversations.chat_model` stehen haben; sie laufen auf der neuesten
+# Generation weiter (`ki_modelle.fuer_cli`).
+ALLOWED_MODELS: frozenset[str] = frozenset(ki_modelle.bekannte_ids())
 
 # Das Modell, das laeuft, wenn niemand etwas anderes sagt. Bewusst explizit:
-# ohne diesen Wert entscheidet die Claude-CLI selbst, und dann haengt es an der
-# installierten CLI-Version, welches Modell antwortet.
-DEFAULT_CLAUDE_MODEL = "claude-opus-5"
+# ohne diesen Wert entscheidet die Claude-CLI selbst, welches Modell antwortet.
+DEFAULT_CLAUDE_MODEL = "opus"
 
 # Denktiefen, die der Claude-Pfad kennt. "off" heisst: keine Steuerung, der
 # CLI-Default greift.
@@ -194,7 +177,8 @@ async def oneshot_text(
 
     # Expliziter `model`-Override (z.B. günstiges Haiku für den Titel) gewinnt
     # vor dem User-Default und dem Server-Default.
-    effective_model = model or model_override or (settings.claude_model or None)
+    effective_model = (ki_modelle.fuer_cli(model) or model_override
+                       or ki_modelle.fuer_cli(settings.claude_model or None))
     sandbox_cwd = settings.data_dir / "claude-sandbox"
     sandbox_cwd.mkdir(parents=True, exist_ok=True)
 
@@ -624,17 +608,20 @@ async def stream_reply(
         #   1. model_override  → Bedrock-Pin (build_provider_env), gewinnt im
         #      Bedrock-Modus immer (eigener IDs-Namespace).
         #   2. default_model   → globales User-Standard-Modell bzw. Gem-Modell
-        #      (Pro/Max + API-Key), z.B. "claude-opus-5".
+        #      (Pro/Max + API-Key), z.B. "opus".
         #   3. settings.claude_model → Server-Default aus der .env.
         #   4. DEFAULT_CLAUDE_MODEL → das aktuelle Alltagsmodell.
         #
         # Frueher endete die Kette bei None und damit beim CLI-Default. Das war
         # unsichtbar versionsabhaengig: nach einem CLI-Update konnte ploetzlich
         # ein anderes Modell antworten, ohne dass sich in der App etwas aenderte.
+        # Alles ausser dem Bedrock-Pin geht als Kurzname an die CLI; eine
+        # gespeicherte Alt-ID (claude-opus-5) wird dabei auf die aktuelle
+        # Generation angehoben. Der Bedrock-Pin hat eigene IDs, bleibt roh.
         effective_model = (
             model_override
-            or (default_model or None)
-            or (settings.claude_model or None)
+            or ki_modelle.fuer_cli(default_model or None)
+            or ki_modelle.fuer_cli(settings.claude_model or None)
             or DEFAULT_CLAUDE_MODEL
         )
         log.info(

@@ -93,14 +93,19 @@ class Settings(BaseSettings):
     # die Modelle stehen, die man wirklich benutzen will.
     #
     # Komma-getrennte Glob-Muster auf die BASIS-ID (ohne Denktiefe-Suffix und
-    # ohne "gw:<gateway>:"-Praefix), z.B. "gemini-3.7-flash,gpt-5*".
+    # ohne "gw:<gateway>:"-Praefix), z.B. "gemini-flash,gpt-sol".
     # Leer = keine Filterung, alles wird angeboten.
     #
     # Das Muster "gpt-*" waere zu weit: es liesse auch "gpt-oss-120b" durch, das
     # ueber das Google-Konto laeuft und nichts mit der ChatGPT-Subscription zu
     # tun hat. Deshalb stehen die GPT-Modelle einzeln da. Terra und Reserve
     # bleiben bewusst draussen, die sind fuer die Worker reserviert.
-    model_allowlist: str = "gemini-3.7-flash,gpt-5.6-sol,gpt-5.6-luna"
+    #
+    # Seit 24.09.2026 stehen hier nur Kurznamen ohne Versionsnummer. Der Pool
+    # (CLIProxyAPI, `oauth-model-alias`) leitet sie auf die aktuelle Generation
+    # um; gesetzt werden sie von `ki-modelle anwenden` im Projekt AI Worker.
+    # Eine neue Generation braucht deshalb weder hier noch in der .env etwas.
+    model_allowlist: str = "gemini-flash,gpt-sol,gpt-luna"
 
     # Security: allow the per-chat "Bash" skill at all? Off by default — an
     # app user would otherwise be able to execute arbitrary commands on the
