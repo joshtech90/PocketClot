@@ -1,0 +1,71 @@
+{
+  "_hinweis": "EINZIGE Stelle, die festlegt, welche Modell-Generation aktuell ist. Programme nennen nur Familien (opus, sonnet, fable, haiku, gemini-flash, luna, sol) oder die Kurznamen unten, nie eine Versionsnummer. Neue Generation: hier eintragen, `ki-modelle anwenden` (Pools + Kopien), `ki-modelle pruefen`. Doku: docs/KI_MODELLE.md",
+  "stand": "2026-09-24",
+  "familien": {
+    "opus": {
+      "anbieter": "claude",
+      "id": "claude-opus-5-5",
+      "name": "Opus 5.5",
+      "cli_alias": "opus",
+      "abgeloest": ["claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6"]
+    },
+    "fable": {
+      "anbieter": "claude",
+      "id": "claude-fable-5-1",
+      "name": "Fable 5.1",
+      "cli_alias": "fable",
+      "abgeloest": ["claude-fable-5"]
+    },
+    "sonnet": {
+      "anbieter": "claude",
+      "id": "claude-sonnet-5",
+      "name": "Sonnet 5",
+      "cli_alias": "sonnet",
+      "abgeloest": ["claude-sonnet-4-6", "claude-sonnet-4-5"]
+    },
+    "haiku": {
+      "anbieter": "claude",
+      "id": "claude-haiku-4-5",
+      "name": "Haiku 4.5",
+      "cli_alias": "haiku",
+      "abgeloest": []
+    },
+    "gemini-flash": {
+      "anbieter": "gemini",
+      "id": "gemini-3.8-flash-high",
+      "name": "Gemini 3.8 Flash",
+      "pool_alias": "gemini-flash-high",
+      "vertex_id": "gemini-3.8-flash",
+      "abgeloest": ["gemini-3.7-flash-high", "gemini-3.6-flash-high", "gemini-3.5-flash", "gemini-3-flash"]
+    },
+    "luna": {
+      "anbieter": "codex",
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
+      "pool_alias": "gpt-luna",
+      "abgeloest": []
+    },
+    "sol": {
+      "anbieter": "codex",
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol",
+      "pool_alias": "gpt-sol",
+      "abgeloest": []
+    }
+  },
+  "pools": {
+    "aihub": {
+      "config": "~/cliproxy/config.yaml",
+      "models_url": "https://aihub.tail234d04.ts.net:8462/v1/models",
+      "key_file": "~/.config/ai-client/gemini-key"
+    },
+    "paradies": {
+      "ssh": "web",
+      "config": "~/cliproxy/config.yaml",
+      "models_url": "http://127.0.0.1:8317/v1/models"
+    }
+  },
+  "kopien": [
+    "PocketClaude/server/pocket_claude/ki_modelle.json"
+  ]
+}
