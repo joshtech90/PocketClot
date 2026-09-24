@@ -367,7 +367,7 @@ async def _model_key_is_known(model_key: str) -> bool:
     if key.startswith("gw:"):
         models = await gateways.list_models(curated=False)
         return any(m.key == key for m in models)
-    return key in claude_engine.ALLOWED_MODELS
+    return claude_engine.is_allowed_model(key)
 
 
 @app.post("/conversations/{cid}/rewind", response_model=RewindResponse)
@@ -651,7 +651,7 @@ async def send_message(cid: str, body: SendMessageRequest, user=Depends(require_
             f"Bitte in den Einstellungen ein anderes waehlen."
         ))
     if resolved_model and not use_gateway:
-        if resolved_model not in claude_engine.ALLOWED_MODELS:
+        if not claude_engine.is_allowed_model(resolved_model):
             raise HTTPException(400, f"Unbekanntes Modell: {resolved_model!r}")
 
     default_model = None if use_gateway else (resolved_model or None)

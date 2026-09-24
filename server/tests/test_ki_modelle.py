@@ -48,3 +48,28 @@ def test_pool_kurzname_bekommt_generation_im_namen():
 def test_kopie_entspricht_dem_register_im_ai_worker():
     assert REGISTER.read_text() == QUELLE.read_text(), (
         "Veraltete Kopie: `ki-modelle anwenden` laufen lassen und ausrollen")
+
+
+def test_ohne_register_laufen_bestandschats_weiter(tmp_path, monkeypatch):
+    monkeypatch.setenv("KI_MODELLE_DATEI", str(tmp_path / "fehlt.json"))
+    ki_modelle._alle.cache_clear()
+    try:
+        assert ki_modelle.ist_claude_modell("claude-opus-4-8")
+        assert ki_modelle.ist_claude_modell("claude-opus-5[1m]")
+        assert ki_modelle.fuer_cli("claude-opus-5") == "opus"
+        assert [k for k, _ in ki_modelle.picker()] == ["opus", "fable", "sonnet", "haiku"]
+        assert not ki_modelle.ist_claude_modell("gpt-5.6-sol")
+    finally:
+        ki_modelle._alle.cache_clear()
+
+
+def test_kaputtes_register_wirft_nicht(tmp_path, monkeypatch):
+    datei = tmp_path / "kaputt.json"
+    datei.write_text('{"familien": {"opus": null, "sonnet": "x"}}')
+    monkeypatch.setenv("KI_MODELLE_DATEI", str(datei))
+    ki_modelle._alle.cache_clear()
+    try:
+        assert ki_modelle.fuer_cli("claude-sonnet-4-6") == "sonnet"
+        assert dict(ki_modelle.picker())["opus"]
+    finally:
+        ki_modelle._alle.cache_clear()

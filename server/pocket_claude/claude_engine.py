@@ -113,6 +113,11 @@ SELECTABLE_MODELS: list[tuple[str, str]] = ki_modelle.picker()
 # Generation weiter (`ki_modelle.fuer_cli`).
 ALLOWED_MODELS: frozenset[str] = frozenset(ki_modelle.bekannte_ids())
 
+
+def is_allowed_model(key: str | None) -> bool:
+    """Server-Allowlist fuer Claude: jede ID einer bekannten Familie."""
+    return bool(key) and (key in ALLOWED_MODELS or ki_modelle.ist_claude_modell(key))
+
 # Das Modell, das laeuft, wenn niemand etwas anderes sagt. Bewusst explizit:
 # ohne diesen Wert entscheidet die Claude-CLI selbst, welches Modell antwortet.
 DEFAULT_CLAUDE_MODEL = "opus"

@@ -41,7 +41,10 @@ PICKER_REIHENFOLGE = ("opus", "fable", "sonnet", "haiku")
 def _alle() -> dict[str, dict]:
     pfad = Path(os.environ.get("KI_MODELLE_DATEI") or _DATEI)
     try:
-        return dict(json.loads(pfad.read_text(encoding="utf-8"))["familien"])
+        roh = json.loads(pfad.read_text(encoding="utf-8"))["familien"]
+        # Nur wohlgeformte Eintraege: ein kaputtes Register darf den Server
+        # nicht beim Import umwerfen.
+        return {str(k): v for k, v in roh.items() if isinstance(v, dict)}
     except Exception as exc:  # noqa: BLE001 - Rueckfall statt Serverabsturz
         log.warning("PC_MODELLE: Register %s nicht lesbar (%s), nutze Rueckfall", pfad, exc)
         return {}
@@ -83,6 +86,16 @@ def bekannte_ids() -> set[str]:
             out.add(str(f["id"]))
         out |= {str(x) for x in (f.get("abgeloest") or [])}
     return out
+
+
+def ist_claude_modell(modell: str | None) -> bool:
+    """Akzeptiert der Server diese Angabe als Claude-Modell?
+
+    Bewusst ueber die Familie statt ueber eine feste Liste: so laufen
+    Bestandschats mit alten IDs (claude-opus-4-8 ...) auch dann weiter, wenn
+    das Register fehlt und nur der Rueckfall gilt.
+    """
+    return familie_von(modell) is not None
 
 
 def familie_von(modell: str | None) -> str | None:

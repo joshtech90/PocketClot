@@ -7,21 +7,31 @@
       "id": "claude-opus-5-5",
       "name": "Opus 5.5",
       "cli_alias": "opus",
-      "abgeloest": ["claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6"]
+      "abgeloest": [
+        "claude-opus-5",
+        "claude-opus-4-8",
+        "claude-opus-4-7",
+        "claude-opus-4-6"
+      ]
     },
     "fable": {
       "anbieter": "claude",
       "id": "claude-fable-5-1",
       "name": "Fable 5.1",
       "cli_alias": "fable",
-      "abgeloest": ["claude-fable-5"]
+      "abgeloest": [
+        "claude-fable-5"
+      ]
     },
     "sonnet": {
       "anbieter": "claude",
       "id": "claude-sonnet-5",
       "name": "Sonnet 5",
       "cli_alias": "sonnet",
-      "abgeloest": ["claude-sonnet-4-6", "claude-sonnet-4-5"]
+      "abgeloest": [
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5"
+      ]
     },
     "haiku": {
       "anbieter": "claude",
@@ -36,7 +46,20 @@
       "name": "Gemini 3.8 Flash",
       "pool_alias": "gemini-flash-high",
       "vertex_id": "gemini-3.8-flash",
-      "abgeloest": ["gemini-3.7-flash-high", "gemini-3.6-flash-high", "gemini-3.5-flash", "gemini-3-flash"]
+      "abgeloest": [
+        "gemini-3.7-flash-high",
+        "gemini-3.6-flash-high",
+        "gemini-3.5-flash",
+        "gemini-3-flash"
+      ]
+    },
+    "pool-opus": {
+      "anbieter": "antigravity",
+      "id": "claude-opus-4-6-thinking",
+      "name": "Opus 4.6 (Pool)",
+      "pool_alias": "claude-opus-pool",
+      "hinweis": "Claude im Antigravity-Pool (z. B. Kurzvideo-Skript); eine neuere Generation meldet `pruefen`, sobald der Pool sie anbietet.",
+      "abgeloest": []
     },
     "luna": {
       "anbieter": "codex",
