@@ -30,14 +30,14 @@ object ClaudeModels {
      * Hier stehen sie nur, damit die Titelzeile einen lesbaren Namen zeigt.
      */
     private val legacy: List<Option> = listOf(
-        Option("claude-opus-5", "Opus"),
-        Option("claude-fable-5", "Fable"),
-        Option("claude-sonnet-5", "Sonnet"),
-        Option("claude-haiku-4-5", "Haiku"),
-        Option("claude-opus-4-8", "Opus"),
-        Option("claude-opus-4-7", "Opus"),
-        Option("claude-opus-4-6", "Opus"),
-        Option("claude-sonnet-4-6", "Sonnet"),
+        Option("claude-opus-5", "Opus"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-fable-5", "Fable"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-sonnet-5", "Sonnet"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-haiku-4-5", "Haiku"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-opus-4-8", "Opus"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-opus-4-7", "Opus"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-opus-4-6", "Opus"),  // ki-modelle: ok (alte gespeicherte IDs)
+        Option("claude-sonnet-4-6", "Sonnet"),  // ki-modelle: ok (alte gespeicherte IDs)
     )
 
     /** Anzeige-Label für eine Modell-ID; unbekannte IDs werden 1:1 gezeigt. */

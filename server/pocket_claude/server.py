@@ -1811,7 +1811,7 @@ async def _validate_key(api_key: str, timeout_sec: float = 10.0) -> tuple[bool, 
     import httpx as _httpx
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
-        "models/gemini-2.5-flash:generateContent"
+        "models/gemini-2.5-flash:generateContent"  # ki-modelle: ok (nur Schluesseltest gegen AI Studio)
     )
     try:
         async with _httpx.AsyncClient(timeout=timeout_sec) as cli:

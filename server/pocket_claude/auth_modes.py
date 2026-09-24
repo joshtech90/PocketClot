@@ -68,9 +68,9 @@ SECRET_KEYS: Iterable[str] = (
 # Bedrock cross-region inference-profile IDs. The `us.` prefix is required for
 # cross-region inference; users on other AWS regions can override these via
 # the settings UI.
-DEFAULT_BEDROCK_OPUS = "us.anthropic.claude-opus-5"
-DEFAULT_BEDROCK_SONNET = "us.anthropic.claude-sonnet-5"
-DEFAULT_BEDROCK_HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+DEFAULT_BEDROCK_OPUS = "us.anthropic.claude-opus-5"  # ki-modelle: ok (Bedrock-Namensraum, ungenutzt)
+DEFAULT_BEDROCK_SONNET = "us.anthropic.claude-sonnet-5"  # ki-modelle: ok (Bedrock-Namensraum, ungenutzt)
+DEFAULT_BEDROCK_HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"  # ki-modelle: ok (Bedrock-Namensraum, ungenutzt)
 DEFAULT_BEDROCK_ALIAS = "opus"
 DEFAULT_AWS_REGION = "us-east-1"
 
