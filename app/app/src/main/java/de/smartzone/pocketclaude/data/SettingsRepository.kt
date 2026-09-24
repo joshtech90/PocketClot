@@ -24,8 +24,9 @@ const val DEFAULT_PALETTE_ID_DARK = "midnight_atelier"
  *  aelteren App-Version noch gelesen werden kann. */
 const val DEFAULT_PALETTE_ID = DEFAULT_PALETTE_ID_DARK
 
-/** Claude-Alltagsmodell. Muss zu `DEFAULT_CLAUDE_MODEL` in claude_engine.py passen. */
-const val DEFAULT_CLAUDE_MODEL = "claude-opus-5"
+/** Claude-Alltagsmodell als Familie (Server nimmt die neueste Generation).
+ *  Muss zu `DEFAULT_CLAUDE_MODEL` in claude_engine.py passen. */
+const val DEFAULT_CLAUDE_MODEL = "opus"
 
 enum class ThemeMode {
     SYSTEM, LIGHT, DARK;
@@ -112,7 +113,7 @@ data class AppSettings(
      *  Eintrag, gilt „high". Claude liest weiterhin aus `effort`, damit alte
      *  Einstellungen erhalten bleiben. */
     val effortByFamily: Map<String, String> = emptyMap(),
-    /** Standardmodell je Anbieter, z.B. {"claude": "claude-opus-5"}. Leer heisst:
+    /** Standardmodell je Anbieter, z.B. {"claude": "opus"}. Leer heisst:
      *  nimm den eingebauten Standard der Familie. */
     val defaultModelByFamily: Map<String, String> = emptyMap(),
     /** Standard-Auflösung für erzeugte Bilder. 2K passt zu Handy-Displays. */

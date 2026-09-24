@@ -3545,14 +3545,15 @@ window.PocketVoice = (() => {
 // Gems (Custom Agents) — wie ChatGPT-GPTs / Gemini-Gems
 // =========================================================
 
-// Muss zu SELECTABLE_MODELS in claude_engine.py passen. Aeltere IDs stehen hier
-// bewusst nicht mehr: der Server akzeptiert sie zwar weiter (LEGACY_MODELS), neu
-// auswaehlen soll man sie aber nicht.
+// Familien statt Versionsnummern, wie SELECTABLE_MODELS in claude_engine.py:
+// der Server loest `opus` immer auf die neueste Generation auf (Modell-Register
+// im Projekt AI Worker). Alte IDs wie claude-opus-5 akzeptiert er weiter und
+// hebt sie dabei an.
 const CLAUDE_MODELS = [
-  { id: 'claude-opus-5',     label: 'Opus 5' },
-  { id: 'claude-fable-5',    label: 'Fable 5' },
-  { id: 'claude-sonnet-5',   label: 'Sonnet 5' },
-  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5' },
+  { id: 'opus',    label: 'Opus (neueste Generation)' },
+  { id: 'fable',   label: 'Fable (neueste Generation)' },
+  { id: 'sonnet',  label: 'Sonnet (neueste Generation)' },
+  { id: 'haiku',   label: 'Haiku (neueste Generation)' },
 ];
 window.PC_CLAUDE_MODELS = CLAUDE_MODELS;
 const GEM_EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];

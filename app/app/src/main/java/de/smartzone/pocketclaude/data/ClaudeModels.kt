@@ -12,24 +12,32 @@ package de.smartzone.pocketclaude.data
 object ClaudeModels {
     data class Option(val id: String, val label: String)
 
-    /** Waehlbar. Muss zu `SELECTABLE_MODELS` in claude_engine.py passen. */
+    /**
+     * Nur Offline-Fallback: online kommt die Liste samt Generation im Namen
+     * („Opus 5.5") vom Server (`GET /chat/models`). Schluessel sind Familien,
+     * keine Versionsnummern, damit ein gespeichertes `opus` immer die neueste
+     * Generation bekommt (Modell-Register im Projekt AI Worker).
+     */
     val all: List<Option> = listOf(
-        Option("claude-opus-5", "Opus 5"),
-        Option("claude-fable-5", "Fable 5"),
-        Option("claude-sonnet-5", "Sonnet 5"),
-        Option("claude-haiku-4-5", "Haiku 4.5"),
+        Option("opus", "Opus"),
+        Option("fable", "Fable"),
+        Option("sonnet", "Sonnet"),
+        Option("haiku", "Haiku"),
     )
 
     /**
-     * Nicht mehr waehlbar, aber weiterhin benennbar: Bestandschats koennen eine
-     * dieser IDs gespeichert haben, und in der Titelzeile soll dann „Opus 4.8"
-     * stehen statt der rohen ID. Spiegelt `LEGACY_MODELS` im Server.
+     * Alte gespeicherte IDs: der Server hebt sie auf die neueste Generation an.
+     * Hier stehen sie nur, damit die Titelzeile einen lesbaren Namen zeigt.
      */
     private val legacy: List<Option> = listOf(
-        Option("claude-opus-4-8", "Opus 4.8"),
-        Option("claude-opus-4-7", "Opus 4.7"),
-        Option("claude-opus-4-6", "Opus 4.6"),
-        Option("claude-sonnet-4-6", "Sonnet 4.6"),
+        Option("claude-opus-5", "Opus"),
+        Option("claude-fable-5", "Fable"),
+        Option("claude-sonnet-5", "Sonnet"),
+        Option("claude-haiku-4-5", "Haiku"),
+        Option("claude-opus-4-8", "Opus"),
+        Option("claude-opus-4-7", "Opus"),
+        Option("claude-opus-4-6", "Opus"),
+        Option("claude-sonnet-4-6", "Sonnet"),
     )
 
     /** Anzeige-Label für eine Modell-ID; unbekannte IDs werden 1:1 gezeigt. */
