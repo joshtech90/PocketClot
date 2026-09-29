@@ -90,7 +90,8 @@
     "quelle": "https://support.claude.com/en/articles/16266773-how-claude-marks-ai-generated-content",
     "familien": [
       "schreiben"
-    ]
+    ],
+    "text_spalten": 2
   },
   "pools": {
     "aihub": {
