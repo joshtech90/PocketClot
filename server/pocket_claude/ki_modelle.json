@@ -1,6 +1,6 @@
 {
   "_hinweis": "EINZIGE Stelle, die festlegt, welche Modell-Generation aktuell ist. Programme nennen nur Familien (opus, sonnet, fable, haiku, gemini-flash, luna, sol) oder die Kurznamen unten, nie eine Versionsnummer. Neue Generation: hier eintragen, `ki-modelle anwenden` (Pools + Kopien), `ki-modelle pruefen`. Doku: docs/KI_MODELLE.md",
-  "stand": "2026-09-24",
+  "stand": "2026-09-30",
   "familien": {
     "opus": {
       "anbieter": "claude",
@@ -76,22 +76,30 @@
       "abgeloest": []
     },
     "schreiben": {
-      "anbieter": "claude",
-      "id": "claude-opus-4-8",
-      "name": "Opus 4.8 (Schreibmodell)",
-      "cli_alias": "claude-opus-4-8",
+      "anbieter": "codex",
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol (Schreibmodell Joscha)",
+      "effort": "high",
       "festgehalten": true,
-      "web_name": "Claude Opus 4.8",
-      "hinweis": "Bewusst festgehalten (Joscha 29.09.2026): schreibt die veroeffentlichten Texte fuer smartzone.de, EPEI und China-Autos, weil Anthropic fuer dieses Modell keine Textwasserzeichen setzt. Nie automatisch anheben. Die Montagswache prueft die Wasserzeichen-Tabelle.",
+      "hinweis": "Joscha 30.09.2026: schreibt die veroeffentlichten Texte fuer smartzone.de, EPEI und China-Autos in Joschas eigener Umgebung (Smartzone OS, eigene Pipelines) ueber Codex, solange OpenAI keine Textwasserzeichen setzt. Vorher Opus 4.8 (claude-opus-4-8), seit 30.09.2026 nicht mehr wasserzeichenfrei. Nie automatisch anheben.",
+      "abgeloest": []
+    },
+    "schreiben-team": {
+      "anbieter": "kimi",
+      "id": "k3-256k",
+      "name": "Kimi K3 256K (Schreibmodell Team)",
+      "cli_alias": "kimi-code/k3-256k",
+      "effort": "high",
+      "festgehalten": true,
+      "hinweis": "Joscha 30.09.2026: Schreibmodell des Teams (smartzone-team, kein Codex). Laeuft ueber das Kimi-Abo mit der offiziellen Kimi-Code-CLI (`kimi login`), nur interaktiv je Artikel, keine Serienlaeufe. Der Team-Export schreibt diesen Eintrag nach tools/schreiben/schreibmodell.json im Team-Repo.",
       "abgeloest": []
     }
   },
   "wasserzeichen": {
     "quelle": "https://support.claude.com/en/articles/16266773-how-claude-marks-ai-generated-content",
-    "familien": [
-      "schreiben"
-    ],
-    "text_spalten": 2
+    "familien": [],
+    "text_spalten": 2,
+    "hinweis": "Die Tabelle gilt nur fuer Claude-Modelle. Seit 30.09.2026 schreibt kein Claude-Modell mehr, deshalb ruht die Pruefung. Fuer Codex und Kimi gibt es keine vergleichbare offizielle Tabelle."
   },
   "pools": {
     "aihub": {
