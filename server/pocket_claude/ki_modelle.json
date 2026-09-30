@@ -63,17 +63,21 @@
     },
     "luna": {
       "anbieter": "codex",
-      "id": "gpt-5.6-luna",
-      "name": "GPT-5.6 Luna",
+      "id": "gpt-6-luna",
+      "name": "GPT-6 Luna",
       "pool_alias": "gpt-luna",
-      "abgeloest": []
+      "abgeloest": [
+        "gpt-5.6-luna"
+      ]
     },
     "sol": {
       "anbieter": "codex",
-      "id": "gpt-5.6-sol",
-      "name": "GPT-5.6 Sol",
+      "id": "gpt-6.1-sol",
+      "name": "GPT-6.1 Sol",
       "pool_alias": "gpt-sol",
-      "abgeloest": []
+      "abgeloest": [
+        "gpt-5.6-sol"
+      ]
     },
     "schreiben": {
       "anbieter": "codex",
@@ -88,10 +92,10 @@
       "anbieter": "kimi",
       "id": "k3-256k",
       "name": "Kimi K3 256K (Schreibmodell Team)",
-      "cli_alias": "kimi-code/k3-256k",
+      "base_url": "https://api.kimi.ai/coding/v1",
       "effort": "high",
       "festgehalten": true,
-      "hinweis": "Joscha 30.09.2026: Schreibmodell des Teams (smartzone-team, kein Codex). Laeuft ueber das Kimi-Abo mit der offiziellen Kimi-Code-CLI (`kimi login`), nur interaktiv je Artikel, keine Serienlaeufe. Der Team-Export schreibt diesen Eintrag nach tools/schreiben/schreibmodell.json im Team-Repo.",
+      "hinweis": "Joscha 30.09.2026: Schreibmodell des Teams (smartzone-team, kein Codex), ueber Joschas Kimi-Abo. Aufruf direkt ueber die Kimi-Code-Schnittstelle mit dem Team-Schluessel `smartzone-team` (Kimi-Konsole), keine Installation, kein Login. Der Schluessel liegt nie im Repo, sondern auf jedem Rechner in ~/.config/smartzone/kimi_key. Der Team-Export schreibt diesen Eintrag nach tools/schreiben/schreibmodell.json im Team-Repo.",
       "abgeloest": []
     }
   },
