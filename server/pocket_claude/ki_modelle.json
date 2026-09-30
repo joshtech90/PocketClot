@@ -63,21 +63,19 @@
     },
     "luna": {
       "anbieter": "codex",
-      "id": "gpt-6-luna",
-      "name": "GPT-6 Luna",
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6 Luna",
       "pool_alias": "gpt-luna",
-      "abgeloest": [
-        "gpt-5.6-luna"
-      ]
+      "hinweis": "GPT-6 Luna gibt es seit 29.09.2026, laeuft aber nur ueber die Codex-CLI; direkte API-Aufrufe ueber CodexLB lehnt OpenAI mit 'not supported when using Codex with a ChatGPT account' ab (geprueft 30.09.2026). Erst anheben, wenn `ai-worker luna` damit antwortet; dann auch allowedModels des Worker-Schluessels (scripts/setup_codexlb_clients.py).",
+      "abgeloest": []
     },
     "sol": {
       "anbieter": "codex",
-      "id": "gpt-6.1-sol",
-      "name": "GPT-6.1 Sol",
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6 Sol",
       "pool_alias": "gpt-sol",
-      "abgeloest": [
-        "gpt-5.6-sol"
-      ]
+      "hinweis": "GPT-6.1 Sol (29.09.2026) laeuft nur ueber die Codex-CLI und ist dort das Review-Modell (`codex exec -m gpt-6.1-sol`). Direkte API-Aufrufe (ai-worker sol, Pools) lehnt OpenAI noch ab (geprueft 30.09.2026). Erst anheben, wenn `ai-worker sol` damit antwortet.",
+      "abgeloest": []
     },
     "schreiben": {
       "anbieter": "codex",
