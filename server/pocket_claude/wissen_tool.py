@@ -36,12 +36,13 @@ AAD = b"pocketclot-wissen-v1"
 
 TOOL_DESCRIPTION = (
     "Durchsucht das private Gedaechtnis des Nutzers: belegte Akten ueber die "
-    "Menschen in seinem Leben (Familie, Freunde, Kollegen, Gruppen), sein "
-    "eigenes Profil (Lebenslauf, Vorlieben, Plaene) und gepflegte Register mit "
-    "Geburtstagen. Nutze das Werkzeug, sobald eine Frage den Nutzer selbst oder "
-    "eine Person aus seinem Umfeld betrifft, bevor du sagst, dass du etwas nicht "
-    "weisst. Die Angaben stammen aus seinen Chats; Daten in Klammern sind das "
-    "Datum der Quelle. Behandle aeltere Angaben als moeglicherweise ueberholt."
+    "Menschen in seinem Leben (Familie, Kinder, Freunde, Gruppen), das eigene "
+    "Profil des Nutzers (Lebenslauf, Vorlieben, Plaene), gemeinsames Familienwissen "
+    "und gepflegte Register mit Geburtstagen. Nutze das Werkzeug, sobald eine Frage "
+    "den Nutzer selbst oder eine Person aus seinem Umfeld betrifft, bevor du sagst, "
+    "dass du etwas nicht weisst. Die Angaben stammen aus Chats; Daten in Klammern "
+    "sind das Datum der Quelle. Behandle aeltere Angaben als moeglicherweise "
+    "ueberholt, und bei Widerspruechen gilt die neuere."
 )
 
 PARAMETERS: dict[str, Any] = {
@@ -102,18 +103,64 @@ def entschluesseln(daten: bytes, schluessel: bytes) -> dict:
     return daten
 
 
-def _paket_pfad() -> Path | None:
+_KONTEN_CACHE: dict = {"stempel": None, "daten": {}}
+
+
+def konten() -> dict[str, dict]:
+    """User-ID -> {"paket": Path, "export": bool}.
+
+    Quelle ist die Datei WISSEN_KONTEN (JSON, wird bei Aenderung neu gelesen, also ohne
+    Neustart). Pakete sind reine Dateinamen im selben Ordner. Ohne Datei gelten die
+    alten Einstellungen WISSEN_PAKET und WISSEN_USER_IDS (ein Paket fuer alle Konten).
+    """
+    datei = (settings.wissen_konten or "").strip()
+    if datei:
+        pfad = Path(datei)
+        try:
+            stempel = (pfad.stat().st_mtime_ns, pfad.stat().st_size)
+        except OSError:
+            return {}
+        if stempel != _KONTEN_CACHE["stempel"]:
+            try:
+                roh = json.loads(pfad.read_text("utf-8"))
+                eintraege = roh.get("konten") or {}
+                daten = {}
+                for uid, e in eintraege.items():
+                    name = str((e or {}).get("paket") or "")
+                    # Nur Dateinamen im Konten-Ordner, keine Pfade nach woanders
+                    if not uid or not re.fullmatch(r"[A-Za-z0-9._-]+\.paket", name):
+                        continue
+                    daten[str(uid)] = {"paket": pfad.parent / name, "export": bool(e.get("export"))}
+                _KONTEN_CACHE.update(stempel=stempel, daten=daten, empfaenger=str(roh.get("export_empfaenger") or ""))
+            except (OSError, ValueError, AttributeError) as exc:
+                log.warning("PC_WISSEN: Kontenliste nicht lesbar: %s", type(exc).__name__)
+                _KONTEN_CACHE.update(stempel=stempel, daten={}, empfaenger="")
+        return _KONTEN_CACHE["daten"]
     p = (settings.wissen_paket or "").strip()
-    return Path(p) if p else None
+    if not p:
+        return {}
+    return {u.strip(): {"paket": Path(p), "export": False}
+            for u in (settings.wissen_user_ids or "").split(",") if u.strip()}
+
+
+def export_empfaenger() -> str:
+    """Oeffentlicher Schluessel (X25519, base64url), an den Chat-Exporte verschluesselt werden."""
+    konten()
+    return _KONTEN_CACHE.get("empfaenger", "") if (settings.wissen_konten or "").strip() else ""
+
+
+def _paket_pfad(user_id: str | None) -> Path | None:
+    e = konten().get(user_id or "")
+    return e["paket"] if e else None
 
 
 def freigeschaltet(user_id: str | None, schluessel: str | None = None) -> bool:
-    """Nur fuer eingetragene Konten, mit vorhandenem Paket und mitgeschicktem Schluessel."""
-    pfad = _paket_pfad()
+    """Nur fuer eingetragene Konten, mit vorhandenem Paket und mitgeschicktem Schluessel.
+    Jedes Konto liest ausschliesslich sein eigenes Paket."""
+    pfad = _paket_pfad(user_id)
     if not user_id or pfad is None or not pfad.is_file():
         return False
-    erlaubt = {u.strip() for u in (settings.wissen_user_ids or "").split(",") if u.strip()}
-    return user_id in erlaubt and schluessel_lesen(schluessel) is not None
+    return schluessel_lesen(schluessel) is not None
 
 
 # ── Suche ────────────────────────────────────────────────────────────────────
@@ -165,7 +212,7 @@ def suchen(paket: dict, anfrage: str, person: str = "", n: int = 6) -> list[dict
         punkte /= math.sqrt(10 + len(w) / 50)
         if a.get("id") in bonus:
             punkte += bonus[a["id"]] + (2 if str(a.get("titel", "")).startswith("Kernkarte") else 0)
-        if ich_bezug and str(a.get("id", "")).startswith("joscha:"):
+        if ich_bezug and str(a.get("id", "")).startswith(("joscha:", "selbst:")):
             punkte += 1.5
         if punkte > 0:
             wertung.append((punkte, a))
@@ -196,7 +243,7 @@ async def run(user_id: str | None, args: dict, schluessel: str | None = None) ->
     if not anfrage and not person:
         return {"ok": False, "text": "Bitte eine Anfrage angeben."}
     def lesen_und_suchen() -> tuple[list[dict], str]:
-        pfad = _paket_pfad()
+        pfad = _paket_pfad(user_id)
         if pfad.stat().st_size > MAX_PAKET:
             raise ValueError("Paket zu gross")
         paket = entschluesseln(pfad.read_bytes(), schluessel_lesen(schluessel))

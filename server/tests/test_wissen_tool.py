@@ -114,3 +114,74 @@ def test_hook_sperrt_auch_bilder():
     from pocket_claude import claude_engine
     hooks = claude_engine._nach_erinnern_sperren({})
     assert "mcp__pocket__generate_image" in hooks["PreToolUse"][0].matcher
+
+
+# ── Mehrere Konten, jedes mit eigenem Paket ─────────────────────────────────
+
+def _konten(monkeypatch, tmp_path, eintraege, empfaenger=""):
+    datei = tmp_path / "konten.json"
+    datei.write_text(json.dumps({"konten": eintraege, "export_empfaenger": empfaenger}))
+    monkeypatch.setattr(settings, "wissen_konten", str(datei))
+    monkeypatch.setattr(wissen_tool, "_KONTEN_CACHE", {"stempel": None, "daten": {}})
+    return datei
+
+
+def test_jedes_konto_liest_nur_sein_eigenes_paket(monkeypatch, tmp_path):
+    ka, kb = secrets.token_bytes(32), secrets.token_bytes(32)
+    (tmp_path / "a.paket").write_bytes(_paket(tmp_path, ka).read_bytes())
+    anders = dict(PAKET, abschnitte=[{"id": "selbst:profil", "name": "Du selbst", "titel": "Arbeit",
+                                      "text": "- Fitnesstrainerin"}])
+    (tmp_path / "b.paket").write_bytes(_paket(tmp_path, kb, anders).read_bytes())
+    _konten(monkeypatch, tmp_path, {"usr_a": {"paket": "a.paket"}, "usr_b": {"paket": "b.paket"},
+                                    "usr_c": {"paket": "../wissen.paket"}})
+    res = asyncio.run(wissen_tool.run("usr_b", {"anfrage": "Was arbeite ich?"}, _b64(kb)))
+    assert res["ok"] and "Fitnesstrainerin" in res["text"] and "Kopfhoerer" not in res["text"]
+    # Fremder Schluessel oeffnet das eigene Paket nicht, und ein Pfad nach draussen gilt nicht
+    assert not asyncio.run(wissen_tool.run("usr_b", {"anfrage": "Anna"}, _b64(ka)))["ok"]
+    assert not wissen_tool.freigeschaltet("usr_c", _b64(ka))
+    assert wissen_tool.freigeschaltet("usr_a", _b64(ka))
+
+
+def test_ich_frage_findet_auch_selbst_abschnitte():
+    paket = {"personen": [], "abschnitte": [
+        {"id": "joscha", "name": "Joscha", "titel": "Arbeit", "text": "- arbeitet bei smartzone"},
+        {"id": "selbst:profil", "name": "Du selbst", "titel": "Arbeit", "text": "- arbeitet als Trainerin"}]}
+    assert wissen_tool.suchen(paket, "Wo arbeite ich")[0]["id"] == "selbst:profil"
+
+
+def test_export_ist_nur_fuer_den_empfaenger_lesbar_und_ohne_gesperrte_chats(monkeypatch, tmp_path):
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+    from pocket_claude import db, wissen_export
+    privat = X25519PrivateKey.generate()
+    pub = privat.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    (tmp_path / "aus").mkdir()
+    _konten(monkeypatch, tmp_path, {"usr_e": {"paket": "e.paket", "export": True},
+                                    "usr_x": {"paket": "x.paket"}}, _b64(pub))
+    monkeypatch.setattr(settings, "wissen_export_dir", "")
+
+    async def ablauf():
+        await db.init_db()
+        offen = await db.create_conversation("Victors Fuss", user_id="usr_e")
+        await db.add_message(offen, "user", "Victor hat am Montag Physiotherapie")
+        zu = await db.create_conversation("Geheim", user_id="usr_e")
+        await db.add_message(zu, "user", "streng privat")
+        await db.set_locked(zu, True)
+        fremd = await db.create_conversation("Fremd", user_id="usr_x")
+        await db.add_message(fremd, "user", "anderes Konto")
+        n1 = await wissen_export.einmal()
+        n2 = await wissen_export.einmal()   # unveraendert: nichts neu schreiben
+        return n1, n2
+    n1, n2 = asyncio.run(ablauf())
+    assert (n1, n2) == (1, 0)
+    assert not (tmp_path / "aus" / "usr_x.export").exists()
+    roh = (tmp_path / "aus" / "usr_e.export").read_bytes()
+    assert roh.startswith(wissen_export.MAGIE) and b"Physiotherapie" not in roh
+    einmal_pub, nonce, ct = roh[4:36], roh[36:48], roh[48:]
+    k = HKDF(algorithm=hashes.SHA256(), length=32, salt=einmal_pub + pub,
+             info=wissen_export.INFO).derive(privat.exchange(X25519PublicKey.from_public_bytes(einmal_pub)))
+    daten = json.loads(gzip.decompress(AESGCM(k).decrypt(nonce, ct, wissen_export.MAGIE + einmal_pub)))
+    texte = [m["text"] for c in daten["konversationen"] for m in c["nachrichten"]]
+    assert texte == ["Victor hat am Montag Physiotherapie"]

@@ -118,6 +118,11 @@ class Settings(BaseSettings):
     # Konten, fuer die das Werkzeug ueberhaupt angeboten wird (Komma-Liste). Leer = aus.
     wissen_paket: str = ""
     wissen_user_ids: str = ""
+    # Mehrere Konten mit je eigenem Paket: Pfad zu einer JSON-Kontenliste (siehe
+    # wissen_tool.konten). Hat Vorrang vor den beiden Feldern oben. Dort steht auch,
+    # welche Konten ihre Chats verschluesselt fuer die Auswertung bereitstellen.
+    wissen_konten: str = ""
+    wissen_export_dir: str = ""
 
     @field_validator("server_token")
     @classmethod

@@ -121,6 +121,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     import asyncio as _asyncio
     _asyncio.create_task(_tts_prewarm())
     _asyncio.create_task(_migrate_tts_to_gemini_web())
+    from pocket_claude import wissen_export as _wissen_export
+    app.state.wissen_export = _asyncio.create_task(_wissen_export.schleife())
     yield
 
 
