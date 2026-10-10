@@ -671,13 +671,18 @@ class ApiClient(
         conversationId: String,
         request: SendMessageRequest,
     ): Flow<StreamEvent> = callbackFlow {
-        val base = baseUrl()
-        val auth = authHeader()
+        // Ein einziger Profil-Stand fuer URL, Token und Schluessel: ein Profilwechsel
+        // waehrend des Aufbaus darf den Schluessel nie an einen anderen Server schicken.
+        val stand = settings.current()
+        require(stand.isConfigured) { "Server URL and token must be set in settings." }
+        val base = stand.serverUrl
+        val auth = "Bearer ${stand.serverToken}"
         val url = "$base/conversations/$conversationId/messages".toHttpUrlOrNull()
             ?: error("Invalid server URL: $base")
-        // Gedaechtnis-Schluessel nur an den eigenen Server, nur ueber HTTPS und nur bei
-        // Chat-Nachrichten. Der Server entschluesselt damit nur fuer diese Antwort.
-        val wissenSchluessel = settings.wissenSchluessel().takeIf { it.isNotBlank() && url.isHttps }
+        // Gedaechtnis-Schluessel nur an den Server, fuer den er eingetragen wurde, nur ueber
+        // HTTPS und nur bei Chat-Nachrichten. Der Server entschluesselt damit nur fuer diese Antwort.
+        val wissenSchluessel = settings.wissenSchluesselFuer(stand.activeProfileId, url)
+            .takeIf { it.isNotBlank() && url.isHttps }
 
         val builder = Request.Builder()
             .url(url)

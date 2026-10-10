@@ -696,7 +696,12 @@ async def stream_reply(
                     # und die halbe Antwort mitreissen. Das Modell bekommt
                     # stattdessen eine Meldung und kann sie erklaeren.
                     try:
-                        if image_tool is not None and name == image_tool.TOOL_NAME:
+                        if erinnert and name in (web_tool.SEARCH_TOOL_NAME, web_tool.FETCH_TOOL_NAME,
+                                                 getattr(image_tool, "TOOL_NAME", "")):
+                            # Sperre zuerst pruefen, vor jedem externen Werkzeug
+                            tool_text = ("Nach einer Abfrage des privaten Gedaechtnisses sind "
+                                         "Webabrufe und Bilder in dieser Antwort gesperrt.")
+                        elif image_tool is not None and name == image_tool.TOOL_NAME:
                             if len(image_attachments) >= MAX_IMAGES_PER_TURN:
                                 image_budget_hit = True
                                 tool_text = (
@@ -735,10 +740,6 @@ async def stream_reply(
                                 gesperrt.add(image_tool.TOOL_NAME)
                             tools[:] = [t for t in tools if t.get("type") != "web_search" and
                                         (t.get("function") or {}).get("name") not in gesperrt]
-                        elif erinnert and name in (web_tool.SEARCH_TOOL_NAME, web_tool.FETCH_TOOL_NAME,
-                                                   getattr(image_tool, "TOOL_NAME", "")):
-                            tool_text = ("Nach einer Abfrage des privaten Gedaechtnisses sind "
-                                         "Webabrufe und Bilder in dieser Antwort gesperrt.")
                         elif own_search and name == web_tool.SEARCH_TOOL_NAME:
                             res = await web_tool.search(
                                 gw, model_id, str(args.get("query") or ""))

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -474,16 +475,34 @@ class SettingsRepository(
         return wissenPrefs?.getString("k_$id", null).orEmpty()
     }
 
+    /** Schluessel nur, wenn Profil UND Server-Adresse zu dem passen, fuer die er
+     *  eingetragen wurde. Aendert sich die Adresse, muss er neu eingetragen werden. */
+    fun wissenSchluesselFuer(profileId: String, url: okhttp3.HttpUrl): String {
+        if (profileId.isBlank()) return ""
+        val gespeichert = wissenPrefs?.getString("o_$profileId", null) ?: return ""
+        if (gespeichert != herkunft(url)) return ""
+        return wissenPrefs.getString("k_$profileId", null).orEmpty()
+    }
+
+    private fun herkunft(url: okhttp3.HttpUrl): String = "${url.scheme}://${url.host}:${url.port}"
+
     suspend fun refreshWissenStatus() {
         _wissenGesetzt.value = wissenSchluessel().isNotBlank()
     }
 
     /** Setzt den Gedaechtnis-Schluessel des aktiven Profils (leer = entfernen). */
     suspend fun setWissenSchluessel(value: String) {
-        val id = current().activeProfileId
+        val s = current()
+        val id = s.activeProfileId
         if (id.isBlank()) return
+        val ziel = s.serverUrl.toHttpUrlOrNull()
         wissenPrefs?.edit()?.apply {
-            if (value.isBlank()) remove("k_$id") else putString("k_$id", value.trim())
+            if (value.isBlank() || ziel == null || !ziel.isHttps) {
+                remove("k_$id"); remove("o_$id")
+            } else {
+                putString("k_$id", value.trim())
+                putString("o_$id", herkunft(ziel))   // an diese Server-Adresse gebunden
+            }
         }?.commit()
         refreshWissenStatus()
     }

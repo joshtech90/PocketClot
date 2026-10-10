@@ -181,7 +181,10 @@ def suchen(paket: dict, anfrage: str, person: str = "", n: int = 6) -> list[dict
 
 
 import asyncio as _asyncio
-_GLEICHZEITIG = _asyncio.Semaphore(2)
+from concurrent.futures import ThreadPoolExecutor as _Pool
+
+# Eigener Pool: auch wenn eine Anfrage abbricht, laufen hoechstens zwei Entschluesselungen
+_ARBEITER = _Pool(max_workers=2, thread_name_prefix="wissen")
 
 
 async def run(user_id: str | None, args: dict, schluessel: str | None = None) -> dict:
@@ -201,9 +204,7 @@ async def run(user_id: str | None, args: dict, schluessel: str | None = None) ->
 
     try:
         # Entschluesseln und Suchen ausserhalb der Event-Schleife, hoechstens zwei gleichzeitig
-        import asyncio
-        async with _GLEICHZEITIG:
-            treffer, erstellt = await asyncio.to_thread(lesen_und_suchen)
+        treffer, erstellt = await _asyncio.get_running_loop().run_in_executor(_ARBEITER, lesen_und_suchen)
     except (OSError, ValueError, EOFError) as exc:
         log.warning("PC_WISSEN: Paket nicht lesbar: %s", type(exc).__name__)
         text = ("Der Gedaechtnis-Schluessel in der App passt nicht zum Paket auf dem Server."
