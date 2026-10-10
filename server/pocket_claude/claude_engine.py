@@ -193,6 +193,7 @@ async def oneshot_text(
         permission_mode="bypassPermissions",
         cwd=str(sandbox_cwd),
         include_partial_messages=False,
+        **werkzeuggrenze(allowed_tools or []),
         model=effective_model,
         setting_sources=[],
         env=engine_env,
@@ -402,11 +403,52 @@ def _format_transcript(all_msgs: list[dict], current_user_message_id: int) -> st
     return out
 
 
+# ---------- Werkzeuggrenze ----------
+
+# Werkzeuge, die nie ungefragt verfuegbar sein duerfen. `allowed_tools` regelt in
+# der SDK nur die automatische Freigabe; mit bypassPermissions waere ohne
+# `tools` der komplette Standardsatz nutzbar, also auch Bash fuer jedes Konto.
+GEFAEHRLICHE_WERKZEUGE = ["Bash", "BashOutput", "KillShell", "Write", "Edit", "MultiEdit",
+                          "NotebookEdit", "Task", "Glob", "Grep", "Read", "WebFetch", "WebSearch"]
+
+
+def werkzeuggrenze(allowed_tools: list[str]) -> dict:
+    """Optionen, die genau die freigegebenen eingebauten Werkzeuge verfuegbar machen.
+
+    MCP-Werkzeuge (mcp__...) kommen ueber mcp_servers und bleiben unberuehrt.
+    """
+    eingebaut = [t for t in allowed_tools if not t.startswith("mcp__")]
+    return {"tools": eingebaut,
+            "disallowed_tools": [t for t in GEFAEHRLICHE_WERKZEUGE if t not in eingebaut]}
+
+
+def _nach_erinnern_sperren(zustand: dict) -> dict:
+    """PreToolUse-Hook: nach einer Gedaechtnisabfrage keine Webabrufe mehr in diesem Turn.
+
+    Akteninhalte sind Daten aus fremden Chats. Ein eingeschleuster Text duerfte
+    das Modell sonst dazu bringen, private Angaben per URL nach aussen zu tragen.
+    """
+    try:
+        from claude_agent_sdk import HookMatcher
+    except ImportError:
+        return {}
+
+    async def pruefen(eingabe, tool_use_id, kontext):  # noqa: ARG001
+        if zustand.get("erinnert"):
+            return {"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": "Nach einer Abfrage des privaten Gedaechtnisses "
+                                            "sind Webabrufe in dieser Antwort gesperrt."}}
+        return {}
+    return {"PreToolUse": [HookMatcher(matcher="WebFetch|WebSearch", hooks=[pruefen])]}
+
+
 # ---------- Bild-Werkzeug fuer den Claude-Pfad ----------
 
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
                             collected: list[dict], events: "asyncio.Queue",
-                            mit_bild: bool = True, mit_wissen: bool = False):
+                            mit_bild: bool = True, mit_wissen: bool = False,
+                            wissen_zustand: dict | None = None):
     """Registriert `generate_image` als In-Process-MCP-Werkzeug.
 
     Die Claude-Agent-SDK kann Werkzeuge direkt im Server-Prozess ausfuehren, ohne
@@ -441,6 +483,8 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
 
     @tool(_wissen_tool.TOOL_NAME, _wissen_tool.TOOL_DESCRIPTION, _wissen_tool.PARAMETERS)
     async def _erinnern(args: dict) -> dict:
+        if wissen_zustand is not None:
+            wissen_zustand["erinnert"] = True
         result = await _wissen_tool.run(user_id, args or {})
         return {"content": [{"type": "text", "text": result.get("text") or ""}]}
 
@@ -569,9 +613,11 @@ async def stream_reply(
         mcp_servers: dict = {}
         from pocket_claude import wissen_tool as _wissen_tool
         mit_wissen = _wissen_tool.freigeschaltet(user_id)
+        wissen_zustand: dict = {}
         img_server, werkzeug_namen = _build_image_mcp_server(
             user_id, image_defaults, image_attachments, image_events,
             mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
+            wissen_zustand=wissen_zustand,
         )
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server
@@ -668,6 +714,7 @@ async def stream_reply(
         options_kwargs: dict = dict(
             system_prompt=sp,
             allowed_tools=allowed_tools,
+            **werkzeuggrenze(allowed_tools),
             permission_mode="bypassPermissions",
             cwd=str(sandbox_cwd),
             include_partial_messages=True,
@@ -679,6 +726,8 @@ async def stream_reply(
         )
         if mcp_servers:
             options_kwargs["mcp_servers"] = mcp_servers
+        if mit_wissen:
+            options_kwargs["hooks"] = _nach_erinnern_sperren(wissen_zustand)
         # cli_path: global installiertes `claude` (Dein Login + Sessions) statt SDK-Bundle
         resolved_cli = settings.claude_binary or shutil.which("claude")
         if resolved_cli:
