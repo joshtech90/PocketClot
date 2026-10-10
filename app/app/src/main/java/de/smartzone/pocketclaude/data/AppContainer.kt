@@ -38,7 +38,11 @@ class AppContainer(context: Context) {
     @Volatile
     var pendingShare: PendingShare? = null
 
-    val settingsRepository: SettingsRepository = SettingsRepository(context.dataStore)
+    val settingsRepository: SettingsRepository = SettingsRepository(
+        context.dataStore,
+        // Eigene Datei fuer den Gedaechtnis-Schluessel, vom Backup ausgeschlossen
+        context.getSharedPreferences("wissen_schluessel", Context.MODE_PRIVATE),
+    )
 
     /** Merkt sich, welche gesperrten Chats in dieser Sitzung entsperrt wurden.
      *  Wird beim Wechsel in den Hintergrund geleert (Re-Lock). */
@@ -65,6 +69,9 @@ class AppContainer(context: Context) {
     // keine Header oder Bodies, also auch keine Token-Leaks im Log.
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BASIC
+        // Vorsorglich, falls jemand den Level hochdreht: Schluessel nie ins Log
+        redactHeader("Authorization")
+        redactHeader("X-Wissen-Schluessel")
     }
 
     /**

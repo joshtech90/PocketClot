@@ -233,6 +233,11 @@ class SettingsViewModel(
         _testResult.value = ConnectionTestResult.Idle
     }
 
+    /** Ob fuer das aktive Profil ein Gedaechtnis-Schluessel eingetragen ist. */
+    val wissenGesetzt = settingsRepo.wissenGesetzt
+
+    fun refreshWissenStatus() = viewModelScope.launch { settingsRepo.refreshWissenStatus() }
+
     fun setWissenSchluessel(value: String) = viewModelScope.launch {
         settingsRepo.setWissenSchluessel(value)
     }

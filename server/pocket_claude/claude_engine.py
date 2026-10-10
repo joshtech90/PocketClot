@@ -438,9 +438,11 @@ def _nach_erinnern_sperren(zustand: dict) -> dict:
             return {"hookSpecificOutput": {
                 "hookEventName": "PreToolUse", "permissionDecision": "deny",
                 "permissionDecisionReason": "Nach einer Abfrage des privaten Gedaechtnisses "
-                                            "sind Webabrufe in dieser Antwort gesperrt."}}
+                                            "sind Webabrufe und Bilder in dieser Antwort gesperrt."}}
         return {}
-    return {"PreToolUse": [HookMatcher(matcher="WebFetch|WebSearch", hooks=[pruefen])]}
+    # Auch die Bilderzeugung: ihr Prompt geht an einen weiteren Anbieter
+    return {"PreToolUse": [HookMatcher(matcher="WebFetch|WebSearch|mcp__pocket__generate_image",
+                                       hooks=[pruefen])]}
 
 
 # ---------- Bild-Werkzeug fuer den Claude-Pfad ----------
@@ -563,6 +565,15 @@ async def stream_reply(
         need_read_tool = _has_binary_attachments(attach_ids, attachments_by_id)
         session_id = conv.get("claude_session_id")
 
+        # Konten mit Gedaechtnis laufen ohne CLI-Session: die CLI wuerde Werkzeugergebnisse
+        # (Akteninhalte) sonst im Klartext in ihren Sitzungsdateien auf der Platte ablegen.
+        # Der Verlauf kommt dann jedes Mal aus der Datenbank, wie bei den Zusatz-Modellen.
+        from pocket_claude import wissen_tool as _wissen_tool
+        mit_wissen = _wissen_tool.freigeschaltet(user_id, wissen_schluessel)
+        if mit_wissen:
+            session_id = None
+            replay_history = True
+
         # Ohne Session kennt Claude den Chat nicht. Das passiert in zwei Faellen:
         # der User hat zwischendurch mit einem Zusatz-Modell geschrieben, oder
         # die Session ist verloren gegangen. In beiden Faellen bekommt Claude
@@ -612,8 +623,6 @@ async def stream_reply(
         image_attachments: list[dict] = []
         image_events: asyncio.Queue = asyncio.Queue()
         mcp_servers: dict = {}
-        from pocket_claude import wissen_tool as _wissen_tool
-        mit_wissen = _wissen_tool.freigeschaltet(user_id, wissen_schluessel)
         wissen_zustand: dict = {}
         img_server, werkzeug_namen = _build_image_mcp_server(
             user_id, image_defaults, image_attachments, image_events,
@@ -729,6 +738,7 @@ async def stream_reply(
             options_kwargs["mcp_servers"] = mcp_servers
         if mit_wissen:
             options_kwargs["hooks"] = _nach_erinnern_sperren(wissen_zustand)
+            options_kwargs["extra_args"] = {"no-session-persistence": None}
         # cli_path: global installiertes `claude` (Dein Login + Sessions) statt SDK-Bundle
         resolved_cli = settings.claude_binary or shutil.which("claude")
         if resolved_cli:
@@ -917,7 +927,9 @@ async def stream_reply(
 
         current_context = input_tokens + output_tokens + cache_read + cache_write
 
-        if new_session_id and new_session_id != session_id:
+        if mit_wissen:
+            await db.set_claude_session_id(cid, None)
+        elif new_session_id and new_session_id != session_id:
             await db.set_claude_session_id(cid, new_session_id)
 
         msg_id = await db.add_message(

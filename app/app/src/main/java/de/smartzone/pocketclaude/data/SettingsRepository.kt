@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
@@ -58,10 +60,6 @@ data class Profile(
     val serverUrl: String,
     val serverToken: String,
     val username: String = "",
-    /** Schluessel fuer das verschluesselte Gedaechtnis auf dem Server. Bleibt nur
-     *  auf dem Geraet (nicht im Einstellungs-Export) und geht nur im Header
-     *  X-Wissen-Schluessel an den eigenen Server mit. Leer = aus. */
-    val wissenSchluessel: String = "",
 )
 
 data class AppSettings(
@@ -133,8 +131,6 @@ data class AppSettings(
     val serverUrl: String get() = activeProfile?.serverUrl.orEmpty()
     /** Token des aktiven Profils. */
     val serverToken: String get() = activeProfile?.serverToken.orEmpty()
-    /** Gedaechtnis-Schluessel des aktiven Profils, leer wenn keiner eingetragen ist. */
-    val wissenSchluessel: String get() = activeProfile?.wissenSchluessel.orEmpty()
 
     val isConfigured: Boolean
         get() = serverUrl.isNotBlank() && serverToken.isNotBlank()
@@ -205,7 +201,10 @@ data class AppSettings(
     }
 }
 
-class SettingsRepository(private val dataStore: DataStore<Preferences>) {
+class SettingsRepository(
+    private val dataStore: DataStore<Preferences>,
+    private val wissenPrefs: android.content.SharedPreferences? = null,
+) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -413,7 +412,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun updateProfile(id: String, label: String? = null,
                               url: String? = null, token: String? = null,
-                              username: String? = null, wissenSchluessel: String? = null) {
+                              username: String? = null) {
         dataStore.edit { prefs ->
             val list = loadProfilesWithMigration(prefs).map { p ->
                 if (p.id != id) p else p.copy(
@@ -421,7 +420,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
                     serverUrl = (url ?: p.serverUrl).trim().trimEnd('/'),
                     serverToken = (token ?: p.serverToken).trim(),
                     username = (username ?: p.username).trim(),
-                    wissenSchluessel = (wissenSchluessel ?: p.wissenSchluessel).trim(),
                 )
             }
             prefs[keyProfiles] = json.encodeToString(list)
@@ -462,10 +460,32 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         else upsertProfile("Standard", value, "", makeActive = true)
     }
 
+    // ----- Gedaechtnis-Schluessel -----
+    // Liegt NICHT im DataStore, sondern in einer eigenen Datei, die vom
+    // Android-Backup und der Geraeteuebertragung ausgeschlossen ist
+    // (res/xml/data_extraction_rules.xml, backup_rules.xml). Je Profil ein Eintrag.
+
+    private val _wissenGesetzt = MutableStateFlow(false)
+    val wissenGesetzt: StateFlow<Boolean> = _wissenGesetzt
+
+    suspend fun wissenSchluessel(): String {
+        val id = current().activeProfileId
+        if (id.isBlank()) return ""
+        return wissenPrefs?.getString("k_$id", null).orEmpty()
+    }
+
+    suspend fun refreshWissenStatus() {
+        _wissenGesetzt.value = wissenSchluessel().isNotBlank()
+    }
+
     /** Setzt den Gedaechtnis-Schluessel des aktiven Profils (leer = entfernen). */
     suspend fun setWissenSchluessel(value: String) {
-        val active = current().activeProfile ?: return
-        updateProfile(active.id, wissenSchluessel = value)
+        val id = current().activeProfileId
+        if (id.isBlank()) return
+        wissenPrefs?.edit()?.apply {
+            if (value.isBlank()) remove("k_$id") else putString("k_$id", value.trim())
+        }?.commit()
+        refreshWissenStatus()
     }
 
     suspend fun setServerToken(value: String) {

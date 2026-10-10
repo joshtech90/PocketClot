@@ -265,7 +265,7 @@ fun SettingsScreen(
             ExpandableSection(
                 title = stringResource(de.smartzone.pocketclaude.R.string.section_memory),
                 subtitle = stringResource(
-                    if (settings.wissenSchluessel.isNotBlank()) de.smartzone.pocketclaude.R.string.memory_key_set
+                    if (vm.wissenGesetzt.collectAsState().value) de.smartzone.pocketclaude.R.string.memory_key_set
                     else de.smartzone.pocketclaude.R.string.memory_key_unset
                 ),
                 initiallyExpanded = false,
@@ -2760,7 +2760,8 @@ private fun shareBackupZip(context: android.content.Context, bytes: ByteArray, f
 @Composable
 private fun MemoryKeyCard(vm: SettingsViewModel, settings: de.smartzone.pocketclaude.data.AppSettings) {
     var eingabe by remember { mutableStateOf("") }
-    val gesetzt = settings.wissenSchluessel.isNotBlank()
+    val gesetzt by vm.wissenGesetzt.collectAsState()
+    LaunchedEffect(settings.activeProfileId) { vm.refreshWissenStatus() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(de.smartzone.pocketclaude.R.string.memory_key_info),

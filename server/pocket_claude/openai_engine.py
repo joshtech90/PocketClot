@@ -730,12 +730,15 @@ async def stream_reply(
                             tool_text = res["text"]
                             # Nach privater Recherche keine Webwerkzeuge mehr in diesem Turn
                             erinnert = True
+                            gesperrt = {web_tool.SEARCH_TOOL_NAME, web_tool.FETCH_TOOL_NAME}
+                            if image_tool is not None:
+                                gesperrt.add(image_tool.TOOL_NAME)
                             tools[:] = [t for t in tools if t.get("type") != "web_search" and
-                                        (t.get("function") or {}).get("name") not in
-                                        (web_tool.SEARCH_TOOL_NAME, web_tool.FETCH_TOOL_NAME)]
-                        elif erinnert and name in (web_tool.SEARCH_TOOL_NAME, web_tool.FETCH_TOOL_NAME):
+                                        (t.get("function") or {}).get("name") not in gesperrt]
+                        elif erinnert and name in (web_tool.SEARCH_TOOL_NAME, web_tool.FETCH_TOOL_NAME,
+                                                   getattr(image_tool, "TOOL_NAME", "")):
                             tool_text = ("Nach einer Abfrage des privaten Gedaechtnisses sind "
-                                         "Webabrufe in dieser Antwort gesperrt.")
+                                         "Webabrufe und Bilder in dieser Antwort gesperrt.")
                         elif own_search and name == web_tool.SEARCH_TOOL_NAME:
                             res = await web_tool.search(
                                 gw, model_id, str(args.get("query") or ""))

@@ -3,8 +3,10 @@
 Das Gedaechtnis liegt hier nur als verschluesseltes Paket (AES-256-GCM). Den
 Schluessel kennt der Server nicht: die App schickt ihn bei jeder Nachricht im
 Header `X-Wissen-Schluessel` mit. Entschluesselt wird nur im Arbeitsspeicher fuer
-genau diese Abfrage; Schluessel und Klartext werden weder gespeichert noch
-zwischengespeichert noch protokolliert. Das Paket selbst erzeugt ein anderer
+genau diese Abfrage; der Server speichert weder Schluessel noch Paketinhalt und
+protokolliert beides nicht. Konten mit Gedaechtnis laufen im Claude-Pfad ohne
+CLI-Session, damit Werkzeugergebnisse nicht in Sitzungsdateien landen. Was das
+Modell in seine Antwort uebernimmt, steht wie jede Antwort im Chatverlauf. Das Paket selbst erzeugt ein anderer
 Rechner und legt es hier ab (WISSEN_PAKET).
 
 Freigeschaltet ist das Werkzeug nur fuer Konten in WISSEN_USER_IDS und nur, wenn
@@ -60,6 +62,8 @@ PARAMETERS: dict[str, Any] = {
 
 MAX_TEXT = 12000
 MAX_PAKET = 50 * 1024 * 1024
+MAX_KLARTEXT = 40 * 1024 * 1024
+MAX_ABSCHNITTE = 20000
 
 
 # ── Schluessel und Paket ─────────────────────────────────────────────────────
@@ -87,7 +91,15 @@ def entschluesseln(daten: bytes, schluessel: bytes) -> dict:
         klar = AESGCM(schluessel).decrypt(nonce, daten[len(MAGIE) + 12:], AAD)
     except InvalidTag as exc:
         raise ValueError("Schluessel passt nicht") from exc
-    return json.loads(gzip.decompress(klar))
+    import io
+    with gzip.GzipFile(fileobj=io.BytesIO(klar)) as g:
+        roh = g.read(MAX_KLARTEXT + 1)
+    if len(roh) > MAX_KLARTEXT:
+        raise ValueError("Paket entpackt zu gross")
+    daten = json.loads(roh)
+    if not isinstance(daten, dict) or len(daten.get("abschnitte") or []) > MAX_ABSCHNITTE:
+        raise ValueError("Paket hat ein unerwartetes Format")
+    return daten
 
 
 def _paket_pfad() -> Path | None:
@@ -168,6 +180,10 @@ def suchen(paket: dict, anfrage: str, person: str = "", n: int = 6) -> list[dict
     return out
 
 
+import asyncio as _asyncio
+_GLEICHZEITIG = _asyncio.Semaphore(2)
+
+
 async def run(user_id: str | None, args: dict, schluessel: str | None = None) -> dict:
     """Liefert {"ok": bool, "text": str} fuer das Modell."""
     if not freigeschaltet(user_id, schluessel):
@@ -176,14 +192,18 @@ async def run(user_id: str | None, args: dict, schluessel: str | None = None) ->
     person = str(args.get("person") or "").strip()[:100]
     if not anfrage and not person:
         return {"ok": False, "text": "Bitte eine Anfrage angeben."}
-    try:
+    def lesen_und_suchen() -> tuple[list[dict], str]:
         pfad = _paket_pfad()
         if pfad.stat().st_size > MAX_PAKET:
             raise ValueError("Paket zu gross")
         paket = entschluesseln(pfad.read_bytes(), schluessel_lesen(schluessel))
-        treffer = suchen(paket, anfrage, person)
-        erstellt = str(paket.get("erstellt", ""))[:10]
-        del paket   # Klartext nicht laenger halten als noetig
+        return suchen(paket, anfrage, person), str(paket.get("erstellt", ""))[:10]
+
+    try:
+        # Entschluesseln und Suchen ausserhalb der Event-Schleife, hoechstens zwei gleichzeitig
+        import asyncio
+        async with _GLEICHZEITIG:
+            treffer, erstellt = await asyncio.to_thread(lesen_und_suchen)
     except (OSError, ValueError, EOFError) as exc:
         log.warning("PC_WISSEN: Paket nicht lesbar: %s", type(exc).__name__)
         text = ("Der Gedaechtnis-Schluessel in der App passt nicht zum Paket auf dem Server."

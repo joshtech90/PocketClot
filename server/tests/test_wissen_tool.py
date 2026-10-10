@@ -99,3 +99,18 @@ def test_hook_sperrt_webabruf_erst_nach_erinnern():
     zustand["erinnert"] = True
     out = asyncio.run(pruefen({}, "x", None))
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+def test_zu_grosses_entpacktes_paket_wird_abgelehnt(monkeypatch, tmp_path):
+    k = secrets.token_bytes(32)
+    monkeypatch.setattr(wissen_tool, "MAX_KLARTEXT", 1000)
+    pfad = _paket(tmp_path, k, {"personen": [], "abschnitte": [{"text": "x" * 5000}]})
+    _konfig(monkeypatch, pfad)
+    res = asyncio.run(wissen_tool.run("usr_freigegeben", {"anfrage": "x"}, _b64(k)))
+    assert not res["ok"]
+
+
+def test_hook_sperrt_auch_bilder():
+    from pocket_claude import claude_engine
+    hooks = claude_engine._nach_erinnern_sperren({})
+    assert "mcp__pocket__generate_image" in hooks["PreToolUse"][0].matcher

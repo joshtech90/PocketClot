@@ -673,17 +673,17 @@ class ApiClient(
     ): Flow<StreamEvent> = callbackFlow {
         val base = baseUrl()
         val auth = authHeader()
-        val wissenSchluessel = settings.current().wissenSchluessel
         val url = "$base/conversations/$conversationId/messages".toHttpUrlOrNull()
             ?: error("Invalid server URL: $base")
+        // Gedaechtnis-Schluessel nur an den eigenen Server, nur ueber HTTPS und nur bei
+        // Chat-Nachrichten. Der Server entschluesselt damit nur fuer diese Antwort.
+        val wissenSchluessel = settings.wissenSchluessel().takeIf { it.isNotBlank() && url.isHttps }
 
         val builder = Request.Builder()
             .url(url)
             .header("Authorization", auth)
             .header("Accept", "text/event-stream")
-        // Gedaechtnis-Schluessel nur an den eigenen Server und nur bei Chat-Nachrichten.
-        // Der Server entschluesselt damit nur fuer diese Antwort und speichert ihn nicht.
-        if (wissenSchluessel.isNotBlank()) builder.header("X-Wissen-Schluessel", wissenSchluessel)
+        if (wissenSchluessel != null) builder.header("X-Wissen-Schluessel", wissenSchluessel)
         val req = builder
             .post(
                 json.encodeToString(request)
@@ -693,7 +693,12 @@ class ApiClient(
 
         // SSE-Streams nutzen den Client OHNE Read-Timeout, sonst bricht der
         // Stream bei längeren Thinking-Pausen ab.
-        val factory = EventSources.createFactory(streamingClient)
+        // Mit Schluessel keine Weiterleitungen folgen: OkHttp entfernt bei einem Wechsel des
+        // Hosts nur den Authorization-Header, den Gedaechtnis-Schluessel wuerde es mitschicken.
+        val sseClient = if (wissenSchluessel != null)
+            streamingClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
+        else streamingClient
+        val factory = EventSources.createFactory(sseClient)
         val source: EventSource = factory.newEventSource(req, object : EventSourceListener() {
             override fun onEvent(
                 eventSource: EventSource,

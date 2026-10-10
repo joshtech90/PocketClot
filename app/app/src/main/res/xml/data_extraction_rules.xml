@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <!-- Gedaechtnis-Schluessel bleibt auf dem Geraet -->
+        <exclude domain="sharedpref" path="wissen_schluessel.xml"/>
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="wissen_schluessel.xml"/>
     </device-transfer>
 </data-extraction-rules>
