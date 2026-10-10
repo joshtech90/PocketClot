@@ -467,6 +467,9 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
                     "einen PIN fest.",
                 )
         await db.set_locked(cid, body.locked, user_id=user["id"])
+        if body.locked:
+            from pocket_claude import wissen_export
+            wissen_export.verwerfen(user["id"])
     rows = await db.list_conversations(user_id=user["id"])
     for r in rows:
         if r["id"] == cid:
@@ -505,6 +508,8 @@ async def delete_conversation(cid: str, user=Depends(require_user)):
     ok = await db.delete_conversation(cid, user_id=user["id"])
     if not ok:
         raise HTTPException(404, "Konversation nicht gefunden.")
+    from pocket_claude import wissen_export
+    wissen_export.verwerfen(user["id"])
     return JSONResponse(status_code=204, content=None)
 
 

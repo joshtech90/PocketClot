@@ -9,7 +9,9 @@ AES-256-GCM. Das private Gegenstueck liegt nur beim Empfaenger, hier kann nieman
 die Datei wieder lesen.
 
 Gesperrte Chats (PIN in der App) bleiben bewusst draussen: wer einen Chat sperrt,
-will ihn nicht ausgewertet haben. Anhaenge gehen nicht mit, nur ihre Anzahl.
+will ihn nicht ausgewertet haben. Sperren oder Loeschen verwirft den bisherigen
+Export sofort (`verwerfen`); ein Konto ohne Freigabe verliert seinen Export beim
+naechsten Durchgang. Anhaenge gehen nicht mit, nur ihre Anzahl.
 """
 from __future__ import annotations
 
@@ -31,7 +33,8 @@ log = logging.getLogger(__name__)
 
 MAGIE = b"PCX1"
 INFO = b"pocketclot-export-v1"
-INTERVALL = 3 * 3600
+INTERVALL = 3600
+_DATEI = __import__("re").compile(r"usr_[A-Za-z0-9_-]+")
 _STAND: dict[str, tuple] = {}
 
 
@@ -71,6 +74,10 @@ async def _inhalt(user_id: str) -> tuple[dict, tuple]:
     konvs = [c for c in await db.list_conversations(user_id) if not c.get("locked")]
     out, stand = [], []
     for c in konvs:
+        # Waehrend des Lesens gesperrt oder geloescht? Dann gehoert der Chat nicht hinein.
+        aktuell = await db.get_conversation(c["id"], user_id=user_id)
+        if not aktuell or aktuell.get("locked"):
+            continue
         msgs = await db.list_messages(c["id"])
         stand.append((c["id"], len(msgs), msgs[-1]["id"] if msgs else 0))
         out.append({"id": c["id"], "titel": c.get("title") or "", "erstellt": c.get("created_at") or "",
@@ -82,18 +89,45 @@ async def _inhalt(user_id: str) -> tuple[dict, tuple]:
              "konversationen": out}, tuple(sorted(stand)))
 
 
+def verwerfen(user_id: str) -> None:
+    """Export eines Kontos sofort entfernen (nach Sperren oder Loeschen eines Chats)."""
+    _STAND.pop(user_id, None)
+    ordner = _ordner()
+    if ordner is not None and _DATEI.fullmatch(user_id or ""):
+        try:
+            (ordner / f"{user_id}.export").unlink(missing_ok=True)
+        except OSError as exc:
+            log.warning("PC_WISSEN: Export nicht entfernbar: %s", type(exc).__name__)
+
+
+def _aufraeumen(ordner: Path | None, ziele: set[str]) -> None:
+    """Exporte von Konten ohne Freigabe entfernen, auch wenn die Kontenliste fehlt."""
+    if ordner is None or not ordner.is_dir():
+        return
+    for p in ordner.glob("*.export"):
+        if p.stem not in ziele:
+            try:
+                p.unlink()
+                _STAND.pop(p.stem, None)
+            except OSError:
+                pass
+
+
 async def einmal() -> int:
     """Schreibt geaenderte Exporte; liefert die Zahl geschriebener Dateien."""
-    ziele = [u for u, e in wissen_tool.konten().items() if e.get("export")]
+    ziele = [u for u, e in wissen_tool.konten().items() if e.get("export") and _DATEI.fullmatch(u)]
+    ordner = _ordner()
+    _aufraeumen(ordner, set(ziele))
     if not ziele:
         return 0
-    empfaenger, ordner = _empfaenger(), _ordner()
+    empfaenger = _empfaenger()
     if empfaenger is None or ordner is None or not ordner.is_dir() or not os.access(ordner, os.W_OK):
         log.warning("PC_WISSEN: Export eingerichtet, aber Empfaenger oder Ordner fehlt")
         return 0
     geschrieben = 0
     for uid in ziele:
         daten, stand = await _inhalt(uid)
+        stand = (empfaenger, stand)   # neuer Empfaenger-Schluessel: neu versiegeln
         ziel = ordner / f"{uid}.export"
         if _STAND.get(uid) == stand and ziel.exists():
             continue

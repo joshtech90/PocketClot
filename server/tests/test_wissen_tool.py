@@ -155,29 +155,30 @@ def test_export_ist_nur_fuer_den_empfaenger_lesbar_und_ohne_gesperrte_chats(monk
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
     from pocket_claude import db, wissen_export
+    e, x = "usr_e" + secrets.token_hex(4), "usr_x" + secrets.token_hex(4)   # DB wird geteilt
     privat = X25519PrivateKey.generate()
     pub = privat.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     (tmp_path / "aus").mkdir()
-    _konten(monkeypatch, tmp_path, {"usr_e": {"paket": "e.paket", "export": True},
-                                    "usr_x": {"paket": "x.paket"}}, _b64(pub))
+    _konten(monkeypatch, tmp_path, {e: {"paket": "e.paket", "export": True},
+                                    x: {"paket": "x.paket"}}, _b64(pub))
     monkeypatch.setattr(settings, "wissen_export_dir", "")
 
     async def ablauf():
         await db.init_db()
-        offen = await db.create_conversation("Victors Fuss", user_id="usr_e")
+        offen = await db.create_conversation("Victors Fuss", user_id=e)
         await db.add_message(offen, "user", "Victor hat am Montag Physiotherapie")
-        zu = await db.create_conversation("Geheim", user_id="usr_e")
+        zu = await db.create_conversation("Geheim", user_id=e)
         await db.add_message(zu, "user", "streng privat")
         await db.set_locked(zu, True)
-        fremd = await db.create_conversation("Fremd", user_id="usr_x")
+        fremd = await db.create_conversation("Fremd", user_id=x)
         await db.add_message(fremd, "user", "anderes Konto")
         n1 = await wissen_export.einmal()
         n2 = await wissen_export.einmal()   # unveraendert: nichts neu schreiben
         return n1, n2
     n1, n2 = asyncio.run(ablauf())
     assert (n1, n2) == (1, 0)
-    assert not (tmp_path / "aus" / "usr_x.export").exists()
-    roh = (tmp_path / "aus" / "usr_e.export").read_bytes()
+    assert not (tmp_path / "aus" / f"{x}.export").exists()
+    roh = (tmp_path / "aus" / f"{e}.export").read_bytes()
     assert roh.startswith(wissen_export.MAGIE) and b"Physiotherapie" not in roh
     einmal_pub, nonce, ct = roh[4:36], roh[36:48], roh[48:]
     k = HKDF(algorithm=hashes.SHA256(), length=32, salt=einmal_pub + pub,
@@ -185,3 +186,48 @@ def test_export_ist_nur_fuer_den_empfaenger_lesbar_und_ohne_gesperrte_chats(monk
     daten = json.loads(gzip.decompress(AESGCM(k).decrypt(nonce, ct, wissen_export.MAGIE + einmal_pub)))
     texte = [m["text"] for c in daten["konversationen"] for m in c["nachrichten"]]
     assert texte == ["Victor hat am Montag Physiotherapie"]
+
+
+def test_export_verschwindet_bei_sperre_und_ohne_freigabe(monkeypatch, tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+
+    from pocket_claude import db, wissen_export
+    pub = X25519PrivateKey.generate().public_key().public_bytes(serialization.Encoding.Raw,
+                                                                  serialization.PublicFormat.Raw)
+    v = "usr_v" + secrets.token_hex(4)
+    aus = tmp_path / "aus"
+    aus.mkdir()
+    monkeypatch.setattr(settings, "wissen_export_dir", "")
+    _konten(monkeypatch, tmp_path, {v: {"paket": "v.paket", "export": True}}, _b64(pub))
+    (aus / "usr_alt.export").write_bytes(b"PCX1alt")
+
+    async def ablauf():
+        await db.init_db()
+        c = await db.create_conversation("Ein Chat", user_id=v)
+        await db.add_message(c, "user", "Hallo")
+        await wissen_export.einmal()
+        assert (aus / f"{v}.export").exists() and not (aus / "usr_alt.export").exists()
+        wissen_export.verwerfen(v)
+        assert not (aus / f"{v}.export").exists()
+        await wissen_export.einmal()
+        assert (aus / f"{v}.export").exists()
+        _konten(monkeypatch, tmp_path, {v: {"paket": "v.paket"}}, _b64(pub))
+        await wissen_export.einmal()
+        assert not (aus / f"{v}.export").exists()
+    asyncio.run(ablauf())
+
+
+def test_konto_verschwindet_waehrend_der_abfrage(monkeypatch, tmp_path):
+    k = secrets.token_bytes(32)
+    (tmp_path / "a.paket").write_bytes(_paket(tmp_path, k).read_bytes())
+    datei = _konten(monkeypatch, tmp_path, {"usr_a": {"paket": "a.paket"}})
+    echt = wissen_tool._paket_pfad
+    aufrufe = []
+
+    def pfad(uid):
+        aufrufe.append(uid)
+        return echt(uid) if len(aufrufe) == 1 else None
+    monkeypatch.setattr(wissen_tool, "_paket_pfad", pfad)
+    res = asyncio.run(wissen_tool.run("usr_a", {"anfrage": "Anna"}, _b64(k)))
+    assert not res["ok"] and datei.exists()

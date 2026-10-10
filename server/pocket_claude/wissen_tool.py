@@ -244,6 +244,8 @@ async def run(user_id: str | None, args: dict, schluessel: str | None = None) ->
         return {"ok": False, "text": "Bitte eine Anfrage angeben."}
     def lesen_und_suchen() -> tuple[list[dict], str]:
         pfad = _paket_pfad(user_id)
+        if pfad is None:   # Kontenliste waehrenddessen geaendert
+            raise ValueError("Konto nicht mehr freigeschaltet")
         if pfad.stat().st_size > MAX_PAKET:
             raise ValueError("Paket zu gross")
         paket = entschluesseln(pfad.read_bytes(), schluessel_lesen(schluessel))
