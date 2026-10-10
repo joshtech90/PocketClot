@@ -231,3 +231,31 @@ def test_konto_verschwindet_waehrend_der_abfrage(monkeypatch, tmp_path):
     monkeypatch.setattr(wissen_tool, "_paket_pfad", pfad)
     res = asyncio.run(wissen_tool.run("usr_a", {"anfrage": "Anna"}, _b64(k)))
     assert not res["ok"] and datei.exists()
+
+
+def test_laufender_export_nach_sperre_wird_nicht_veroeffentlicht(monkeypatch, tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+
+    from pocket_claude import db, wissen_export
+    pub = X25519PrivateKey.generate().public_key().public_bytes(serialization.Encoding.Raw,
+                                                                  serialization.PublicFormat.Raw)
+    g = "usr_g" + secrets.token_hex(4)
+    (tmp_path / "aus").mkdir()
+    monkeypatch.setattr(settings, "wissen_export_dir", "")
+    _konten(monkeypatch, tmp_path, {g: {"paket": "g.paket", "export": True}}, _b64(pub))
+    echt = wissen_export._inhalt
+
+    async def inhalt_mit_sperre(uid):
+        ergebnis = await echt(uid)
+        wissen_export.verwerfen(uid)          # Sperre kommt waehrend des Lesens
+        return ergebnis
+    monkeypatch.setattr(wissen_export, "_inhalt", inhalt_mit_sperre)
+
+    async def ablauf():
+        await db.init_db()
+        c = await db.create_conversation("Chat", user_id=g)
+        await db.add_message(c, "user", "Hallo")
+        return await wissen_export.einmal()
+    assert asyncio.run(ablauf()) == 0
+    assert not (tmp_path / "aus" / f"{g}.export").exists()

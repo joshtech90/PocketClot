@@ -36,6 +36,9 @@ INFO = b"pocketclot-export-v1"
 INTERVALL = 3600
 _DATEI = __import__("re").compile(r"usr_[A-Za-z0-9_-]+")
 _STAND: dict[str, tuple] = {}
+# Zaehler je Konto: jedes Verwerfen erhoeht ihn. Ein Export, der waehrenddessen schon
+# lief, sieht den neuen Wert und wird nicht mehr veroeffentlicht.
+_GENERATION: dict[str, int] = {}
 
 
 def _empfaenger() -> bytes | None:
@@ -91,6 +94,7 @@ async def _inhalt(user_id: str) -> tuple[dict, tuple]:
 
 def verwerfen(user_id: str) -> None:
     """Export eines Kontos sofort entfernen (nach Sperren oder Loeschen eines Chats)."""
+    _GENERATION[user_id] = _GENERATION.get(user_id, 0) + 1
     _STAND.pop(user_id, None)
     ordner = _ordner()
     if ordner is not None and _DATEI.fullmatch(user_id or ""):
@@ -126,6 +130,7 @@ async def einmal() -> int:
         return 0
     geschrieben = 0
     for uid in ziele:
+        generation = _GENERATION.get(uid, 0)
         daten, stand = await _inhalt(uid)
         stand = (empfaenger, stand)   # neuer Empfaenger-Schluessel: neu versiegeln
         ziel = ordner / f"{uid}.export"
@@ -133,9 +138,14 @@ async def einmal() -> int:
             continue
         roh = await asyncio.get_running_loop().run_in_executor(
             None, lambda: versiegeln(gzip.compress(json.dumps(daten, ensure_ascii=False).encode()), empfaenger))
+        if _GENERATION.get(uid, 0) != generation:
+            continue   # waehrenddessen gesperrt oder geloescht: naechster Durchgang
         tmp = ordner / f".{uid}.{secrets.token_hex(4)}.tmp"
         tmp.write_bytes(roh)
         os.chmod(tmp, 0o644)   # Datensalat; lesbar fuer den Abholer, schreibbar nur fuer diesen Dienst
+        if _GENERATION.get(uid, 0) != generation:
+            tmp.unlink(missing_ok=True)
+            continue
         tmp.replace(ziel)
         _STAND[uid] = stand
         geschrieben += 1
