@@ -113,6 +113,13 @@ class Settings(BaseSettings):
     # Bash set ALLOW_BASH=1 in .env.
     allow_bash: bool = False
 
+    # Privates Gedaechtnis (Werkzeug `erinnern`). Der Lesedienst laeuft auf einem
+    # anderen Rechner; hier stehen nur Adresse, Token und die Konten, fuer die das
+    # Werkzeug ueberhaupt angeboten wird (Komma-Liste von User-IDs). Leer = aus.
+    wissen_url: str = ""
+    wissen_token: str = ""
+    wissen_user_ids: str = ""
+
     @field_validator("server_token")
     @classmethod
     def _reject_placeholder_token(cls, v: str) -> str:

@@ -405,7 +405,8 @@ def _format_transcript(all_msgs: list[dict], current_user_message_id: int) -> st
 # ---------- Bild-Werkzeug fuer den Claude-Pfad ----------
 
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
-                            collected: list[dict], events: "asyncio.Queue"):
+                            collected: list[dict], events: "asyncio.Queue",
+                            mit_bild: bool = True, mit_wissen: bool = False):
     """Registriert `generate_image` als In-Process-MCP-Werkzeug.
 
     Die Claude-Agent-SDK kann Werkzeuge direkt im Server-Prozess ausfuehren, ohne
@@ -416,15 +417,16 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
     Rueckgabe: (mcp_server, tool_name) oder (None, None), wenn die SDK das nicht
     kann. Ein Fehler hier darf den Chat nie kippen.
     """
-    if user_id is None:
-        return None, None
+    if user_id is None or not (mit_bild or mit_wissen):
+        return None, []
     try:
         from claude_agent_sdk import create_sdk_mcp_server, tool
 
         from pocket_claude import image_tool as _image_tool
+        from pocket_claude import wissen_tool as _wissen_tool
     except ImportError as exc:
-        log.warning("PC_IMG: Bild-Werkzeug nicht verfuegbar: %s", exc)
-        return None, None
+        log.warning("PC_IMG: Werkzeuge nicht verfuegbar: %s", exc)
+        return None, []
 
     @tool(_image_tool.TOOL_NAME, _image_tool.TOOL_DESCRIPTION, _image_tool.PARAMETERS)
     async def _generate_image(args: dict) -> dict:
@@ -437,14 +439,24 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
             events.put_nowait({"type": "image", "attachments": atts})
         return {"content": [{"type": "text", "text": result.get("text") or ""}]}
 
+    @tool(_wissen_tool.TOOL_NAME, _wissen_tool.TOOL_DESCRIPTION, _wissen_tool.PARAMETERS)
+    async def _erinnern(args: dict) -> dict:
+        result = await _wissen_tool.run(user_id, args or {})
+        return {"content": [{"type": "text", "text": result.get("text") or ""}]}
+
+    werkzeuge, namen = [], []
+    if mit_bild:
+        werkzeuge.append(_generate_image)
+        namen.append(f"mcp__pocket__{_image_tool.TOOL_NAME}")
+    if mit_wissen:
+        werkzeuge.append(_erinnern)
+        namen.append(f"mcp__pocket__{_wissen_tool.TOOL_NAME}")
     try:
-        server = create_sdk_mcp_server(
-            name="pocket", version="1.0.0", tools=[_generate_image],
-        )
+        server = create_sdk_mcp_server(name="pocket", version="1.0.0", tools=werkzeuge)
     except Exception as exc:  # noqa: BLE001 - SDK-Version passt nicht, dann eben ohne
         log.warning("PC_IMG: MCP-Server konnte nicht gebaut werden: %s", exc)
-        return None, None
-    return server, f"mcp__pocket__{_image_tool.TOOL_NAME}"
+        return None, []
+    return server, namen
 
 
 # ---------- Streaming via claude-agent-sdk ----------
@@ -555,13 +567,15 @@ async def stream_reply(
         image_attachments: list[dict] = []
         image_events: asyncio.Queue = asyncio.Queue()
         mcp_servers: dict = {}
-        if sk.get("image_generation", True):
-            img_server, img_tool_name = _build_image_mcp_server(
-                user_id, image_defaults, image_attachments, image_events,
-            )
-            if img_server is not None and img_tool_name:
-                mcp_servers["pocket"] = img_server
-                allowed_tools.append(img_tool_name)
+        from pocket_claude import wissen_tool as _wissen_tool
+        mit_wissen = _wissen_tool.freigeschaltet(user_id)
+        img_server, werkzeug_namen = _build_image_mcp_server(
+            user_id, image_defaults, image_attachments, image_events,
+            mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
+        )
+        if img_server is not None and werkzeug_namen:
+            mcp_servers["pocket"] = img_server
+            allowed_tools.extend(werkzeug_namen)
 
         log.info("Skills enabled → allowed_tools: %s", allowed_tools)
 

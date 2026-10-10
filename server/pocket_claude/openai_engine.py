@@ -457,6 +457,19 @@ async def stream_reply(
             except ImportError as exc:
                 log.warning("PC_GW: Bild-Werkzeug nicht verfuegbar: %s", exc)
 
+        # Privates Gedaechtnis, nur fuer freigeschaltete Konten
+        from pocket_claude import wissen_tool
+        mit_wissen = wissen_tool.freigeschaltet(user_id)
+        if mit_wissen:
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": wissen_tool.TOOL_NAME,
+                    "description": wissen_tool.TOOL_DESCRIPTION,
+                    "parameters": wissen_tool.PARAMETERS,
+                },
+            })
+
         # Suche: GPT bei CodexLB bringt seine eigene mit, die ist besser
         # eingebunden als alles, was wir vorne dranbauen koennten. Gemini
         # bekommt unser Werkzeug, das intern den nativen Google-Pfad benutzt.
@@ -710,6 +723,9 @@ async def stream_reply(
                                     "Bild erzeugt." if result.get("ok")
                                     else "Bilderzeugung fehlgeschlagen."
                                 )
+                        elif mit_wissen and name == wissen_tool.TOOL_NAME:
+                            res = await wissen_tool.run(user_id, args)
+                            tool_text = res["text"]
                         elif own_search and name == web_tool.SEARCH_TOOL_NAME:
                             res = await web_tool.search(
                                 gw, model_id, str(args.get("query") or ""))
