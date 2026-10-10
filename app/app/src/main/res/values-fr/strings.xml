@@ -896,4 +896,11 @@
     <item quantity="one">Le message après cette réponse sera supprimé. Vous continuerez ensuite à partir d\'ici.</item>
     <item quantity="other">Les %1$d messages après cette réponse seront supprimés. Vous continuerez ensuite à partir d\'ici.</item>
   </plurals>
+    <string name="section_memory">Mémoire</string>
+    <string name="memory_key_set">Clé enregistrée sur cet appareil</string>
+    <string name="memory_key_unset">Aucune clé</string>
+    <string name="memory_key_label">Clé de mémoire</string>
+    <string name="memory_key_save">Enregistrer</string>
+    <string name="memory_key_remove">Supprimer</string>
+    <string name="memory_key_info">Ta mémoire privée est chiffrée sur le serveur. Colle la clé une fois ; elle reste sur cet appareil et n\'est envoyée qu\'avec tes propres messages. Le serveur ne la conserve pas.</string>
 </resources>

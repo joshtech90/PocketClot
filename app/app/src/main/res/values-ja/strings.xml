@@ -895,4 +895,11 @@
   <plurals name="rewind_dialog_body">
     <item quantity="other">この回答より後の%1$d件のメッセージは破棄されます。その後、ここから再開します。</item>
   </plurals>
+    <string name="section_memory">メモリー</string>
+    <string name="memory_key_set">この端末にキーを保存済み</string>
+    <string name="memory_key_unset">キー未設定</string>
+    <string name="memory_key_label">メモリーキー</string>
+    <string name="memory_key_save">保存</string>
+    <string name="memory_key_remove">削除</string>
+    <string name="memory_key_info">あなたのプライベートなメモリーはサーバー上で暗号化されています。キーを一度貼り付けてください。キーはこの端末にのみ保存され、自分のチャットメッセージと一緒にだけ送信されます。サーバーは保存しません。</string>
 </resources>

@@ -594,8 +594,12 @@ def _conv_lock(cid: str) -> asyncio.Lock:
 
 
 @app.post("/conversations/{cid}/messages")
-async def send_message(cid: str, body: SendMessageRequest, user=Depends(require_user)) -> EventSourceResponse:
+async def send_message(cid: str, body: SendMessageRequest, request: Request,
+                       user=Depends(require_user)) -> EventSourceResponse:
     """Sendet eine User-Message und streamt die Assistant-Antwort via SSE."""
+    # Gedaechtnis-Schluessel aus der App: nur durchreichen, nie speichern oder loggen
+    from pocket_claude import wissen_tool
+    wissen_schluessel = request.headers.get(wissen_tool.HEADER) or None
     conv = await db.get_conversation(cid, user_id=user["id"])
     if not conv:
         raise HTTPException(404, "Konversation nicht gefunden.")
@@ -813,6 +817,7 @@ async def send_message(cid: str, body: SendMessageRequest, user=Depends(require_
                     # Dieselben Schalter wie bei Claude. Was ein Zusatz-Modell
                     # nicht kann (Bash), faellt in der Engine still weg.
                     skills=skills_dict,
+                    wissen_schluessel=wissen_schluessel,
                 )
             else:
                 engine_stream = claude_engine.stream_reply(
@@ -825,6 +830,7 @@ async def send_message(cid: str, body: SendMessageRequest, user=Depends(require_
                     extra_attachment_ids=extra_attachment_ids,
                     replay_history=replay_history,
                     image_defaults=image_defaults,
+                    wissen_schluessel=wissen_schluessel,
                 )
 
             async for ev in engine_stream:

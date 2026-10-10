@@ -113,11 +113,10 @@ class Settings(BaseSettings):
     # Bash set ALLOW_BASH=1 in .env.
     allow_bash: bool = False
 
-    # Privates Gedaechtnis (Werkzeug `erinnern`). Der Lesedienst laeuft auf einem
-    # anderen Rechner; hier stehen nur Adresse, Token und die Konten, fuer die das
-    # Werkzeug ueberhaupt angeboten wird (Komma-Liste von User-IDs). Leer = aus.
-    wissen_url: str = ""
-    wissen_token: str = ""
+    # Privates Gedaechtnis (Werkzeug `erinnern`). Hier liegt nur ein verschluesseltes
+    # Paket (Pfad), den Schluessel schickt die App bei jeder Nachricht mit. Dazu die
+    # Konten, fuer die das Werkzeug ueberhaupt angeboten wird (Komma-Liste). Leer = aus.
+    wissen_paket: str = ""
     wissen_user_ids: str = ""
 
     @field_validator("server_token")

@@ -394,6 +394,7 @@ async def stream_reply(
     allow_image_tool: bool = True,
     image_defaults: dict | None = None,
     skills: dict | None = None,
+    wissen_schluessel: str | None = None,
 ) -> AsyncIterator[dict]:
     """Streamt eine Antwort eines Zusatz-Modells.
 
@@ -459,7 +460,7 @@ async def stream_reply(
 
         # Privates Gedaechtnis, nur fuer freigeschaltete Konten
         from pocket_claude import wissen_tool
-        mit_wissen = wissen_tool.freigeschaltet(user_id)
+        mit_wissen = wissen_tool.freigeschaltet(user_id, wissen_schluessel)
         erinnert = False
         if mit_wissen:
             tools.append({
@@ -725,7 +726,7 @@ async def stream_reply(
                                     else "Bilderzeugung fehlgeschlagen."
                                 )
                         elif mit_wissen and name == wissen_tool.TOOL_NAME:
-                            res = await wissen_tool.run(user_id, args)
+                            res = await wissen_tool.run(user_id, args, wissen_schluessel)
                             tool_text = res["text"]
                             # Nach privater Recherche keine Webwerkzeuge mehr in diesem Turn
                             erinnert = True

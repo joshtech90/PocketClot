@@ -896,4 +896,11 @@
     <item quantity="one">A mensagem após esta resposta será descartada. Depois você continuará a partir daqui.</item>
     <item quantity="other">As %1$d mensagens após esta resposta serão descartadas. Depois você continuará a partir daqui.</item>
   </plurals>
+    <string name="section_memory">Memória</string>
+    <string name="memory_key_set">Chave salva neste dispositivo</string>
+    <string name="memory_key_unset">Nenhuma chave</string>
+    <string name="memory_key_label">Chave da memória</string>
+    <string name="memory_key_save">Salvar</string>
+    <string name="memory_key_remove">Remover</string>
+    <string name="memory_key_info">Sua memória privada fica criptografada no servidor. Cole a chave uma vez; ela fica neste dispositivo e só é enviada com suas próprias mensagens. O servidor não a armazena.</string>
 </resources>

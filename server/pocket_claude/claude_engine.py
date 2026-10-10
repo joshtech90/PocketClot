@@ -448,7 +448,7 @@ def _nach_erinnern_sperren(zustand: dict) -> dict:
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
                             collected: list[dict], events: "asyncio.Queue",
                             mit_bild: bool = True, mit_wissen: bool = False,
-                            wissen_zustand: dict | None = None):
+                            wissen_zustand: dict | None = None, wissen_schluessel: str | None = None):
     """Registriert `generate_image` als In-Process-MCP-Werkzeug.
 
     Die Claude-Agent-SDK kann Werkzeuge direkt im Server-Prozess ausfuehren, ohne
@@ -485,7 +485,7 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
     async def _erinnern(args: dict) -> dict:
         if wissen_zustand is not None:
             wissen_zustand["erinnert"] = True
-        result = await _wissen_tool.run(user_id, args or {})
+        result = await _wissen_tool.run(user_id, args or {}, wissen_schluessel)
         return {"content": [{"type": "text", "text": result.get("text") or ""}]}
 
     werkzeuge, namen = [], []
@@ -516,6 +516,7 @@ async def stream_reply(
     extra_attachment_ids: list[str] | None = None,
     replay_history: bool = False,
     image_defaults: dict | None = None,
+    wissen_schluessel: str | None = None,
 ) -> AsyncIterator[dict]:
     """Yieldet SSE-kompatible Events:
       - {"type": "delta", "text": "..."}
@@ -612,12 +613,12 @@ async def stream_reply(
         image_events: asyncio.Queue = asyncio.Queue()
         mcp_servers: dict = {}
         from pocket_claude import wissen_tool as _wissen_tool
-        mit_wissen = _wissen_tool.freigeschaltet(user_id)
+        mit_wissen = _wissen_tool.freigeschaltet(user_id, wissen_schluessel)
         wissen_zustand: dict = {}
         img_server, werkzeug_namen = _build_image_mcp_server(
             user_id, image_defaults, image_attachments, image_events,
             mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
-            wissen_zustand=wissen_zustand,
+            wissen_zustand=wissen_zustand, wissen_schluessel=wissen_schluessel,
         )
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server

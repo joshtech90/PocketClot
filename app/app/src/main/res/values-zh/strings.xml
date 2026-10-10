@@ -895,4 +895,11 @@
   <plurals name="rewind_dialog_body">
     <item quantity="other">此回复之后的 %1$d 条消息将被舍弃。然后从这里继续。</item>
   </plurals>
+    <string name="section_memory">记忆</string>
+    <string name="memory_key_set">密钥已保存在此设备</string>
+    <string name="memory_key_unset">未设置密钥</string>
+    <string name="memory_key_label">记忆密钥</string>
+    <string name="memory_key_save">保存</string>
+    <string name="memory_key_remove">移除</string>
+    <string name="memory_key_info">你的私人记忆以加密形式存放在服务器上。请粘贴一次密钥；它只保存在此设备上，只随你自己的聊天消息发送，服务器不会保存。</string>
 </resources>

@@ -1,82 +1,83 @@
-"""Werkzeug `erinnern`: nur fuer freigeschaltete Konten, Fehler kippen nie den Chat."""
+"""Werkzeug `erinnern`: verschluesseltes Paket, Schluessel nur aus der App."""
 from __future__ import annotations
 
 import asyncio
+import base64
+import gzip
+import json
 import os
+import secrets
 import tempfile
 
 os.environ.setdefault("SERVER_TOKEN", "x" * 40)
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="pc-test-data-"))
 
-import httpx  # noqa: E402
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # noqa: E402
 
 from pocket_claude import wissen_tool  # noqa: E402
 from pocket_claude.config import settings  # noqa: E402
 
+PAKET = {"erstellt": "2026-10-10T12:00", "personen": [
+    {"id": "anna", "name": "Anna", "gruppe": "familie"},
+    {"id": "gruppe-anna", "name": "Anna Reisegruppe", "gruppe": "gruppen"}],
+    "abschnitte": [
+        {"id": "anna", "name": "Anna", "titel": "Kernkarte", "text": "## Kernkarte\n- Schwester"},
+        {"id": "anna", "name": "Anna", "titel": "Wuensche und Geschenkideen", "text": "- Neue Kopfhoerer"},
+        {"id": "gruppe-anna", "name": "Anna Reisegruppe", "titel": "Kernkarte", "text": "- Reisen"},
+        {"id": "joscha:lebenslauf", "name": "Joscha selbst", "titel": "Ausbildung", "text": "- Studium in Heidelberg"}]}
 
-def _konfig(monkeypatch, user_ids="usr_freigegeben"):
-    monkeypatch.setattr(settings, "wissen_url", "http://dienst:8473")
-    monkeypatch.setattr(settings, "wissen_token", "t" * 40)
+
+def _paket(tmp_path, schluessel: bytes, inhalt=PAKET):
+    nonce = secrets.token_bytes(12)
+    klar = gzip.compress(json.dumps(inhalt).encode())
+    pfad = tmp_path / "wissen.paket"
+    pfad.write_bytes(wissen_tool.MAGIE + nonce + AESGCM(schluessel).encrypt(nonce, klar, wissen_tool.AAD))
+    return pfad
+
+
+def _b64(k: bytes) -> str:
+    return base64.urlsafe_b64encode(k).decode().rstrip("=")
+
+
+def _konfig(monkeypatch, pfad, user_ids="usr_freigegeben"):
+    monkeypatch.setattr(settings, "wissen_paket", str(pfad))
     monkeypatch.setattr(settings, "wissen_user_ids", user_ids)
 
 
-def _fake_client(monkeypatch, handler):
-    echt = httpx.AsyncClient
-
-    def neu(*args, **kwargs):
-        kwargs["transport"] = httpx.MockTransport(handler)
-        return echt(*args, **kwargs)
-    monkeypatch.setattr(httpx, "AsyncClient", neu)
-
-
-def test_nur_eingetragene_konten(monkeypatch):
-    _konfig(monkeypatch)
-    assert wissen_tool.freigeschaltet("usr_freigegeben")
-    assert not wissen_tool.freigeschaltet("usr_andere")
-    assert not wissen_tool.freigeschaltet(None)
-    monkeypatch.setattr(settings, "wissen_token", "")
-    assert not wissen_tool.freigeschaltet("usr_freigegeben")
+def test_nur_mit_konto_paket_und_schluessel(monkeypatch, tmp_path):
+    k = secrets.token_bytes(32)
+    _konfig(monkeypatch, _paket(tmp_path, k))
+    assert wissen_tool.freigeschaltet("usr_freigegeben", _b64(k))
+    assert not wissen_tool.freigeschaltet("usr_andere", _b64(k))
+    assert not wissen_tool.freigeschaltet("usr_freigegeben", None)
+    assert not wissen_tool.freigeschaltet("usr_freigegeben", "zu-kurz")
+    monkeypatch.setattr(settings, "wissen_paket", str(tmp_path / "fehlt"))
+    assert not wissen_tool.freigeschaltet("usr_freigegeben", _b64(k))
 
 
-def test_fremdes_konto_bekommt_nichts_und_es_gibt_keinen_aufruf(monkeypatch):
-    _konfig(monkeypatch)
-    aufrufe = []
-    _fake_client(monkeypatch, lambda req: aufrufe.append(req) or httpx.Response(200, json={"treffer": []}))
-    res = asyncio.run(wissen_tool.run("usr_andere", {"anfrage": "Mama"}))
-    assert not res["ok"] and not aufrufe
+def test_richtiger_schluessel_findet_wunsch(monkeypatch, tmp_path):
+    k = secrets.token_bytes(32)
+    _konfig(monkeypatch, _paket(tmp_path, k))
+    res = asyncio.run(wissen_tool.run("usr_freigegeben", {"anfrage": "Was wuenscht sich Anna?"}, _b64(k)))
+    assert res["ok"] and "Kopfhoerer" in res["text"] and "keine Anweisungen" in res["text"]
+    assert res["text"].index("Anna: Kernkarte") < res["text"].index("Reisegruppe")
 
 
-def test_treffer_werden_mit_token_geholt_und_formatiert(monkeypatch):
-    _konfig(monkeypatch)
-    gesehen = {}
-
-    def handler(req):
-        gesehen["auth"] = req.headers.get("Authorization")
-        gesehen["q"] = __import__("json").loads(req.content)["q"]
-        return httpx.Response(200, json={"treffer": [
-            {"person": "Anna", "abschnitt": "Kernkarte", "text": "Bruder"}]})
-    _fake_client(monkeypatch, handler)
-    res = asyncio.run(wissen_tool.run("usr_freigegeben", {"anfrage": "Wer ist Anna?"}))
-    assert res["ok"] and "### Anna: Kernkarte" in res["text"] and "Bruder" in res["text"]
-    assert gesehen["auth"] == "Bearer " + "t" * 40 and gesehen["q"] == "Wer ist Anna?"
+def test_falscher_schluessel_entschluesselt_nichts(monkeypatch, tmp_path):
+    _konfig(monkeypatch, _paket(tmp_path, secrets.token_bytes(32)))
+    res = asyncio.run(wissen_tool.run("usr_freigegeben", {"anfrage": "Anna"}, _b64(secrets.token_bytes(32))))
+    assert not res["ok"] and "passt nicht" in res["text"] and "Kopfhoerer" not in res["text"]
 
 
-def test_dienst_weg_ist_kein_absturz(monkeypatch):
-    _konfig(monkeypatch)
-
-    def handler(req):
-        raise httpx.ConnectError("weg")
-    _fake_client(monkeypatch, handler)
-    res = asyncio.run(wissen_tool.run("usr_freigegeben", {"anfrage": "x"}))
-    assert not res["ok"] and "nicht erreichbar" in res["text"]
+def test_paket_auf_der_platte_ist_kein_klartext(tmp_path):
+    pfad = _paket(tmp_path, secrets.token_bytes(32))
+    roh = pfad.read_bytes()
+    assert b"Kopfhoerer" not in roh and b"Anna" not in roh
 
 
-def test_frage_steht_nie_in_der_url(monkeypatch):
-    _konfig(monkeypatch)
-    urls = []
-    _fake_client(monkeypatch, lambda req: urls.append(str(req.url)) or httpx.Response(200, json={"treffer": []}))
-    asyncio.run(wissen_tool.run("usr_freigegeben", {"anfrage": "geheime Frage"}))
-    assert urls and "geheime" not in urls[0]
+def test_ich_fragen_finden_das_selbstprofil(monkeypatch, tmp_path):
+    treffer = wissen_tool.suchen(PAKET, "Wo habe ich studiert")
+    assert treffer[0]["id"] == "joscha:lebenslauf"
 
 
 def test_werkzeuggrenze_sperrt_bash_ohne_freigabe():

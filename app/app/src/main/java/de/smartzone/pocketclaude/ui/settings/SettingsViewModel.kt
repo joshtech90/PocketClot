@@ -233,6 +233,10 @@ class SettingsViewModel(
         _testResult.value = ConnectionTestResult.Idle
     }
 
+    fun setWissenSchluessel(value: String) = viewModelScope.launch {
+        settingsRepo.setWissenSchluessel(value)
+    }
+
     fun setServerToken(value: String) = viewModelScope.launch {
         settingsRepo.setServerToken(value)
         _testResult.value = ConnectionTestResult.Idle

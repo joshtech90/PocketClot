@@ -673,13 +673,18 @@ class ApiClient(
     ): Flow<StreamEvent> = callbackFlow {
         val base = baseUrl()
         val auth = authHeader()
+        val wissenSchluessel = settings.current().wissenSchluessel
         val url = "$base/conversations/$conversationId/messages".toHttpUrlOrNull()
             ?: error("Invalid server URL: $base")
 
-        val req = Request.Builder()
+        val builder = Request.Builder()
             .url(url)
             .header("Authorization", auth)
             .header("Accept", "text/event-stream")
+        // Gedaechtnis-Schluessel nur an den eigenen Server und nur bei Chat-Nachrichten.
+        // Der Server entschluesselt damit nur fuer diese Antwort und speichert ihn nicht.
+        if (wissenSchluessel.isNotBlank()) builder.header("X-Wissen-Schluessel", wissenSchluessel)
+        val req = builder
             .post(
                 json.encodeToString(request)
                     .toRequestBody("application/json".toMediaType())

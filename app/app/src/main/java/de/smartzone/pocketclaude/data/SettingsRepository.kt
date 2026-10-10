@@ -58,6 +58,10 @@ data class Profile(
     val serverUrl: String,
     val serverToken: String,
     val username: String = "",
+    /** Schluessel fuer das verschluesselte Gedaechtnis auf dem Server. Bleibt nur
+     *  auf dem Geraet (nicht im Einstellungs-Export) und geht nur im Header
+     *  X-Wissen-Schluessel an den eigenen Server mit. Leer = aus. */
+    val wissenSchluessel: String = "",
 )
 
 data class AppSettings(
@@ -129,6 +133,8 @@ data class AppSettings(
     val serverUrl: String get() = activeProfile?.serverUrl.orEmpty()
     /** Token des aktiven Profils. */
     val serverToken: String get() = activeProfile?.serverToken.orEmpty()
+    /** Gedaechtnis-Schluessel des aktiven Profils, leer wenn keiner eingetragen ist. */
+    val wissenSchluessel: String get() = activeProfile?.wissenSchluessel.orEmpty()
 
     val isConfigured: Boolean
         get() = serverUrl.isNotBlank() && serverToken.isNotBlank()
@@ -407,7 +413,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     suspend fun updateProfile(id: String, label: String? = null,
                               url: String? = null, token: String? = null,
-                              username: String? = null) {
+                              username: String? = null, wissenSchluessel: String? = null) {
         dataStore.edit { prefs ->
             val list = loadProfilesWithMigration(prefs).map { p ->
                 if (p.id != id) p else p.copy(
@@ -415,6 +421,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
                     serverUrl = (url ?: p.serverUrl).trim().trimEnd('/'),
                     serverToken = (token ?: p.serverToken).trim(),
                     username = (username ?: p.username).trim(),
+                    wissenSchluessel = (wissenSchluessel ?: p.wissenSchluessel).trim(),
                 )
             }
             prefs[keyProfiles] = json.encodeToString(list)
@@ -453,6 +460,12 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val active = s.activeProfile
         if (active != null) updateProfile(active.id, url = value)
         else upsertProfile("Standard", value, "", makeActive = true)
+    }
+
+    /** Setzt den Gedaechtnis-Schluessel des aktiven Profils (leer = entfernen). */
+    suspend fun setWissenSchluessel(value: String) {
+        val active = current().activeProfile ?: return
+        updateProfile(active.id, wissenSchluessel = value)
     }
 
     suspend fun setServerToken(value: String) {

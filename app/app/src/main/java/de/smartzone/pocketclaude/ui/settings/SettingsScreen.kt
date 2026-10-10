@@ -263,6 +263,17 @@ fun SettingsScreen(
             }
 
             ExpandableSection(
+                title = stringResource(de.smartzone.pocketclaude.R.string.section_memory),
+                subtitle = stringResource(
+                    if (settings.wissenSchluessel.isNotBlank()) de.smartzone.pocketclaude.R.string.memory_key_set
+                    else de.smartzone.pocketclaude.R.string.memory_key_unset
+                ),
+                initiallyExpanded = false,
+            ) {
+                MemoryKeyCard(vm = vm, settings = settings)
+            }
+
+            ExpandableSection(
                 title = stringResource(de.smartzone.pocketclaude.R.string.section_token_usage),
                 subtitle = stringResource(de.smartzone.pocketclaude.R.string.usage_this_month),
                 initiallyExpanded = false,
@@ -2744,6 +2755,39 @@ private fun shareBackupZip(context: android.content.Context, bytes: ByteArray, f
  * obvious. Profile-label is moved to the bottom and marked optional —
  * users who don't bother get a sensible default ("Server").
  */
+/** Schluessel fuer das verschluesselte Gedaechtnis. Bleibt auf dem Geraet; der Server
+ *  bekommt ihn nur mit jeder Chat-Nachricht und speichert ihn nicht. */
+@Composable
+private fun MemoryKeyCard(vm: SettingsViewModel, settings: de.smartzone.pocketclaude.data.AppSettings) {
+    var eingabe by remember { mutableStateOf("") }
+    val gesetzt = settings.wissenSchluessel.isNotBlank()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.memory_key_info),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedTextField(
+            value = eingabe,
+            onValueChange = { eingabe = it.trim() },
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.memory_key_label)) },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { vm.setWissenSchluessel(eingabe); eingabe = "" },
+                enabled = eingabe.length >= 40,
+            ) { Text(stringResource(de.smartzone.pocketclaude.R.string.memory_key_save)) }
+            if (gesetzt) {
+                OutlinedButton(onClick = { vm.setWissenSchluessel("") }) {
+                    Text(stringResource(de.smartzone.pocketclaude.R.string.memory_key_remove))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun FirstRunSignInCard(vm: SettingsViewModel) {
     val loginState by vm.loginState.collectAsState()
