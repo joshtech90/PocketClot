@@ -308,6 +308,7 @@ els.logoutBtn.addEventListener('click', async () => {
   // wenn der Token bereits ungültig ist, dann reicht der lokale Cleanup)
   try { await api('POST', '/auth/logout'); } catch (_) {}
   localStorage.removeItem(LS.token);
+  wissenVergessen();
   state.token = '';
   state.cid = null;
   location.reload();
@@ -2009,17 +2010,52 @@ function abortStream() {
   }
 }
 
+// =========================================================
+// Gedaechtnis-Schluessel (wie in der App): je Konto ein Eintrag, gebunden an die
+// Server-Adresse, fuer die er eingetragen wurde. Geht nur ueber HTTPS und nur mit
+// Chat-Nachrichten raus; der Server entschluesselt damit nur fuer diese Antwort.
+// =========================================================
+const WISSEN_PREFIX = 'pc.wissen.';
+const WISSEN_FORMAT = /^[A-Za-z0-9_-]{43}=?$/;   // 32 Byte als base64url
+
+function serverOrigin() {
+  try { return new URL(state.serverUrl).origin; } catch { return ''; }
+}
+
+function wissenSchluessel() {
+  if (!state.me || !state.me.id) return '';
+  const origin = serverOrigin();
+  if (!origin.startsWith('https://')) return '';
+  try {
+    const e = JSON.parse(localStorage.getItem(WISSEN_PREFIX + state.me.id) || 'null');
+    return e && e.o === origin && WISSEN_FORMAT.test(e.k || '') ? e.k : '';
+  } catch { return ''; }
+}
+
+/** Beim Abmelden alle Schluessel aus diesem Browser entfernen. */
+function wissenVergessen() {
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith(WISSEN_PREFIX))
+    .forEach((k) => localStorage.removeItem(k));
+}
+
 async function streamReply(content) {
   abortStream();
   const ctrl = new AbortController();
   state.abort = ctrl;
+  const headers = {
+    'Authorization': 'Bearer ' + state.token,
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream',
+  };
+  const wissen = wissenSchluessel();
+  if (wissen) headers['X-Wissen-Schluessel'] = wissen;
   const resp = await fetch(state.serverUrl + '/conversations/' + state.cid + '/messages', {
     method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + state.token,
-      'Content-Type': 'application/json',
-      'Accept': 'text/event-stream',
-    },
+    headers,
+    // Mit Schluessel keiner Weiterleitung folgen: der Browser wuerde den Header
+    // auch an eine fremde Adresse mitschicken.
+    redirect: wissen ? 'error' : 'follow',
     body: JSON.stringify({
       content,
       attachment_ids: state.messages[state.messages.length - 1]?.attachments?.map(a => a.id) || [],
@@ -2603,6 +2639,7 @@ if (logoutAllBtn) logoutAllBtn.addEventListener('click', async () => {
   try {
     await api('POST', '/auth/logout-all');
     localStorage.removeItem(LS.token);
+    wissenVergessen();
     state.token = '';
     location.reload();
   } catch (e) { toast(t('toast_logout_all_failed', e.message), { error: true }); }
@@ -2617,7 +2654,38 @@ openSettings = async function() {
   if (state.me && state.me.is_admin) await loadUsersList();
   await loadImageKeyStatus();
   await loadChatLockStatus();
+  loadMemoryKeyStatus();
 };
+
+// =========================================================
+// Settings → Gedaechtnis-Schluessel
+// =========================================================
+function loadMemoryKeyStatus(msg = '', cls = '') {
+  const gesetzt = !!wissenSchluessel();
+  const el = document.getElementById('memory-key-status');
+  if (el) {
+    el.textContent = msg || t(gesetzt ? 'memory_key_set' : 'memory_key_unset');
+    el.className = 'backup-status ' + (cls || (gesetzt ? 'ok' : ''));
+  }
+  document.getElementById('memory-key-remove')?.classList.toggle('hidden', !gesetzt);
+}
+
+document.getElementById('memory-key-save')?.addEventListener('click', () => {
+  const input = document.getElementById('memory-key-input');
+  const k = (input.value || '').trim();
+  if (!WISSEN_FORMAT.test(k)) { loadMemoryKeyStatus(t('memory_key_invalid'), 'error'); return; }
+  const origin = serverOrigin();
+  if (!origin.startsWith('https://')) { loadMemoryKeyStatus(t('memory_key_https'), 'error'); return; }
+  if (!state.me || !state.me.id) return;
+  localStorage.setItem(WISSEN_PREFIX + state.me.id, JSON.stringify({ k, o: origin }));
+  input.value = '';
+  loadMemoryKeyStatus();
+});
+
+document.getElementById('memory-key-remove')?.addEventListener('click', () => {
+  if (state.me && state.me.id) localStorage.removeItem(WISSEN_PREFIX + state.me.id);
+  loadMemoryKeyStatus();
+});
 
 // =========================================================
 // Settings → Chat-Sperre (globale PIN setzen/ändern/entfernen)
