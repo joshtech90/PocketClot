@@ -2022,10 +2022,15 @@ function serverOrigin() {
   try { return new URL(state.serverUrl).origin; } catch { return ''; }
 }
 
+// HTTPS, oder unverschluesselt nur zum eigenen Rechner (lokaler Testserver)
+function sichereHerkunft(origin) {
+  return origin.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 function wissenSchluessel() {
   if (!state.me || !state.me.id) return '';
   const origin = serverOrigin();
-  if (!origin.startsWith('https://')) return '';
+  if (!sichereHerkunft(origin)) return '';
   try {
     const e = JSON.parse(localStorage.getItem(WISSEN_PREFIX + state.me.id) || 'null');
     return e && e.o === origin && WISSEN_FORMAT.test(e.k || '') ? e.k : '';
@@ -2675,7 +2680,7 @@ document.getElementById('memory-key-save')?.addEventListener('click', () => {
   const k = (input.value || '').trim();
   if (!WISSEN_FORMAT.test(k)) { loadMemoryKeyStatus(t('memory_key_invalid'), 'error'); return; }
   const origin = serverOrigin();
-  if (!origin.startsWith('https://')) { loadMemoryKeyStatus(t('memory_key_https'), 'error'); return; }
+  if (!sichereHerkunft(origin)) { loadMemoryKeyStatus(t('memory_key_https'), 'error'); return; }
   if (!state.me || !state.me.id) return;
   localStorage.setItem(WISSEN_PREFIX + state.me.id, JSON.stringify({ k, o: origin }));
   input.value = '';
