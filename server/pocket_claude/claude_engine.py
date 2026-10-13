@@ -122,6 +122,13 @@ def is_allowed_model(key: str | None) -> bool:
 # ohne diesen Wert entscheidet die Claude-CLI selbst, welches Modell antwortet.
 DEFAULT_CLAUDE_MODEL = "opus"
 
+# Obergrenze fuer EINE JSON-Zeile, die das SDK von der CLI liest. Der
+# SDK-Standard ist 1 MB. Liest Claude ein mitgeschicktes Foto oder PDF mit dem
+# Read-Werkzeug, kommt das Ergebnis base64-kodiert in einer einzigen Zeile
+# zurueck, und schon ein normales Handyfoto sprengte die 1 MB: Der Turn brach
+# dann mit CLIJSONDecodeError ab, ohne ein einziges Wort Antwort.
+CLI_MAX_BUFFER_BYTES = 64 * 1024 * 1024
+
 # Denktiefen, die der Claude-Pfad kennt. "off" heisst: keine Steuerung, der
 # CLI-Default greift.
 CLAUDE_EFFORTS: list[str] = ["off", "low", "medium", "high", "xhigh", "max"]
@@ -197,6 +204,7 @@ async def oneshot_text(
         model=effective_model,
         setting_sources=[],
         env=engine_env,
+        max_buffer_size=CLI_MAX_BUFFER_BYTES,
     )
     resolved_cli = settings.claude_binary or shutil.which("claude")
     if resolved_cli:
@@ -733,6 +741,7 @@ async def stream_reply(
             setting_sources=[],
             env=engine_env,
             stderr=_capture_stderr,
+            max_buffer_size=CLI_MAX_BUFFER_BYTES,
         )
         if mcp_servers:
             options_kwargs["mcp_servers"] = mcp_servers
