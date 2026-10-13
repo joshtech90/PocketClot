@@ -4,6 +4,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -713,7 +714,12 @@ class ApiClient(
             ) {
                 val event = parseEvent(type, data)
                 if (event != null) {
-                    trySend(event)
+                    // Blockierend senden: OkHttp ruft das auf seinem eigenen Lese-Thread
+                    // auf. `trySend` hat bei vollem Puffer (64 Events) still Deltas
+                    // verworfen, wenn die Oberflaeche beim schnellen Streamen nicht
+                    // hinterherkam. Dann fehlten mitten in der Antwort Satzteile oder
+                    // das `done` ging verloren und die Antwort brach einfach ab.
+                    trySendBlocking(event)
                     if (event is StreamEvent.Done || event is StreamEvent.ErrorEvent) {
                         close()
                     }
@@ -722,7 +728,7 @@ class ApiClient(
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
                 val msg = t?.message ?: response?.message ?: "Verbindung verloren"
-                trySend(StreamEvent.ErrorEvent(msg))
+                trySendBlocking(StreamEvent.ErrorEvent(msg))
                 close(t)
             }
 

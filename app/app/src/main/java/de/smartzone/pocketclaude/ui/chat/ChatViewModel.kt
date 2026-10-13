@@ -2,6 +2,7 @@ package de.smartzone.pocketclaude.ui.chat
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -606,7 +608,28 @@ class ChatViewModel(
                 // gewählte Voice/Speed. Nächster Vorlesen-Tap = Cache-Hit.
                 ttsVoice = s.ttsVoice,
                 ttsRate = s.ttsSpeed,
-            ).collect { ev -> handleEvent(ev) }
+            )
+                // Ein Verbindungsabbruch kommt schon als ErrorEvent an; die
+                // Ausnahme dahinter darf die App nicht mehr abstuerzen lassen.
+                .catch { e -> Log.w("PC_NET", "stream ended with ${e::class.java.simpleName}") }
+                .collect { ev -> handleEvent(ev) }
+            // Stream zu, aber weder `done` noch Fehler kam an: Die lokal
+            // gesammelte Antwort kann unvollstaendig sein, der Server hat sie
+            // dagegen ganz gespeichert. Also von dort neu laden statt den Rest
+            // stehen zu lassen.
+            if (_state.value.isStreaming) {
+                Log.w("PC_NET", "stream closed without done, reloading cid=$cid")
+                runCatching { StreamingService.stop(appContext) }
+                _state.update {
+                    it.copy(
+                        isStreaming = false,
+                        streamingText = "",
+                        streamingThinking = "",
+                        streamingAttachments = emptyList(),
+                    )
+                }
+                refresh()
+            }
         }
     }
 
