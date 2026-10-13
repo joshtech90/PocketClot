@@ -44,6 +44,7 @@ from pocket_claude import auth_modes, db, ki_modelle, usage
 from pocket_claude.attachments import (
     build_prompt_text as _build_prompt_text,
     has_binary_attachments as _has_binary_attachments,
+    inline_images as _inline_images,
 )
 from pocket_claude.config import settings
 
@@ -569,8 +570,9 @@ async def stream_reply(
         # Prompt-Bau über die kombinierte ID-Liste (user_msg trägt nur die
         # eigenen Anhänge des Nutzers).
         msg_for_prompt = {**user_msg, "attachment_ids": attach_ids}
-        prompt = _build_prompt_text(msg_for_prompt, attachments_by_id)
-        need_read_tool = _has_binary_attachments(attach_ids, attachments_by_id)
+        image_blocks, inline_ids = _inline_images(attach_ids, attachments_by_id)
+        prompt = _build_prompt_text(msg_for_prompt, attachments_by_id, inline_ids)
+        need_read_tool = _has_binary_attachments(attach_ids, attachments_by_id, inline_ids)
         session_id = conv.get("claude_session_id")
 
         # Konten mit Gedaechtnis laufen ohne CLI-Session: die CLI wuerde Werkzeugergebnisse
@@ -775,7 +777,22 @@ async def stream_reply(
         emitted_via_stream = False
         received_success_result = False
 
-        async for message in query(prompt=prompt, options=options):
+        # Mit Bildern geht die Nachricht als Inhaltsliste raus, Text vorne.
+        # Ein reiner String bleibt der Normalfall.
+        if image_blocks:
+            log.info("PC_FLOW: cid=%s %d Bild(er) direkt in der Nachricht", cid, len(image_blocks))
+            nachricht = {"type": "user", "session_id": "", "parent_tool_use_id": None,
+                         "message": {"role": "user",
+                                     "content": [{"type": "text", "text": prompt}, *image_blocks]}}
+
+            async def _als_strom():
+                yield nachricht
+
+            sdk_prompt = _als_strom()
+        else:
+            sdk_prompt = prompt
+
+        async for message in query(prompt=sdk_prompt, options=options):
             # Vom Bild-Werkzeug erzeugte Events sofort rausschieben, damit das
             # Bild in der App erscheint, sobald es fertig ist, und nicht erst
             # wenn Claude seinen Text zu Ende geschrieben hat.

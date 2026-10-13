@@ -12,6 +12,7 @@ Namen bleiben in `claude_engine` als Alias bestehen.
 """
 from __future__ import annotations
 
+import base64
 import logging
 from pathlib import Path
 
@@ -19,6 +20,14 @@ log = logging.getLogger(__name__)
 
 
 MAX_TEXT_ATTACHMENT_BYTES = 200_000
+
+# Bilder bekommt Claude direkt in die Nachricht, nicht als Pfad fuer das
+# Read-Werkzeug. Ueber das Werkzeug hing es am Modell, ob es den Anhang
+# ueberhaupt oeffnet: in einem langen Chat, in dem es vorher kein Read hatte,
+# antwortete Claude trotz Bild, sein Werkzeug zum Lesen von Dateien sei
+# deaktiviert. Die API nimmt hoechstens 5 MB base64 je Bild, das sind 3,75 MB
+# Rohdaten; groessere Bilder gehen weiter ueber Read, das selbst verkleinert.
+MAX_INLINE_IMAGE_BYTES = 3_750_000
 
 _TEXT_MIME_PREFIXES = ("text/",)
 _TEXT_MIME_TYPES = {
@@ -114,7 +123,53 @@ def looks_like_text(filename: str, mime: str) -> bool:
     return False
 
 
-def build_prompt_text(user_msg: dict, attachments_by_id: dict[str, dict]) -> str:
+def _bildformat(head: bytes) -> str | None:
+    """Mimetyp an den ersten Bytes, nur Formate, die Claude direkt liest."""
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if head[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def inline_images(
+    attach_ids: list[str], attachments_by_id: dict[str, dict]
+) -> tuple[list[dict], set[str]]:
+    """Bild-Anhaenge als Inhaltsbloecke fuer die Nachricht an Claude.
+
+    Liefert die Bloecke und die IDs, die damit erledigt sind. Alles andere
+    (PDF, HEIC, zu gross, Datei fehlt) bleibt beim Read-Werkzeug.
+    """
+    blocks: list[dict] = []
+    ids: set[str] = set()
+    for aid in attach_ids:
+        a = attachments_by_id.get(aid)
+        if not a or aid in ids or looks_like_text(a["filename"], a["mime_type"] or ""):
+            continue
+        path = Path(a["path"])
+        try:
+            if not path.is_file() or path.stat().st_size > MAX_INLINE_IMAGE_BYTES:
+                continue
+            raw = path.read_bytes()
+        except OSError as exc:
+            log.warning("Bild %s nicht lesbar: %s", a["filename"], exc)
+            continue
+        mime = _bildformat(raw[:12])
+        if not mime:
+            continue
+        blocks.append({"type": "image", "source": {
+            "type": "base64", "media_type": mime,
+            "data": base64.b64encode(raw).decode("ascii")}})
+        ids.add(aid)
+    return blocks, ids
+
+
+def build_prompt_text(user_msg: dict, attachments_by_id: dict[str, dict],
+                      inline_ids: set[str] = frozenset()) -> str:
     content = user_msg["content"] or ""
     attach_ids = user_msg.get("attachment_ids") or []
     if not attach_ids:
@@ -132,6 +187,9 @@ def build_prompt_text(user_msg: dict, attachments_by_id: dict[str, dict]) -> str
         path = Path(a["path"])
         if not path.exists():
             parts.append(f"\n\n[Anhang '{filename}' fehlt auf dem Server.]")
+            continue
+        if aid in inline_ids:
+            parts.append(f"\n\n[Bild '{filename}' ist dieser Nachricht direkt beigefuegt.]")
             continue
         if looks_like_text(filename, mime):
             try:
@@ -165,11 +223,12 @@ def build_prompt_text(user_msg: dict, attachments_by_id: dict[str, dict]) -> str
 
 
 def has_binary_attachments(
-    attach_ids: list[str], attachments_by_id: dict[str, dict]
+    attach_ids: list[str], attachments_by_id: dict[str, dict],
+    inline_ids: set[str] = frozenset(),
 ) -> bool:
     for aid in attach_ids:
         a = attachments_by_id.get(aid)
-        if not a:
+        if not a or aid in inline_ids:
             continue
         if not looks_like_text(a["filename"], a["mime_type"]):
             return True
