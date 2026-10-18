@@ -1,63 +1,97 @@
 /* =========================================================
-   PocketClot — Web-UI v2 Redesign
-   Vanilla CSS, ChatGPT-inspirierter Look, Light/Dark.
+   PocketClot — Web-UI
+   Vanilla CSS, Light/Dark. Farben, Schrift- und Symbolgroessen folgen der
+   Android-App: dunkel wie deren Standardpalette Midnight Atelier, hell wie
+   Nordic Blue. Werte kommen aus den Variablen unten, nicht aus Einzelwerten.
    ========================================================= */
 
 :root {
-  /* Brand */
-  --brand-50:  #EAF4FB;
-  --brand-100: #C8E3F2;
-  --brand-200: #9ECCE5;
-  --brand-400: #5BC0DE;
-  --brand-500: #4A90C2;
-  --brand-600: #2F6A94;
-  --brand-700: #1E4D75;
+  /* Schriftskala (px): Overline/Badge · Meta · sekundaer · Standard ·
+     Chattext · Titel · Seitentitel/h1 · Hero */
+  --fs-2xs: 11px;
+  --fs-xs:  12px;
+  --fs-sm:  13px;
+  --fs-md:  14px;
+  --fs-lg:  15px;
+  --fs-xl:  17px;
+  --fs-2xl: 20px;
+  --fs-3xl: 24px;
 
-  /* Light theme */
-  --bg:          #FFFFFF;
-  --bg-elev:     #F7F7F8;
-  --bg-elev-2:   #ECECF1;
-  --sidebar-bg:  #F9F9F9;
+  /* Symbolgroessen (px): Marker · Nachrichten-Aktionen · Sidebar/Menue ·
+     Toolbar/Eingabe · leere Zustaende */
+  --ic-xs: 14px;
+  --ic-sm: 16px;
+  --ic-md: 18px;
+  --ic-lg: 20px;
+  --ic-xl: 40px;
+
+  /* Radien */
+  --radius-xs:  6px;
+  --radius-sm:  8px;
+  --radius:     12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+  --radius-pill: 999px;
+
+  /* Bedienelemente */
+  --control-h: 36px;
+
+  /* Hell: Nordic Blue */
+  --bg:          #F9FBFE;
+  --bg-elev:     #F3F7FB;
+  --bg-elev-2:   #E2EAF2;
+  --sidebar-bg:  #EDF3FA;
   --surface:     #FFFFFF;
-  --surface-2:   #F0F0F2;
-  --border:      #E5E5E7;
-  --border-soft: #EFEFF1;
-  --text:        #2D2D2F;
-  --text-soft:   #565869;
-  --text-muted:  #8E8EA0;
-  --bubble-user: #F0F4F9;
-  --bubble-user-fg: #2D2D2F;
-  --accent:      var(--brand-500);
-  --accent-hover: var(--brand-600);
-  --danger:      #DC2626;
-  --success:     #10B981;
-  --warning:     #F59E0B;
-  --shadow-sm:   0 1px 2px rgba(0,0,0,0.04);
-  --shadow:      0 4px 16px rgba(0,0,0,0.06);
-  --shadow-lg:   0 12px 40px rgba(0,0,0,0.14);
-  --radius:      12px;
-  --radius-lg:   18px;
-  --radius-xl:   24px;
+  --surface-2:   #E9EFF6;
+  --border:      #D2DEEA;
+  --border-soft: #E2EAF2;
+  --text:        #16202B;
+  --text-soft:   #4B5A6A;
+  --text-muted:  #758394;
+  --bubble-user: #1B649E;
+  --bubble-user-fg: #FFFFFF;
+  --accent:      #1B649E;
+  --accent-hover: #15507F;
+  --on-accent:   #FFFFFF;
+  /* Auswahlzustand (Chips, Segmente, aktive Eintraege) wie in der App:
+     secondaryContainer, nicht die Akzentfarbe. */
+  --selected-bg: #CBE6EC;
+  --selected-fg: #002024;
+  --link:        #3E6B75;
+  --danger:      #BA1A1A;
+  --success:     #187A54;
+  --warning:     #8A5A00;
+  --shadow-sm:   0 1px 2px rgba(16,32,48,0.05);
+  --shadow:      0 4px 16px rgba(16,32,48,0.07);
+  --shadow-lg:   0 12px 40px rgba(16,32,48,0.14);
 
   color-scheme: light;
 }
 
+/* Dunkel: Midnight Atelier */
 [data-theme="dark"] {
-  --bg:          #0F0F10;
-  --bg-elev:     #181819;
-  --bg-elev-2:   #242427;
-  --sidebar-bg:  #161617;
-  --surface:     #1B1B1D;
-  --surface-2:   #232326;
-  --border:      #2A2A2D;
-  --border-soft: #222225;
-  --text:        #EAEAEC;
-  --text-soft:   #B4B4BA;
-  --text-muted:  #7D7D86;
-  --bubble-user: #2B2C30;
-  --bubble-user-fg: #EAEAEC;
-  --accent:      var(--brand-400);
-  --accent-hover: var(--brand-200);
+  --bg:          #100E14;
+  --bg-elev:     #1C1821;
+  --bg-elev-2:   #2D2834;
+  --sidebar-bg:  #151219;
+  --surface:     #19161E;
+  --surface-2:   #25212B;
+  --border:      #352F3B;
+  --border-soft: #25212B;
+  --text:        #F1E9E2;
+  --text-soft:   #BEB3AE;
+  --text-muted:  #8C8186;
+  --bubble-user: #E77755;
+  --bubble-user-fg: #26130D;
+  --accent:      #F08361;
+  --accent-hover: #F59B7D;
+  --on-accent:   #29130D;
+  --selected-bg: #214A54;
+  --selected-fg: #BDEAF3;
+  --link:        #8BC9D6;
+  --danger:      #FFB4AB;
+  --success:     #51C99A;
+  --warning:     #F1BE72;
   --shadow-sm:   0 1px 2px rgba(0,0,0,0.5);
   --shadow:      0 8px 24px rgba(0,0,0,0.4);
   --shadow-lg:   0 24px 60px rgba(0,0,0,0.6);
@@ -67,21 +101,28 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:          #0F0F10;
-    --bg-elev:     #181819;
-    --bg-elev-2:   #242427;
-    --sidebar-bg:  #161617;
-    --surface:     #1B1B1D;
-    --surface-2:   #232326;
-    --border:      #2A2A2D;
-    --border-soft: #222225;
-    --text:        #EAEAEC;
-    --text-soft:   #B4B4BA;
-    --text-muted:  #7D7D86;
-    --bubble-user: #2B2C30;
-    --bubble-user-fg: #EAEAEC;
-    --accent:      var(--brand-400);
-    --accent-hover: var(--brand-200);
+    --bg:          #100E14;
+    --bg-elev:     #1C1821;
+    --bg-elev-2:   #2D2834;
+    --sidebar-bg:  #151219;
+    --surface:     #19161E;
+    --surface-2:   #25212B;
+    --border:      #352F3B;
+    --border-soft: #25212B;
+    --text:        #F1E9E2;
+    --text-soft:   #BEB3AE;
+    --text-muted:  #8C8186;
+    --bubble-user: #E77755;
+    --bubble-user-fg: #26130D;
+    --accent:      #F08361;
+    --accent-hover: #F59B7D;
+    --on-accent:   #29130D;
+    --selected-bg: #214A54;
+    --selected-fg: #BDEAF3;
+    --link:        #8BC9D6;
+    --danger:      #FFB4AB;
+    --success:     #51C99A;
+    --warning:     #F1BE72;
     --shadow-sm:   0 1px 2px rgba(0,0,0,0.5);
     --shadow:      0 8px 24px rgba(0,0,0,0.4);
     --shadow-lg:   0 24px 60px rgba(0,0,0,0.6);
