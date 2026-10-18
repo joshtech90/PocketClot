@@ -110,6 +110,11 @@ import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
+import androidx.compose.foundation.layout.ColumnScope
+import de.smartzone.pocketclaude.ui.components.PocketCard
+import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -369,7 +374,7 @@ fun SettingsScreen(
                 initiallyExpanded = false,
             ) {
                 ThemeCard(settings = settings, vm = vm)
-                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 LanguageCard()
             }
 
@@ -467,83 +472,70 @@ private fun ProfileAndServerCard(
     // profile (so the first-run screen stays simple).
     ProfilesCard(vm = vm, settings = settings)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        shape = RoundedCornerShape(28.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            OutlinedTextField(
-                value = settings.serverUrl,
-                onValueChange = vm::setServerUrl,
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_server_url_label)) },
-                placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_server_url_placeholder)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+    PocketCard {
+        OutlinedTextField(
+            value = settings.serverUrl,
+            onValueChange = vm::setServerUrl,
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_server_url_label)) },
+            placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_server_url_placeholder)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        )
+        // Username + Session-Status als Info-Block (read-only, Editier-Pfad
+        // läuft über „Neu anmelden").
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                stringResource(de.smartzone.pocketclaude.R.string.settings_username),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // Username + Session-Status als Info-Block (read-only, Editier-Pfad
-            // läuft über „Neu anmelden").
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_username),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    activeUsername.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in) },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (activeUsername.isNotBlank()) FW.Medium else FW.Normal,
-                )
-                Text(
-                    if (sessionOk) stringResource(de.smartzone.pocketclaude.R.string.settings_session_active)
-                    else stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (sessionOk) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.error,
-                )
-            }
+            Text(
+                activeUsername.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in) },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (activeUsername.isNotBlank()) FW.Medium else FW.Normal,
+            )
+            Text(
+                if (sessionOk) stringResource(de.smartzone.pocketclaude.R.string.settings_session_active)
+                else stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (sessionOk) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+            )
+        }
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                FilledTonalButton(
-                    onClick = vm::testConnection,
-                    enabled = settings.isConfigured && testResult !is ConnectionTestResult.Testing,
-                    shape = RoundedCornerShape(12.dp),
-                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_test_connection)) }
-                FilledTonalButton(
-                    onClick = { reLoginOpen = true },
-                    enabled = activeUsername.isNotBlank() && settings.serverUrl.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                ) { Text(if (sessionOk) stringResource(de.smartzone.pocketclaude.R.string.settings_relogin) else stringResource(de.smartzone.pocketclaude.R.string.settings_login)) }
-                FilledTonalButton(
-                    onClick = { changePwOpen = true },
-                    enabled = sessionOk,
-                    shape = RoundedCornerShape(12.dp),
-                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_change_password)) }
-                if (sessionOk) {
-                    TextButton(onClick = { vm.logoutActiveProfile() }) {
-                        Text(stringResource(de.smartzone.pocketclaude.R.string.settings_logout), color = MaterialTheme.colorScheme.error)
-                    }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            FilledTonalButton(
+                onClick = vm::testConnection,
+                enabled = settings.isConfigured && testResult !is ConnectionTestResult.Testing,
+            ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_test_connection)) }
+            FilledTonalButton(
+                onClick = { reLoginOpen = true },
+                enabled = activeUsername.isNotBlank() && settings.serverUrl.isNotBlank(),
+            ) { Text(if (sessionOk) stringResource(de.smartzone.pocketclaude.R.string.settings_relogin) else stringResource(de.smartzone.pocketclaude.R.string.settings_login)) }
+            FilledTonalButton(
+                onClick = { changePwOpen = true },
+                enabled = sessionOk,
+            ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_change_password)) }
+            if (sessionOk) {
+                TextButton(onClick = { vm.logoutActiveProfile() }) {
+                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_logout), color = MaterialTheme.colorScheme.error)
                 }
             }
-            TestResultIndicator(testResult)
         }
+        TestResultIndicator(testResult)
     }
 
     if (reLoginOpen) {
@@ -581,104 +573,98 @@ private fun ClaudeBehaviorCard(
             stringResource(de.smartzone.pocketclaude.R.string.settings_info_claude_skills_body)
         )
     }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Globales Standard-Modell für neue Chats, über alle Familien.
-            val chatModels by vm.chatModels.collectAsState()
-            val chatModelsLoading by vm.chatModelsLoading.collectAsState()
-            DefaultModelPicker(
-                models = chatModels,
-                selectedKey = settings.chatModelKey,
-                loading = chatModelsLoading,
-                onSelect = vm::setDefaultChatModel,
-                onRefresh = vm::refreshChatModels,
+    PocketCard {
+        // Globales Standard-Modell für neue Chats, über alle Familien.
+        val chatModels by vm.chatModels.collectAsState()
+        val chatModelsLoading by vm.chatModelsLoading.collectAsState()
+        DefaultModelPicker(
+            models = chatModels,
+            selectedKey = settings.chatModelKey,
+            loading = chatModelsLoading,
+            onSelect = vm::setDefaultChatModel,
+            onRefresh = vm::refreshChatModels,
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Ein Block je Anbieter: welches Modell, und direkt darunter dessen
+        // Denktiefe. Vorher standen Modell und Denktiefe in zwei getrennten
+        // Listen, und die Stufen waren fest verdrahtet statt vom Modell
+        // abgeleitet. Dann liess sich eine Stufe waehlen, die der Server
+        // still verworfen hat.
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_provider_defaults))
+        listOf(
+            ChatModelFamilies.CLAUDE to de.smartzone.pocketclaude.R.string.settings_effort_claude,
+            ChatModelFamilies.GEMINI to de.smartzone.pocketclaude.R.string.settings_effort_gemini,
+            ChatModelFamilies.GPT to de.smartzone.pocketclaude.R.string.settings_effort_gpt,
+        ).forEach { (family, labelRes) ->
+            val familyModels = chatModels.filter { it.family == family }
+            val selectedKey = settings.defaultModelFor(family)
+            val selectedModel = familyModels.firstOrNull { it.key == selectedKey }
+            // Claude ist immer da, auch ohne Gateway, und kennt zusaetzlich
+            // die Stufe „aus". Bei den Zusatz-Modellen bestimmt das konkrete
+            // Modell, welche Stufen es ueberhaupt gibt.
+            // Dieselbe Quelle wie im Chat-Sheet und im Sendepfad. Ohne
+            // gewaehltes Zusatz-Modell gibt es nichts einzustellen, dann
+            // bleibt die Liste leer und der Block sagt das auch.
+            val availableEfforts =
+                if (family != ChatModelFamilies.CLAUDE && selectedModel == null) emptyList()
+                else settings.availableEffortsFor(family, selectedModel)
+
+            ProviderDefaultsBlock(
+                familyLabel = stringResource(labelRes),
+                models = familyModels,
+                selectedKey = selectedKey,
+                onSelectModel = { key -> vm.setDefaultModelForFamily(family, key) },
+                availableEfforts = availableEfforts,
+                selectedEffort = settings.effortForModelKey(selectedKey, selectedModel),
+                onSelectEffort = { value -> vm.setEffortForFamily(family, value) },
             )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Ein Block je Anbieter: welches Modell, und direkt darunter dessen
-            // Denktiefe. Vorher standen Modell und Denktiefe in zwei getrennten
-            // Listen, und die Stufen waren fest verdrahtet statt vom Modell
-            // abgeleitet. Dann liess sich eine Stufe waehlen, die der Server
-            // still verworfen hat.
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_provider_defaults))
-            listOf(
-                ChatModelFamilies.CLAUDE to de.smartzone.pocketclaude.R.string.settings_effort_claude,
-                ChatModelFamilies.GEMINI to de.smartzone.pocketclaude.R.string.settings_effort_gemini,
-                ChatModelFamilies.GPT to de.smartzone.pocketclaude.R.string.settings_effort_gpt,
-            ).forEach { (family, labelRes) ->
-                val familyModels = chatModels.filter { it.family == family }
-                val selectedKey = settings.defaultModelFor(family)
-                val selectedModel = familyModels.firstOrNull { it.key == selectedKey }
-                // Claude ist immer da, auch ohne Gateway, und kennt zusaetzlich
-                // die Stufe „aus". Bei den Zusatz-Modellen bestimmt das konkrete
-                // Modell, welche Stufen es ueberhaupt gibt.
-                // Dieselbe Quelle wie im Chat-Sheet und im Sendepfad. Ohne
-                // gewaehltes Zusatz-Modell gibt es nichts einzustellen, dann
-                // bleibt die Liste leer und der Block sagt das auch.
-                val availableEfforts =
-                    if (family != ChatModelFamilies.CLAUDE && selectedModel == null) emptyList()
-                    else settings.availableEffortsFor(family, selectedModel)
-
-                ProviderDefaultsBlock(
-                    familyLabel = stringResource(labelRes),
-                    models = familyModels,
-                    selectedKey = selectedKey,
-                    onSelectModel = { key -> vm.setDefaultModelForFamily(family, key) },
-                    availableEfforts = availableEfforts,
-                    selectedEffort = settings.effortForModelKey(selectedKey, selectedModel),
-                    onSelectEffort = { value -> vm.setEffortForFamily(family, value) },
-                )
-            }
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_provider_defaults_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // System-Prompt
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_subsection_system_prompt))
-            SystemPromptModeChips(
-                selected = settings.systemPromptMode,
-                onSelect = vm::setSystemPromptMode,
-            )
-            // Ohne diesen Satz ist nicht erkennbar, dass der Modus auch bei
-            // Gemini und GPT wirkt. Er tut es, nur eben in angepasster Fassung.
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_prompt_all_models_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (settings.systemPromptMode == SystemPromptMode.CUSTOM) {
-                OutlinedTextField(
-                    value = settings.customSystemPrompt,
-                    onValueChange = vm::setCustomSystemPrompt,
-                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_custom_system_prompt_label)) },
-                    placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_custom_system_prompt_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 4,
-                    maxLines = 14,
-                    shape = RoundedCornerShape(14.dp),
-                )
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_custom_system_prompt_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Skills (Default für alle neuen Chats)
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_subsection_skills_defaults))
-            SkillsDefaultsSection(vm = vm)
         }
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_provider_defaults_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // System-Prompt
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_subsection_system_prompt))
+        SystemPromptModeChips(
+            selected = settings.systemPromptMode,
+            onSelect = vm::setSystemPromptMode,
+        )
+        // Ohne diesen Satz ist nicht erkennbar, dass der Modus auch bei
+        // Gemini und GPT wirkt. Er tut es, nur eben in angepasster Fassung.
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_prompt_all_models_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (settings.systemPromptMode == SystemPromptMode.CUSTOM) {
+            OutlinedTextField(
+                value = settings.customSystemPrompt,
+                onValueChange = vm::setCustomSystemPrompt,
+                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_custom_system_prompt_label)) },
+                placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_custom_system_prompt_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+                maxLines = 14,
+                shape = MaterialTheme.shapes.small,
+            )
+            Text(
+                stringResource(de.smartzone.pocketclaude.R.string.settings_custom_system_prompt_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Skills (Default für alle neuen Chats)
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_subsection_skills_defaults))
+        SkillsDefaultsSection(vm = vm)
     }
 }
 
@@ -688,84 +674,69 @@ private fun ThemeCard(
     settings: de.smartzone.pocketclaude.data.AppSettings,
     vm: SettingsViewModel,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_theme_label))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ThemeMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = settings.themeMode == mode,
-                        onClick = { vm.setThemeMode(mode) },
-                        label = {
-                            Text(
-                                when (mode) {
-                                    ThemeMode.SYSTEM -> stringResource(de.smartzone.pocketclaude.R.string.theme_system)
-                                    ThemeMode.LIGHT -> stringResource(de.smartzone.pocketclaude.R.string.settings_light)
-                                    ThemeMode.DARK -> stringResource(de.smartzone.pocketclaude.R.string.settings_dark)
-                                }
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
-                    )
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Farbschema, getrennt fuer hell und dunkel. Jede Palette hat beide
-            // Varianten, aber welche hell gefaellt, muss dunkel nicht gefallen.
-            // Die Proben zeigen jeweils die Variante, um die es gerade geht.
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_palette_label_light))
-            PalettePicker(
-                selectedId = settings.paletteIdLight,
-                dark = false,
-                fallback = PocketPalette.NORDIC_BLUE,
-                onSelect = vm::setPaletteIdLight,
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_palette_label_dark))
-            PalettePicker(
-                selectedId = settings.paletteIdDark,
-                dark = true,
-                fallback = PocketPalette.MIDNIGHT_ATELIER,
-                onSelect = vm::setPaletteIdDark,
-            )
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_palette_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Lange Nachrichten einklappen (ChatGPT-Style)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_collapse_long_user_messages),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_collapse_long_user_messages_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = settings.collapseLongUserMessages,
-                    onCheckedChange = { vm.setCollapseLongUserMessages(it) },
+    SettingsGroup {
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_theme_label))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemeMode.entries.forEach { mode ->
+                PocketChoiceChip(
+                    selected = settings.themeMode == mode,
+                    onClick = { vm.setThemeMode(mode) },
+                    label = when (mode) {
+                                ThemeMode.SYSTEM -> stringResource(de.smartzone.pocketclaude.R.string.theme_system)
+                                ThemeMode.LIGHT -> stringResource(de.smartzone.pocketclaude.R.string.settings_light)
+                                ThemeMode.DARK -> stringResource(de.smartzone.pocketclaude.R.string.settings_dark)
+                            },
                 )
             }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Farbschema, getrennt fuer hell und dunkel. Jede Palette hat beide
+        // Varianten, aber welche hell gefaellt, muss dunkel nicht gefallen.
+        // Die Proben zeigen jeweils die Variante, um die es gerade geht.
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_palette_label_light))
+        PalettePicker(
+            selectedId = settings.paletteIdLight,
+            dark = false,
+            fallback = PocketPalette.NORDIC_BLUE,
+            onSelect = vm::setPaletteIdLight,
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_palette_label_dark))
+        PalettePicker(
+            selectedId = settings.paletteIdDark,
+            dark = true,
+            fallback = PocketPalette.MIDNIGHT_ATELIER,
+            onSelect = vm::setPaletteIdDark,
+        )
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_palette_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Lange Nachrichten einklappen (ChatGPT-Style)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_collapse_long_user_messages),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_collapse_long_user_messages_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = settings.collapseLongUserMessages,
+                onCheckedChange = { vm.setCollapseLongUserMessages(it) },
+            )
         }
     }
 }
@@ -793,44 +764,38 @@ private fun LanguageCard() {
     val currentLabel = languageEntries.firstOrNull { it.first == current }?.second
         ?: languageEntries.first().second
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.language_label))
-            ExposedDropdownMenuBox(
+    SettingsGroup(spacing = 8.dp) {
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.language_label))
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+        ) {
+            OutlinedTextField(
+                value = currentLabel,
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                shape = MaterialTheme.shapes.small,
+            )
+            DropdownMenu(
                 expanded = expanded,
-                onExpandedChange = { expanded = it },
+                onDismissRequest = { expanded = false },
             ) {
-                OutlinedTextField(
-                    value = currentLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    shape = RoundedCornerShape(14.dp),
-                )
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                ) {
-                    languageEntries.forEach { (tag, label) ->
-                        DropdownMenuItem(
-                            text = { Text(label) },
-                            onClick = {
-                                expanded = false
-                                if (tag != current) {
-                                    LocalePrefs.set(ctx, tag)
-                                    current = tag
-                                    (ctx as? Activity)?.recreate()
-                                }
-                            },
-                        )
-                    }
+                languageEntries.forEach { (tag, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            expanded = false
+                            if (tag != current) {
+                                LocalePrefs.set(ctx, tag)
+                                current = tag
+                                (ctx as? Activity)?.recreate()
+                            }
+                        },
+                    )
                 }
             }
         }
@@ -942,182 +907,180 @@ private fun ClaudeAuthSection(vm: SettingsViewModel) {
     var aliasMenuOpen by remember { mutableStateOf(false) }
     val alias = auth?.bedrockModelAlias ?: "opus"
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                modes.forEachIndexed { idx, (key, label) ->
-                    SegmentedButton(
-                        selected = current == key,
-                        onClick = {
-                            vm.updateClaudeAuth(ClaudeAuthUpdateRequest(mode = key))
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = modes.size),
-                    ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                }
+    SettingsGroup {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            modes.forEachIndexed { idx, (key, label) ->
+                SegmentedButton(
+                    selected = current == key,
+                    onClick = {
+                        vm.updateClaudeAuth(ClaudeAuthUpdateRequest(mode = key))
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = idx, count = modes.size),
+                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
+        }
 
-            // Hint per mode
-            val hintRes = when (current) {
-                "api_key" -> de.smartzone.pocketclaude.R.string.claude_mode_api_key_hint
-                "bedrock" -> de.smartzone.pocketclaude.R.string.claude_mode_bedrock_hint
-                else      -> de.smartzone.pocketclaude.R.string.claude_mode_pro_max_hint
-            }
+        // Hint per mode
+        val hintRes = when (current) {
+            "api_key" -> de.smartzone.pocketclaude.R.string.claude_mode_api_key_hint
+            "bedrock" -> de.smartzone.pocketclaude.R.string.claude_mode_bedrock_hint
+            else      -> de.smartzone.pocketclaude.R.string.claude_mode_pro_max_hint
+        }
+        Text(
+            stringResource(hintRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // Das globale Standard-Modell steht jetzt im Abschnitt
+        // „Modelle und Denktiefe": dort sind auch die Zusatz-Modelle
+        // wählbar, und es gibt nur EINE Stelle, die den Wert schreibt.
+        if (current != "bedrock") {
             Text(
-                stringResource(hintRes),
+                stringResource(de.smartzone.pocketclaude.R.string.settings_default_model_moved),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
 
-            // Das globale Standard-Modell steht jetzt im Abschnitt
-            // „Modelle und Denktiefe": dort sind auch die Zusatz-Modelle
-            // wählbar, und es gibt nur EINE Stelle, die den Wert schreibt.
-            if (current != "bedrock") {
+        when (current) {
+            "api_key" -> {
+                val currentLabel = if (auth?.apiKeySet == true) auth?.apiKeyMasked
+                    else stringResource(de.smartzone.pocketclaude.R.string.not_configured)
                 Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_default_model_moved),
+                    stringResource(de.smartzone.pocketclaude.R.string.current_value_label, currentLabel.orEmpty()),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                OutlinedTextField(
+                    value = apiKeyInput,
+                    onValueChange = { apiKeyInput = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.anthropic_api_key)) },
+                    placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.anthropic_api_key_hint)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        enabled = !busy && apiKeyInput.isNotBlank(),
+                        onClick = {
+                            vm.updateClaudeAuth(ClaudeAuthUpdateRequest(apiKey = apiKeyInput.trim()))
+                            apiKeyInput = ""
+                        },
+                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_save)) }
+                    TextButton(
+                        enabled = !busy && auth?.apiKeySet == true,
+                        onClick = { vm.updateClaudeAuth(ClaudeAuthUpdateRequest(apiKey = "")) },
+                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.clear)) }
+                }
             }
 
-            when (current) {
-                "api_key" -> {
-                    val currentLabel = if (auth?.apiKeySet == true) auth?.apiKeyMasked
-                        else stringResource(de.smartzone.pocketclaude.R.string.not_configured)
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.current_value_label, currentLabel.orEmpty()),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = apiKeyInput,
-                        onValueChange = { apiKeyInput = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.anthropic_api_key)) },
-                        placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.anthropic_api_key_hint)) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            enabled = !busy && apiKeyInput.isNotBlank(),
+            "bedrock" -> {
+                OutlinedTextField(
+                    value = awsRegion,
+                    onValueChange = { awsRegion = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_region)) },
+                    placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_region_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                val akidCurrent = if (auth?.awsAccessKeySet == true) auth?.awsAccessKeyIdMasked
+                    else stringResource(de.smartzone.pocketclaude.R.string.not_configured)
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.current_value_label, akidCurrent.orEmpty()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = awsAkid,
+                    onValueChange = { awsAkid = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_access_key_id)) },
+                    placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_access_key_id_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                OutlinedTextField(
+                    value = awsSecret,
+                    onValueChange = { awsSecret = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_secret_access_key)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                OutlinedTextField(
+                    value = awsSession,
+                    onValueChange = { awsSession = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_session_token)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                OutlinedTextField(
+                    value = opusModel,
+                    onValueChange = { opusModel = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.bedrock_opus_model)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                OutlinedTextField(
+                    value = sonnetModel,
+                    onValueChange = { sonnetModel = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.bedrock_sonnet_model)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                OutlinedTextField(
+                    value = haikuModel,
+                    onValueChange = { haikuModel = it },
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.bedrock_haiku_model)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.small,
+                )
+
+                // Default-model alias picker
+                SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.bedrock_model_alias))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "opus" to stringResource(de.smartzone.pocketclaude.R.string.bedrock_alias_opus),
+                        "sonnet" to stringResource(de.smartzone.pocketclaude.R.string.bedrock_alias_sonnet),
+                        "haiku" to stringResource(de.smartzone.pocketclaude.R.string.bedrock_alias_haiku),
+                    ).forEach { (key, label) ->
+                        PocketChoiceChip(
+                            selected = alias == key,
                             onClick = {
-                                vm.updateClaudeAuth(ClaudeAuthUpdateRequest(apiKey = apiKeyInput.trim()))
-                                apiKeyInput = ""
+                                vm.updateClaudeAuth(ClaudeAuthUpdateRequest(bedrockModelAlias = key))
                             },
-                        ) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_save)) }
-                        TextButton(
-                            enabled = !busy && auth?.apiKeySet == true,
-                            onClick = { vm.updateClaudeAuth(ClaudeAuthUpdateRequest(apiKey = "")) },
-                        ) { Text(stringResource(de.smartzone.pocketclaude.R.string.clear)) }
+                            label = label,
+                        )
                     }
                 }
 
-                "bedrock" -> {
-                    OutlinedTextField(
-                        value = awsRegion,
-                        onValueChange = { awsRegion = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_region)) },
-                        placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_region_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    val akidCurrent = if (auth?.awsAccessKeySet == true) auth?.awsAccessKeyIdMasked
-                        else stringResource(de.smartzone.pocketclaude.R.string.not_configured)
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.current_value_label, akidCurrent.orEmpty()),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = awsAkid,
-                        onValueChange = { awsAkid = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_access_key_id)) },
-                        placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_access_key_id_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = awsSecret,
-                        onValueChange = { awsSecret = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_secret_access_key)) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = awsSession,
-                        onValueChange = { awsSession = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.aws_session_token)) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = opusModel,
-                        onValueChange = { opusModel = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.bedrock_opus_model)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = sonnetModel,
-                        onValueChange = { sonnetModel = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.bedrock_sonnet_model)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = haikuModel,
-                        onValueChange = { haikuModel = it },
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.bedrock_haiku_model)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    // Default-model alias picker
-                    SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.bedrock_model_alias))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(
-                            "opus" to stringResource(de.smartzone.pocketclaude.R.string.bedrock_alias_opus),
-                            "sonnet" to stringResource(de.smartzone.pocketclaude.R.string.bedrock_alias_sonnet),
-                            "haiku" to stringResource(de.smartzone.pocketclaude.R.string.bedrock_alias_haiku),
-                        ).forEach { (key, label) ->
-                            FilterChip(
-                                selected = alias == key,
-                                onClick = {
-                                    vm.updateClaudeAuth(ClaudeAuthUpdateRequest(bedrockModelAlias = key))
-                                },
-                                label = { Text(label) },
-                                shape = RoundedCornerShape(12.dp),
-                            )
-                        }
-                    }
-
-                    Button(
-                        enabled = !busy,
-                        onClick = {
-                            vm.updateClaudeAuth(
-                                ClaudeAuthUpdateRequest(
-                                    awsRegion = awsRegion.trim().ifBlank { null },
-                                    awsAccessKeyId = awsAkid.trim().ifBlank { null },
-                                    awsSecretAccessKey = awsSecret.trim().ifBlank { null },
-                                    awsSessionToken = awsSession.trim().ifBlank { null },
-                                    bedrockOpusModel = opusModel.trim().ifBlank { null },
-                                    bedrockSonnetModel = sonnetModel.trim().ifBlank { null },
-                                    bedrockHaikuModel = haikuModel.trim().ifBlank { null },
-                                ),
-                            )
-                            awsAkid = ""; awsSecret = ""; awsSession = ""
-                        },
-                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.apply)) }
-                }
+                Button(
+                    enabled = !busy,
+                    onClick = {
+                        vm.updateClaudeAuth(
+                            ClaudeAuthUpdateRequest(
+                                awsRegion = awsRegion.trim().ifBlank { null },
+                                awsAccessKeyId = awsAkid.trim().ifBlank { null },
+                                awsSecretAccessKey = awsSecret.trim().ifBlank { null },
+                                awsSessionToken = awsSession.trim().ifBlank { null },
+                                bedrockOpusModel = opusModel.trim().ifBlank { null },
+                                bedrockSonnetModel = sonnetModel.trim().ifBlank { null },
+                                bedrockHaikuModel = haikuModel.trim().ifBlank { null },
+                            ),
+                        )
+                        awsAkid = ""; awsSecret = ""; awsSession = ""
+                    },
+                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.apply)) }
             }
         }
     }
@@ -1130,35 +1093,29 @@ private fun UsageStatsSection(vm: SettingsViewModel) {
     val auth by vm.claudeAuth.collectAsState()
     val isProMax = (auth?.mode ?: "pro_max") == "pro_max"
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (usage == null) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-            } else {
-                val u = usage!!
-                UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_input), u.inputTokens)
-                UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_output), u.outputTokens)
-                UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_cache_create), u.cacheCreateTokens)
-                UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_cache_read), u.cacheReadTokens)
-                UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_requests), u.requestCount)
-                if (u.provider.isNotEmpty()) {
-                    UsageRowText(stringResource(de.smartzone.pocketclaude.R.string.usage_provider), u.provider)
-                }
-                if (isProMax) {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.usage_pro_max_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+    SettingsGroup(spacing = 8.dp) {
+        if (usage == null) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+        } else {
+            val u = usage!!
+            UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_input), u.inputTokens)
+            UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_output), u.outputTokens)
+            UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_cache_create), u.cacheCreateTokens)
+            UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_cache_read), u.cacheReadTokens)
+            UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_requests), u.requestCount)
+            if (u.provider.isNotEmpty()) {
+                UsageRowText(stringResource(de.smartzone.pocketclaude.R.string.usage_provider), u.provider)
             }
-            TextButton(onClick = { vm.refreshUsage() }) {
-                Text(stringResource(de.smartzone.pocketclaude.R.string.usage_refresh))
+            if (isProMax) {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.usage_pro_max_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+        }
+        TextButton(onClick = { vm.refreshUsage() }) {
+            Text(stringResource(de.smartzone.pocketclaude.R.string.usage_refresh))
         }
     }
 }
@@ -1211,133 +1168,127 @@ private fun ChatLockSection(
     fun clearInputs() { currentPin = ""; newPin = ""; confirmPin = "" }
     fun isPin(s: String) = s.length == 5 && s.all { it.isDigit() }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            when (isSet) {
-                null -> CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                false -> {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.chat_lock_no_pin),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    PinTextField(
-                        value = newPin,
-                        onValueChange = { newPin = it.filter { c -> c.isDigit() }.take(5); error = null },
-                        label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_new_pin),
-                    )
-                    PinTextField(
-                        value = confirmPin,
-                        onValueChange = { confirmPin = it.filter { c -> c.isDigit() }.take(5); error = null },
-                        label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_confirm_pin),
-                    )
+    SettingsGroup {
+        when (isSet) {
+            null -> CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            false -> {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.chat_lock_no_pin),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                PinTextField(
+                    value = newPin,
+                    onValueChange = { newPin = it.filter { c -> c.isDigit() }.take(5); error = null },
+                    label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_new_pin),
+                )
+                PinTextField(
+                    value = confirmPin,
+                    onValueChange = { confirmPin = it.filter { c -> c.isDigit() }.take(5); error = null },
+                    label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_confirm_pin),
+                )
+                Button(
+                    onClick = {
+                        error = null; success = null
+                        when {
+                            !isPin(newPin) -> error = invalidText
+                            newPin != confirmPin -> error = mismatchText
+                            else -> vm.setChatLockPin(newPin, null) { err ->
+                                if (err == null) { clearInputs(); success = savedText }
+                                else error = if (err == "wrong") wrongPinText else err
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_lock_set_pin)) }
+            }
+            true -> {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.chat_lock_pin_active),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                PinTextField(
+                    value = currentPin,
+                    onValueChange = { currentPin = it.filter { c -> c.isDigit() }.take(5); error = null },
+                    label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_current_pin),
+                )
+                PinTextField(
+                    value = newPin,
+                    onValueChange = { newPin = it.filter { c -> c.isDigit() }.take(5); error = null },
+                    label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_new_pin),
+                )
+                PinTextField(
+                    value = confirmPin,
+                    onValueChange = { confirmPin = it.filter { c -> c.isDigit() }.take(5); error = null },
+                    label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_confirm_pin),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
                             error = null; success = null
                             when {
                                 !isPin(newPin) -> error = invalidText
                                 newPin != confirmPin -> error = mismatchText
-                                else -> vm.setChatLockPin(newPin, null) { err ->
+                                else -> vm.setChatLockPin(newPin, currentPin) { err ->
                                     if (err == null) { clearInputs(); success = savedText }
                                     else error = if (err == "wrong") wrongPinText else err
                                 }
                             }
                         },
                         enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_lock_set_pin)) }
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_lock_change_pin)) }
+                    TextButton(
+                        onClick = {
+                            error = null; success = null
+                            if (!isPin(currentPin)) error = wrongPinText
+                            else vm.removeChatLockPin(currentPin) { err ->
+                                if (err == null) { clearInputs(); success = removedText }
+                                else error = if (err == "wrong") wrongPinText else err
+                            }
+                        },
+                        enabled = !busy,
+                    ) {
+                        Text(
+                            stringResource(de.smartzone.pocketclaude.R.string.chat_lock_remove_pin),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
-                true -> {
+            }
+        }
+
+        error?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        success?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        }
+
+        if (biometricAvailable) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.chat_lock_pin_active),
+                        stringResource(de.smartzone.pocketclaude.R.string.chat_lock_biometric_toggle),
                         style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        stringResource(de.smartzone.pocketclaude.R.string.chat_lock_biometric_toggle_sub),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    PinTextField(
-                        value = currentPin,
-                        onValueChange = { currentPin = it.filter { c -> c.isDigit() }.take(5); error = null },
-                        label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_current_pin),
-                    )
-                    PinTextField(
-                        value = newPin,
-                        onValueChange = { newPin = it.filter { c -> c.isDigit() }.take(5); error = null },
-                        label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_new_pin),
-                    )
-                    PinTextField(
-                        value = confirmPin,
-                        onValueChange = { confirmPin = it.filter { c -> c.isDigit() }.take(5); error = null },
-                        label = stringResource(de.smartzone.pocketclaude.R.string.chat_lock_confirm_pin),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = {
-                                error = null; success = null
-                                when {
-                                    !isPin(newPin) -> error = invalidText
-                                    newPin != confirmPin -> error = mismatchText
-                                    else -> vm.setChatLockPin(newPin, currentPin) { err ->
-                                        if (err == null) { clearInputs(); success = savedText }
-                                        else error = if (err == "wrong") wrongPinText else err
-                                    }
-                                }
-                            },
-                            enabled = !busy,
-                            modifier = Modifier.weight(1f),
-                        ) { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_lock_change_pin)) }
-                        TextButton(
-                            onClick = {
-                                error = null; success = null
-                                if (!isPin(currentPin)) error = wrongPinText
-                                else vm.removeChatLockPin(currentPin) { err ->
-                                    if (err == null) { clearInputs(); success = removedText }
-                                    else error = if (err == "wrong") wrongPinText else err
-                                }
-                            },
-                            enabled = !busy,
-                        ) {
-                            Text(
-                                stringResource(de.smartzone.pocketclaude.R.string.chat_lock_remove_pin),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
                 }
-            }
-
-            error?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
-            success?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            }
-
-            if (biometricAvailable) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.chat_lock_biometric_toggle),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.chat_lock_biometric_toggle_sub),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = settings.chatLockBiometricEnabled,
-                        onCheckedChange = { vm.setChatLockBiometric(it) },
-                    )
-                }
+                Switch(
+                    checked = settings.chatLockBiometricEnabled,
+                    onCheckedChange = { vm.setChatLockBiometric(it) },
+                )
             }
         }
     }
@@ -1353,29 +1304,23 @@ private fun PinTextField(value: String, onValueChange: (String) -> Unit, label: 
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.small,
     )
 }
 
 /** Über-Sektion — minimal, nur App-Name + Beschreibung. */
 @Composable
 private fun AboutCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.app_name),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_about_app_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    SettingsGroup(spacing = 4.dp) {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.app_name),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_about_app_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1392,16 +1337,11 @@ private fun SectionHeader(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(start = 16.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(18.dp)
-                .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.primary)
-        )
-        Spacer(Modifier.width(10.dp))
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
@@ -1412,6 +1352,21 @@ private fun SectionHeader(
             InfoButton(title = infoTitle, body = infoBody)
         }
     }
+}
+
+/** Gruppe innerhalb einer aufklappbaren Karte. Frueher steckte hier jeweils
+ *  eine zweite Card in der Karte; die doppelte Einrueckung und der zweite
+ *  Rand haben die Abschnitte unruhig gemacht. */
+@Composable
+private fun SettingsGroup(
+    spacing: androidx.compose.ui.unit.Dp = 12.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        content = content,
+    )
 }
 
 /** Kleiner Untertitel innerhalb einer Card (für Sub-Gruppen wie „Denktiefe",
@@ -1449,20 +1404,15 @@ private fun EffortChips(
         .filter { it in available }
         .map { it to (labels[it] ?: it) }
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         options.forEach { (value, label) ->
-            FilterChip(
+            PocketChoiceChip(
                 selected = selected == value,
                 onClick = { onSelect(value) },
-                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                shape = RoundedCornerShape(10.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                label = label,
             )
         }
     }
@@ -1481,20 +1431,15 @@ private fun SystemPromptModeChips(
         SystemPromptMode.CUSTOM to stringResource(de.smartzone.pocketclaude.R.string.settings_sysprompt_custom),
     )
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         options.forEach { (value, label) ->
-            FilterChip(
+            PocketChoiceChip(
                 selected = selected == value,
                 onClick = { onSelect(value) },
-                label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-                shape = RoundedCornerShape(10.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                label = label,
             )
         }
     }
@@ -1515,7 +1460,7 @@ private fun QuickSetupBanner(
     isLoggedIn: Boolean,
     ttsReady: Boolean,
 ) {
-    val shape = RoundedCornerShape(26.dp)
+    val shape = RoundedCornerShape(PocketRadius.Large)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1531,8 +1476,8 @@ private fun QuickSetupBanner(
             .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f), shape),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 stringResource(de.smartzone.pocketclaude.R.string.settings_quick_setup_header),
@@ -1602,8 +1547,8 @@ private fun ExpandableSection(
     var expanded by remember { mutableStateOf(initiallyExpanded) }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+        shape = RoundedCornerShape(PocketRadius.Large),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
     ) {
@@ -1613,11 +1558,13 @@ private fun ExpandableSection(
     ) {
         // Header-Row: Titel + (optional) Info-Button + Chevron
         Row(
+            // Mindesthoehe 48 dp: mit und ohne Info-Button gleich hoch. Vorher
+            // waren die Karten mit Info-Button sichtbar hoeher als die ohne.
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .clickable { expanded = !expanded }
-                .padding(vertical = 4.dp),
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(PocketRadius.Small))
+                .clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -1657,15 +1604,15 @@ private fun ExpandableSection(
 private fun TierBadge(tierHint: String) {
     data class BadgeStyle(val text: String, val color: androidx.compose.ui.graphics.Color)
     val style = when (tierHint) {
-        "free" -> BadgeStyle("Free", androidx.compose.ui.graphics.Color(0xFFE89F2C))
-        "likely_paid" -> BadgeStyle("Paid?", androidx.compose.ui.graphics.Color(0xFF4CAF50))
+        "free" -> BadgeStyle("Free", MaterialTheme.colorScheme.tertiary)
+        "likely_paid" -> BadgeStyle("Paid?", PocketTheme.colors.success)
         else -> BadgeStyle("?", MaterialTheme.colorScheme.onSurfaceVariant)
     }
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(style.color.copy(alpha = 0.18f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .clip(CircleShape)
+            .background(style.color.copy(alpha = 0.16f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(
             style.text,
@@ -1708,517 +1655,502 @@ private fun TtsSection(
     // ============================================================
     // Card A — Provider & Setup
     // ============================================================
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    SettingsGroup {
 
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_setup_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+
+        // Provider-Auswahl: Edge (free, no-setup) / Gemini API (paid key) / Cloud TTS (service account).
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                InfoButton(
+                    title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_info_title),
+                ) {
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_body)
+                    )
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_body)
+                    )
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_gemini_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_gemini_body)
+                    )
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_cloud_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_cloud_body)
+                    )
+                }
+            }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = isWeb,
+                    onClick = {
+                        if (!isWeb && !ttsBusy) vm.setTtsProvider("gemini_web")
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    enabled = !ttsBusy,
+                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_short)) }
+                SegmentedButton(
+                    selected = isEdge,
+                    onClick = {
+                        if (!isEdge && !ttsBusy) vm.setTtsProvider("edge_tts")
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    enabled = !ttsBusy,
+                ) { Text("Edge") }
+            }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = isGemini,
+                    onClick = {
+                        if (!isGemini && !ttsBusy) vm.setTtsProvider("gemini_api")
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    enabled = !ttsBusy,
+                ) { Text("Gemini API") }
+                SegmentedButton(
+                    selected = isCloud,
+                    onClick = {
+                        if (!isCloud && !ttsBusy) vm.setTtsProvider("cloud_tts")
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    enabled = !ttsBusy,
+                ) { Text("Cloud TTS") }
+            }
+            // Status-Hint mit Farb-Tönung je nach Provider.
+            //
+            // Wichtig: der Hint trennt jetzt SAUBER zwischen Pool-Effekt
+            // (= Round-Robin über aufeinanderfolgende Antworten) und
+            // Chunking-Effekt (= mehrere parallele API-Calls pro Antwort).
+            // Vorher stand „Round-Robin + Rate-Limiter" im selben Satz —
+            // das war irreführend, weil der Rate-Limiter nur greift wenn
+            // Chunking AN ist und parallele Calls rausgehen.
+            data class Hint(val text: String, val emphasis: Boolean)
+            val keySource = ttsStatus?.geminiApiKeySource ?: "none"
+            val keyCount = ttsStatus?.geminiApiKeyCount ?: 0
+            val chunkOn = ttsStatus?.chunkingEnabled ?: false
+            val hint = when {
+                isWeb && ttsStatus?.configured == false -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_down),
+                    emphasis = true,
+                )
+                isWeb -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_active),
+                    emphasis = false,
+                )
+                isEdge -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_edge_active),
+                    emphasis = false,
+                )
+                isGemini && keyCount >= 2 && chunkOn -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_on, keyCount, keyCount * 3),
+                    emphasis = false,
+                )
+                isGemini && keyCount >= 2 && !chunkOn -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_off, keyCount),
+                    emphasis = false,
+                )
+                isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "tts" -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_1key_tts),
+                    emphasis = false,
+                )
+                isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "image" -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_image_shared),
+                    emphasis = false,
+                )
+                isGemini -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_no_key),
+                    emphasis = true,
+                )
+                isCloud && ttsStatus?.cloudTtsConfigured == true && chunkOn -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_chunk_on),
+                    emphasis = false,
+                )
+                isCloud && ttsStatus?.cloudTtsConfigured == true -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_ok),
+                    emphasis = false,
+                )
+                else -> Hint(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_no_json),
+                    emphasis = true,
+                )
+            }
             Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_setup_title),
-                style = MaterialTheme.typography.titleMedium,
+                hint.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (hint.emphasis) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Provider-Auswahl: Edge (free, no-setup) / Gemini API (paid key) / Cloud TTS (service account).
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // === Chunking-Toggle ===
+            // Bewusst HIER in derselben Card wie der Status-Hint, weil
+            // der Hint sich auf den Chunking-Stand bezieht. Bei Edge-TTS
+            // ausgeblendet — die edge-tts-Lib chunkt intern via WebSocket,
+            // ein zusätzliches App-Chunking bringt nichts. Bei Gemini-Web
+            // ebenfalls ausgeblendet, und dort ist es keine Frage des
+            // Nutzens: dessen Audioformat laesst sich nicht stueckweise
+            // aneinanderhaengen, ein eingeschalteter Schalter wuerde stumm
+            // kaputtes Audio erzeugen. Der Server sperrt das zusaetzlich.
+            if (!isEdge && !isWeb) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                val chunkingExplicit = ttsStatus?.chunkingExplicit ?: false
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_label),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    InfoButton(
-                        title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_info_title),
-                    ) {
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_body)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_label),
+                            style = MaterialTheme.typography.titleSmall,
                         )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_body)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_gemini_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_gemini_body)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_cloud_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_cloud_body)
+                        val ttsCloudLabel = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_for_cloud_tts)
+                        val ttsGeminiRateHint = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_gemini_rate_hint)
+                        val sub = when {
+                            chunkingExplicit && chunkOn ->
+                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_manual_on)
+                            chunkingExplicit && !chunkOn ->
+                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_manual_off)
+                            chunkOn ->
+                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_auto_default_on, if (isCloud) ttsCloudLabel else provider)
+                            else ->
+                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_auto_default_off, if (isGemini) ttsGeminiRateHint else provider)
+                        }
+                        Text(
+                            sub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = isWeb,
-                        onClick = {
-                            if (!isWeb && !ttsBusy) vm.setTtsProvider("gemini_web")
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_title)) {
+                        InfoParagraph(
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_intro)
+                        )
+                        InfoBulletParagraph(
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_cloud_label),
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_cloud_body)
+                        )
+                        InfoBulletParagraph(
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_gemini_label),
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_gemini_body)
+                        )
+                    }
+                    Switch(
+                        checked = chunkOn,
+                        onCheckedChange = { v -> vm.setTtsChunking(v) },
                         enabled = !ttsBusy,
-                    ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_short)) }
-                    SegmentedButton(
-                        selected = isEdge,
-                        onClick = {
-                            if (!isEdge && !ttsBusy) vm.setTtsProvider("edge_tts")
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        enabled = !ttsBusy,
-                    ) { Text("Edge") }
-                }
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = isGemini,
-                        onClick = {
-                            if (!isGemini && !ttsBusy) vm.setTtsProvider("gemini_api")
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                        enabled = !ttsBusy,
-                    ) { Text("Gemini API") }
-                    SegmentedButton(
-                        selected = isCloud,
-                        onClick = {
-                            if (!isCloud && !ttsBusy) vm.setTtsProvider("cloud_tts")
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                        enabled = !ttsBusy,
-                    ) { Text("Cloud TTS") }
-                }
-                // Status-Hint mit Farb-Tönung je nach Provider.
-                //
-                // Wichtig: der Hint trennt jetzt SAUBER zwischen Pool-Effekt
-                // (= Round-Robin über aufeinanderfolgende Antworten) und
-                // Chunking-Effekt (= mehrere parallele API-Calls pro Antwort).
-                // Vorher stand „Round-Robin + Rate-Limiter" im selben Satz —
-                // das war irreführend, weil der Rate-Limiter nur greift wenn
-                // Chunking AN ist und parallele Calls rausgehen.
-                data class Hint(val text: String, val emphasis: Boolean)
-                val keySource = ttsStatus?.geminiApiKeySource ?: "none"
-                val keyCount = ttsStatus?.geminiApiKeyCount ?: 0
-                val chunkOn = ttsStatus?.chunkingEnabled ?: false
-                val hint = when {
-                    isWeb && ttsStatus?.configured == false -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_down),
-                        emphasis = true,
-                    )
-                    isWeb -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_active),
-                        emphasis = false,
-                    )
-                    isEdge -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_edge_active),
-                        emphasis = false,
-                    )
-                    isGemini && keyCount >= 2 && chunkOn -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_on, keyCount, keyCount * 3),
-                        emphasis = false,
-                    )
-                    isGemini && keyCount >= 2 && !chunkOn -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_off, keyCount),
-                        emphasis = false,
-                    )
-                    isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "tts" -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_1key_tts),
-                        emphasis = false,
-                    )
-                    isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "image" -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_image_shared),
-                        emphasis = false,
-                    )
-                    isGemini -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_no_key),
-                        emphasis = true,
-                    )
-                    isCloud && ttsStatus?.cloudTtsConfigured == true && chunkOn -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_chunk_on),
-                        emphasis = false,
-                    )
-                    isCloud && ttsStatus?.cloudTtsConfigured == true -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_ok),
-                        emphasis = false,
-                    )
-                    else -> Hint(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_no_json),
-                        emphasis = true,
                     )
                 }
-                Text(
-                    hint.text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (hint.emphasis) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (chunkingExplicit) {
+                    TextButton(
+                        onClick = { vm.setTtsChunking(null) },
+                        enabled = !ttsBusy,
+                    ) {
+                        Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_back_to_default))
+                    }
+                }
+            }
+        }
 
-                // === Chunking-Toggle ===
-                // Bewusst HIER in derselben Card wie der Status-Hint, weil
-                // der Hint sich auf den Chunking-Stand bezieht. Bei Edge-TTS
-                // ausgeblendet — die edge-tts-Lib chunkt intern via WebSocket,
-                // ein zusätzliches App-Chunking bringt nichts. Bei Gemini-Web
-                // ebenfalls ausgeblendet, und dort ist es keine Frage des
-                // Nutzens: dessen Audioformat laesst sich nicht stueckweise
-                // aneinanderhaengen, ein eingeschalteter Schalter wuerde stumm
-                // kaputtes Audio erzeugen. Der Server sperrt das zusaetzlich.
-                if (!isEdge && !isWeb) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    val chunkingExplicit = ttsStatus?.chunkingExplicit ?: false
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Eigenes API-Key-Feld für TTS — nur wenn Provider = Gemini API.
+        // Bewusst getrennt von der Image-Gen-API-Key-Eingabe, weil:
+        //   - Image-Gen läuft oft über Paid-Account (4K-Output, Pro-Modelle)
+        //   - TTS kann komplett über Free-Tier-Account laufen (Gemini-3.1-
+        //     Flash-TTS ist im Free Tier verfügbar, verifiziert Mai 2026)
+        if (isGemini) {
+            // Hinweis-Banner: Image- und TTS-Key können derselbe sein, müssen
+            // aber nicht — der Server fällt bei fehlendem TTS-Key automatisch
+            // auf den Image-Key zurück. Klärt das verbreitete „warum zwei
+            // Felder?"-Verständnis-Problem.
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
+            ) {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_image_shared_key_tip),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(10.dp),
+                )
+            }
+            TtsGeminiApiKeyField(vm = vm, ttsStatus = ttsStatus, ttsBusy = ttsBusy)
+        }
+
+        // Status — nur informativ wenn nicht Edge (Edge braucht nichts).
+        if (!isEdge) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val configured = ttsStatus?.configured == true
+                Icon(
+                    imageVector = if (configured) PocketIcons.CheckCircle else PocketIcons.Error,
+                    contentDescription = null,
+                    tint = if (configured) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
+                           else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (configured) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_ready)
+                        else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_not_ready),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    if (configured && isCloud) {
+                        val email = ttsStatus?.clientEmail.orEmpty()
+                        if (email.isNotBlank()) {
                             Text(
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_label),
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            val ttsCloudLabel = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_for_cloud_tts)
-                            val ttsGeminiRateHint = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_gemini_rate_hint)
-                            val sub = when {
-                                chunkingExplicit && chunkOn ->
-                                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_manual_on)
-                                chunkingExplicit && !chunkOn ->
-                                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_manual_off)
-                                chunkOn ->
-                                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_auto_default_on, if (isCloud) ttsCloudLabel else provider)
-                                else ->
-                                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_auto_default_off, if (isGemini) ttsGeminiRateHint else provider)
-                            }
-                            Text(
-                                sub,
+                                email,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_title)) {
-                            InfoParagraph(
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_intro)
-                            )
-                            InfoBulletParagraph(
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_cloud_label),
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_cloud_body)
-                            )
-                            InfoBulletParagraph(
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_gemini_label),
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_gemini_body)
-                            )
-                        }
-                        Switch(
-                            checked = chunkOn,
-                            onCheckedChange = { v -> vm.setTtsChunking(v) },
-                            enabled = !ttsBusy,
-                        )
                     }
-                    if (chunkingExplicit) {
-                        TextButton(
-                            onClick = { vm.setTtsChunking(null) },
-                            enabled = !ttsBusy,
-                        ) {
-                            Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_back_to_default))
-                        }
+                }
+                // Lösch-Button für Cloud-TTS-Credentials nur bei Cloud-Provider.
+                if (ttsStatus?.cloudTtsConfigured == true && isCloud) {
+                    IconButton(onClick = { vm.deleteTtsCredentials() }, enabled = !ttsBusy) {
+                        Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_remove_credentials))
                     }
                 }
             }
+        }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Eigenes API-Key-Feld für TTS — nur wenn Provider = Gemini API.
-            // Bewusst getrennt von der Image-Gen-API-Key-Eingabe, weil:
-            //   - Image-Gen läuft oft über Paid-Account (4K-Output, Pro-Modelle)
-            //   - TTS kann komplett über Free-Tier-Account laufen (Gemini-3.1-
-            //     Flash-TTS ist im Free Tier verfügbar, verifiziert Mai 2026)
-            if (isGemini) {
-                // Hinweis-Banner: Image- und TTS-Key können derselbe sein, müssen
-                // aber nicht — der Server fällt bei fehlendem TTS-Key automatisch
-                // auf den Image-Key zurück. Klärt das verbreitete „warum zwei
-                // Felder?"-Verständnis-Problem.
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
-                ) {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_image_shared_key_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(10.dp),
-                    )
-                }
-                TtsGeminiApiKeyField(vm = vm, ttsStatus = ttsStatus, ttsBusy = ttsBusy)
-            }
-
-            // Status — nur informativ wenn nicht Edge (Edge braucht nichts).
-            if (!isEdge) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val configured = ttsStatus?.configured == true
-                    Icon(
-                        imageVector = if (configured) PocketIcons.CheckCircle else PocketIcons.Error,
-                        contentDescription = null,
-                        tint = if (configured) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
-                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+        // JSON-Upload-Button — nur für Cloud-TTS-Pfad (Edge braucht's nicht, Gemini hat eigenen Key-Slot).
+        if (isCloud) {
+            FilledTonalButton(
+                onClick = {
+                    jsonText = ""
+                    showJsonDialog = true
+                },
+                enabled = !ttsBusy && settings.isConfigured,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (ttsBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (configured) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_ready)
-                            else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_not_ready),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        if (configured && isCloud) {
-                            val email = ttsStatus?.clientEmail.orEmpty()
-                            if (email.isNotBlank()) {
-                                Text(
-                                    email,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    // Lösch-Button für Cloud-TTS-Credentials nur bei Cloud-Provider.
-                    if (ttsStatus?.cloudTtsConfigured == true && isCloud) {
-                        IconButton(onClick = { vm.deleteTtsCredentials() }, enabled = !ttsBusy) {
-                            Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_remove_credentials))
-                        }
-                    }
                 }
+                Icon(PocketIcons.Upload, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (ttsStatus?.cloudTtsConfigured == true) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_replace_cloud_credentials) else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_paste_cloud_credentials))
             }
+        }
 
-            // JSON-Upload-Button — nur für Cloud-TTS-Pfad (Edge braucht's nicht, Gemini hat eigenen Key-Slot).
-            if (isCloud) {
-                FilledTonalButton(
-                    onClick = {
-                        jsonText = ""
-                        showJsonDialog = true
-                    },
-                    enabled = !ttsBusy && settings.isConfigured,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (ttsBusy) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Icon(PocketIcons.Upload, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (ttsStatus?.cloudTtsConfigured == true) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_replace_cloud_credentials) else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_paste_cloud_credentials))
-                }
-            }
+        if (!settings.isConfigured) {
+            Text(
+                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_need_server_config),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
-            if (!settings.isConfigured) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_need_server_config),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        ttsError?.let { err ->
+            Text(
+                err,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            TextButton(onClick = vm::clearTtsError) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
+        }
 
-            ttsError?.let { err ->
-                Text(
-                    err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                TextButton(onClick = vm::clearTtsError) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
-            }
-
-            // Cloud-Billing-Widget: Spend, Budget, AI-Pro-Credit-Restwert.
-            // Nur sichtbar wenn Cloud-TTS konfiguriert ist (vorher gibt's
-            // keinen Service-Account → API-Call ginge ins Leere).
-            if (ttsStatus?.cloudTtsConfigured == true) {
-                CloudBillingWidget(vm = vm)
-            }
+        // Cloud-Billing-Widget: Spend, Budget, AI-Pro-Credit-Restwert.
+        // Nur sichtbar wenn Cloud-TTS konfiguriert ist (vorher gibt's
+        // keinen Service-Account → API-Call ginge ins Leere).
+        if (ttsStatus?.cloudTtsConfigured == true) {
+            CloudBillingWidget(vm = vm)
         }
     }
 
     // ============================================================
     // Card B — Stimme & Wiedergabe
     // ============================================================
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    SettingsGroup {
 
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_voice_playback_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+
+        // Voice-Auswahl — nach Engine-Tier gruppiert, damit Gemini-Voices
+        // klar von den klassischen Cloud-TTS-Voices getrennt sind.
+        // Filtert auf den aktuell aktiven Provider: bei `gemini_api` sind
+        // nur die `gemini-*`-Voices kompatibel (Direct-API kennt keine
+        // Chirp/Studio/Neural2/etc.), bei `cloud_tts` ist alles möglich.
+        val allVoices = ttsStatus?.voices.orEmpty()
+        val voices = allVoices.filter { provider in it.compatible_providers }
+        if (isWeb) {
+            // Ehrlicher Hinweis statt einer Auswahl, die keine ist: der
+            // Vorlese-Aufruf von Gemini kennt schlicht keinen Parameter
+            // fuer die Stimme.
             Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_voice_playback_title),
-                style = MaterialTheme.typography.titleMedium,
+                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_voice_web_fixed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-
-            // Voice-Auswahl — nach Engine-Tier gruppiert, damit Gemini-Voices
-            // klar von den klassischen Cloud-TTS-Voices getrennt sind.
-            // Filtert auf den aktuell aktiven Provider: bei `gemini_api` sind
-            // nur die `gemini-*`-Voices kompatibel (Direct-API kennt keine
-            // Chirp/Studio/Neural2/etc.), bei `cloud_tts` ist alles möglich.
-            val allVoices = ttsStatus?.voices.orEmpty()
-            val voices = allVoices.filter { provider in it.compatible_providers }
-            if (isWeb) {
-                // Ehrlicher Hinweis statt einer Auswahl, die keine ist: der
-                // Vorlese-Aufruf von Gemini kennt schlicht keinen Parameter
-                // fuer die Stimme.
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_voice_web_fixed),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+        if (voices.isNotEmpty()) {
+            ExposedDropdownMenuBox(
+                expanded = voiceMenuOpen,
+                onExpandedChange = { voiceMenuOpen = !voiceMenuOpen },
+            ) {
+                // Aktuelle Voice: Label aus der vollen (un-gefilterten) Liste
+                // lesen, damit der Anzeigename sichtbar bleibt — selbst wenn
+                // die Voice mit dem aktuellen Provider nicht kompatibel ist
+                // (Server fällt dann intern auf einen Default zurück).
+                val currentVoice = allVoices.firstOrNull { it.id == settings.ttsVoice }
+                val currentVoiceIncompatible = currentVoice != null &&
+                    provider !in currentVoice.compatible_providers
+                OutlinedTextField(
+                    value = if (currentVoiceIncompatible)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_voice_incompatible, currentVoice.label, provider)
+                    else currentVoice?.label ?: settings.ttsVoice,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_label)) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = voiceMenuOpen)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    shape = MaterialTheme.shapes.small,
                 )
-            }
-            if (voices.isNotEmpty()) {
-                ExposedDropdownMenuBox(
+                DropdownMenu(
                     expanded = voiceMenuOpen,
-                    onExpandedChange = { voiceMenuOpen = !voiceMenuOpen },
+                    onDismissRequest = { voiceMenuOpen = false },
                 ) {
-                    // Aktuelle Voice: Label aus der vollen (un-gefilterten) Liste
-                    // lesen, damit der Anzeigename sichtbar bleibt — selbst wenn
-                    // die Voice mit dem aktuellen Provider nicht kompatibel ist
-                    // (Server fällt dann intern auf einen Default zurück).
-                    val currentVoice = allVoices.firstOrNull { it.id == settings.ttsVoice }
-                    val currentVoiceIncompatible = currentVoice != null &&
-                        provider !in currentVoice.compatible_providers
-                    OutlinedTextField(
-                        value = if (currentVoiceIncompatible)
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_voice_incompatible, currentVoice.label, provider)
-                        else currentVoice?.label ?: settings.ttsVoice,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_label)) },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = voiceMenuOpen)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        shape = RoundedCornerShape(14.dp),
+                    val tierOrder = listOf("edge", "gemini", "chirp3hd", "studio", "neural2", "wavenet", "standard")
+                    val tierLabels = mapOf(
+                        "edge" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_edge),
+                        "gemini" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_gemini),
+                        "chirp3hd" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_chirp3hd),
+                        "studio" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_studio),
+                        "neural2" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_neural2),
+                        "wavenet" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_wavenet),
+                        "standard" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_standard),
                     )
-                    DropdownMenu(
-                        expanded = voiceMenuOpen,
-                        onDismissRequest = { voiceMenuOpen = false },
-                    ) {
-                        val tierOrder = listOf("edge", "gemini", "chirp3hd", "studio", "neural2", "wavenet", "standard")
-                        val tierLabels = mapOf(
-                            "edge" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_edge),
-                            "gemini" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_gemini),
-                            "chirp3hd" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_chirp3hd),
-                            "studio" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_studio),
-                            "neural2" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_neural2),
-                            "wavenet" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_wavenet),
-                            "standard" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_standard),
+                    val grouped = voices.groupBy { it.tier }
+                    val orderedTiers = tierOrder.filter { grouped.containsKey(it) } +
+                        grouped.keys.filter { it !in tierOrder }
+                    orderedTiers.forEachIndexed { idx, tier ->
+                        if (idx > 0) HorizontalDivider()
+                        Text(
+                            text = tierLabels[tier] ?: tier.replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp,
+                            ),
                         )
-                        val grouped = voices.groupBy { it.tier }
-                        val orderedTiers = tierOrder.filter { grouped.containsKey(it) } +
-                            grouped.keys.filter { it !in tierOrder }
-                        orderedTiers.forEachIndexed { idx, tier ->
-                            if (idx > 0) HorizontalDivider()
-                            Text(
-                                text = tierLabels[tier] ?: tier.replaceFirstChar { it.uppercase() },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(
-                                    start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp,
-                                ),
+                        grouped[tier].orEmpty().forEach { v ->
+                            DropdownMenuItem(
+                                text = { Text(v.label) },
+                                onClick = {
+                                    vm.setVoice(v.id)
+                                    voiceMenuOpen = false
+                                },
                             )
-                            grouped[tier].orEmpty().forEach { v ->
-                                DropdownMenuItem(
-                                    text = { Text(v.label) },
-                                    onClick = {
-                                        vm.setVoice(v.id)
-                                        voiceMenuOpen = false
-                                    },
-                                )
-                            }
                         }
                     }
                 }
             }
+        }
 
-            // Wiedergabe-Geschwindigkeit — diskrete 0.25-Schritte von 0.25x bis 2.0x.
-            // Wird als ?rate=... Query-Param an den Server geschickt.
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_speed_label),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_speed_value, "%.2f".format(settings.ttsSpeed)),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Slider(
-                    value = settings.ttsSpeed,
-                    onValueChange = { v ->
-                        // auf 0.25-Schritte snappen
-                        val snapped = (v * 4f).toInt().coerceIn(1, 8) / 4f
-                        if (snapped != settings.ttsSpeed) vm.setSpeed(snapped)
-                    },
-                    valueRange = 0.25f..2.0f,
-                    steps = 6,  // 0.25, 0.50, 0.75, 1.00, 1.25, 1.50, 1.75, 2.00 → 6 Stops zwischen 8 Werten
-                    enabled = ttsStatus?.configured == true,
-                    colors = SliderDefaults.colors(
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+        // Wiedergabe-Geschwindigkeit — diskrete 0.25-Schritte von 0.25x bis 2.0x.
+        // Wird als ?rate=... Query-Param an den Server geschickt.
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_speed_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_speed_min), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_speed_one), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_speed_max), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_speed_value, "%.2f".format(settings.ttsSpeed)),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
-
-            // Auto-Speak Switch
+            Slider(
+                value = settings.ttsSpeed,
+                onValueChange = { v ->
+                    // auf 0.25-Schritte snappen
+                    val snapped = (v * 4f).toInt().coerceIn(1, 8) / 4f
+                    if (snapped != settings.ttsSpeed) vm.setSpeed(snapped)
+                },
+                valueRange = 0.25f..2.0f,
+                steps = 6,  // 0.25, 0.50, 0.75, 1.00, 1.25, 1.50, 1.75, 2.00 → 6 Stops zwischen 8 Werten
+                enabled = ttsStatus?.configured == true,
+                colors = SliderDefaults.colors(
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_auto_speak_label), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_auto_speak_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = settings.ttsAutoSpeak,
-                    onCheckedChange = vm::setAutoSpeak,
-                    enabled = ttsStatus?.configured == true,
-                )
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_speed_min), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_speed_one), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_speed_max), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
 
-            // Test-Button
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalButton(
-                    onClick = vm::testVoice,
-                    enabled = ttsStatus?.configured == true && ttsTest !is TtsTestResult.Testing,
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Icon(PocketIcons.VolumeUp, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_test_btn))
-                }
-                Spacer(Modifier.width(8.dp))
-                FilledTonalButton(
-                    onClick = vm::stopAudio,
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Icon(PocketIcons.Stop, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_stop_btn))
-                }
-            }
-            when (val t = ttsTest) {
-                is TtsTestResult.Failure -> Text(
-                    t.reason,
+        // Auto-Speak Switch
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_auto_speak_label), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_auto_speak_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                else -> Unit
             }
+            Switch(
+                checked = settings.ttsAutoSpeak,
+                onCheckedChange = vm::setAutoSpeak,
+                enabled = ttsStatus?.configured == true,
+            )
+        }
+
+        // Test-Button
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FilledTonalButton(
+                onClick = vm::testVoice,
+                enabled = ttsStatus?.configured == true && ttsTest !is TtsTestResult.Testing,
+            ) {
+                Icon(PocketIcons.VolumeUp, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_test_btn))
+            }
+            Spacer(Modifier.width(8.dp))
+            FilledTonalButton(
+                onClick = vm::stopAudio,
+            ) {
+                Icon(PocketIcons.Stop, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_stop_btn))
+            }
+        }
+        when (val t = ttsTest) {
+            is TtsTestResult.Failure -> Text(
+                t.reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            else -> Unit
         }
     }
 
@@ -2236,96 +2168,90 @@ private fun TtsSection(
         voicesForModel.firstOrNull { it.id == settings.ttsVoice }?.tier == "gemini"
     val availableModels = ttsStatus?.availableModels.orEmpty()
     if (isGeminiVoice && availableModels.isNotEmpty()) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(20.dp),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SettingsGroup {
+            Text(
+                stringResource(de.smartzone.pocketclaude.R.string.settings_gemini_tts_model_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            run {
+            val currentModelId = ttsStatus?.ttsModel
+                ?: availableModels.firstOrNull { it.default }?.id
+                ?: availableModels.first().id
+            val currentModel = availableModels.firstOrNull { it.id == currentModelId }
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_gemini_tts_model_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
                 )
-                run {
-                val currentModelId = ttsStatus?.ttsModel
-                    ?: availableModels.firstOrNull { it.default }?.id
-                    ?: availableModels.first().id
-                val currentModel = availableModels.firstOrNull { it.id == currentModelId }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_label),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.weight(1f),
+                InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_picker_title)) {
+                    InfoParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_picker_intro)
                     )
-                    InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_picker_title)) {
-                        InfoParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_picker_intro)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_flash_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_flash_body)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_31_flash_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_31_flash_body)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_pro_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_pro_body)
-                        )
-                    }
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_flash_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_flash_body)
+                    )
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_31_flash_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_31_flash_body)
+                    )
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_pro_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_pro_body)
+                    )
                 }
-                var modelMenuOpen by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
+            }
+            var modelMenuOpen by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = modelMenuOpen,
+                onExpandedChange = { if (!ttsBusy) modelMenuOpen = !modelMenuOpen },
+            ) {
+                val priceText = currentModel?.priceHint?.takeIf { it.isNotBlank() }.orEmpty()
+                OutlinedTextField(
+                    value = currentModel?.label ?: currentModelId,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_model_label)) },
+                    supportingText = {
+                        if (priceText.isNotEmpty()) Text(priceText)
+                    },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuOpen)
+                    },
+                    enabled = !ttsBusy,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    shape = MaterialTheme.shapes.small,
+                )
+                DropdownMenu(
                     expanded = modelMenuOpen,
-                    onExpandedChange = { if (!ttsBusy) modelMenuOpen = !modelMenuOpen },
+                    onDismissRequest = { modelMenuOpen = false },
                 ) {
-                    val priceText = currentModel?.priceHint?.takeIf { it.isNotBlank() }.orEmpty()
-                    OutlinedTextField(
-                        value = currentModel?.label ?: currentModelId,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_model_label)) },
-                        supportingText = {
-                            if (priceText.isNotEmpty()) Text(priceText)
-                        },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuOpen)
-                        },
-                        enabled = !ttsBusy,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                    DropdownMenu(
-                        expanded = modelMenuOpen,
-                        onDismissRequest = { modelMenuOpen = false },
-                    ) {
-                        availableModels.forEach { m ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(m.label)
-                                        if (m.priceHint.isNotBlank()) {
-                                            Text(
-                                                m.priceHint,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
+                    availableModels.forEach { m ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(m.label)
+                                    if (m.priceHint.isNotBlank()) {
+                                        Text(
+                                            m.priceHint,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
-                                },
-                                onClick = {
-                                    if (m.id != currentModelId) vm.setTtsModel(m.id)
-                                    modelMenuOpen = false
-                                },
-                            )
-                        }
+                                }
+                            },
+                            onClick = {
+                                if (m.id != currentModelId) vm.setTtsModel(m.id)
+                                modelMenuOpen = false
+                            },
+                        )
                     }
                 }
-                }  // close run {}
-            }  // close Column
+            }
+            }  // close run {}
         }  // close Card
     }  // close if (isGeminiVoice && ...)
 
@@ -2349,7 +2275,7 @@ private fun TtsSection(
                         placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_sa_dialog_placeholder)) },
                         maxLines = 12,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.small,
                     )
                 }
             },
@@ -2444,72 +2370,61 @@ private fun BackupSection(vm: SettingsViewModel) {
         }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+    SettingsGroup {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_backup_intro),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val busy = state is SettingsViewModel.BackupState.Exporting ||
+            state is SettingsViewModel.BackupState.Verifying ||
+            state is SettingsViewModel.BackupState.Importing
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_backup_intro),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val busy = state is SettingsViewModel.BackupState.Exporting ||
-                state is SettingsViewModel.BackupState.Verifying ||
-                state is SettingsViewModel.BackupState.Importing
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            FilledTonalButton(
+                onClick = { vm.startExport() },
+                enabled = !busy,
             ) {
-                FilledTonalButton(
-                    onClick = { vm.startExport() },
-                    enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Icon(PocketIcons.Upload, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_export))
-                }
-                FilledTonalButton(
-                    onClick = {
-                        // ZIP-MIME-Types — Android lässt unterschiedliche
-                        // MIME-Strings je nach Quelle (z.B. Telegram nutzt
-                        // application/zip, andere application/x-zip-compressed).
-                        importPicker.launch(arrayOf(
-                            "application/zip",
-                            "application/x-zip-compressed",
-                            "application/octet-stream",
-                            "*/*",
-                        ))
-                    },
-                    enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Icon(PocketIcons.Play, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_import))
-                }
+                Icon(PocketIcons.Upload, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_export))
             }
-            if (busy) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        when (state) {
-                            is SettingsViewModel.BackupState.Importing -> stringResource(de.smartzone.pocketclaude.R.string.settings_backup_importing)
-                            is SettingsViewModel.BackupState.Verifying -> stringResource(de.smartzone.pocketclaude.R.string.settings_backup_checking)
-                            else -> stringResource(de.smartzone.pocketclaude.R.string.settings_backup_loading)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+            FilledTonalButton(
+                onClick = {
+                    // ZIP-MIME-Types — Android lässt unterschiedliche
+                    // MIME-Strings je nach Quelle (z.B. Telegram nutzt
+                    // application/zip, andere application/x-zip-compressed).
+                    importPicker.launch(arrayOf(
+                        "application/zip",
+                        "application/x-zip-compressed",
+                        "application/octet-stream",
+                        "*/*",
+                    ))
+                },
+                enabled = !busy,
+            ) {
+                Icon(PocketIcons.Play, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_import))
+            }
+        }
+        if (busy) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    when (state) {
+                        is SettingsViewModel.BackupState.Importing -> stringResource(de.smartzone.pocketclaude.R.string.settings_backup_importing)
+                        is SettingsViewModel.BackupState.Verifying -> stringResource(de.smartzone.pocketclaude.R.string.settings_backup_checking)
+                        else -> stringResource(de.smartzone.pocketclaude.R.string.settings_backup_loading)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }
@@ -2635,7 +2550,7 @@ private fun BackupSection(vm: SettingsViewModel) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.small,
                     )
                 }
             },
@@ -2687,7 +2602,7 @@ private fun BackupSection(vm: SettingsViewModel) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.small,
                     )
                 }
             },
@@ -2754,6 +2669,7 @@ private fun MemoryKeyCard(vm: SettingsViewModel, settings: de.smartzone.pocketcl
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
@@ -2785,110 +2701,99 @@ private fun FirstRunSignInCard(vm: SettingsViewModel) {
     LaunchedEffect(Unit) { vm.clearLoginState() }
     DisposableEffect(Unit) { onDispose { vm.clearLoginState() } }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        shape = RoundedCornerShape(28.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.login_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FW.SemiBold,
-            )
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_profile_first_run),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    PocketCard {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.login_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FW.SemiBold,
+        )
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_profile_first_run),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.server_url)) },
-                placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.server_url_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                enabled = !working,
-            )
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.username)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                enabled = !working,
-            )
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.password)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    IconButton(onClick = { showPw = !showPw }) {
-                        Icon(
-                            if (showPw) PocketIcons.VisibilityOff else PocketIcons.Visibility,
-                            contentDescription = stringResource(
-                                if (showPw) de.smartzone.pocketclaude.R.string.settings_label_hide
-                                else de.smartzone.pocketclaude.R.string.settings_label_show
-                            ),
-                        )
-                    }
-                },
-                enabled = !working,
-            )
-            OutlinedTextField(
-                value = label,
-                onValueChange = { label = it },
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_display_name_optional)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                enabled = !working,
-            )
-
-            val state = loginState
-            if (attempted && state is LoginUiState.Failure) {
-                Text(
-                    state.reason,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-
-            Button(
-                onClick = {
-                    if (url.isNotBlank() && username.isNotBlank() && password.isNotBlank()) {
-                        attempted = true
-                        vm.addProfileAndLogin(label, url, username, password)
-                    }
-                },
-                enabled = !working && url.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (working) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.server_url)) },
+            placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.server_url_hint)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            enabled = !working,
+        )
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.username)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            enabled = !working,
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.password)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                IconButton(onClick = { showPw = !showPw }) {
+                    Icon(
+                        if (showPw) PocketIcons.VisibilityOff else PocketIcons.Visibility,
+                        contentDescription = stringResource(
+                            if (showPw) de.smartzone.pocketclaude.R.string.settings_label_hide
+                            else de.smartzone.pocketclaude.R.string.settings_label_show
+                        ),
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_signing_in))
-                } else {
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_sign_in_btn))
                 }
+            },
+            enabled = !working,
+        )
+        OutlinedTextField(
+            value = label,
+            onValueChange = { label = it },
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_display_name_optional)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            enabled = !working,
+        )
+
+        val state = loginState
+        if (attempted && state is LoginUiState.Failure) {
+            Text(
+                state.reason,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        Button(
+            onClick = {
+                if (url.isNotBlank() && username.isNotBlank() && password.isNotBlank()) {
+                    attempted = true
+                    vm.addProfileAndLogin(label, url, username, password)
+                }
+            },
+            enabled = !working && url.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (working) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_signing_in))
+            } else {
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_sign_in_btn))
             }
         }
     }
@@ -2990,7 +2895,7 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                     value = renameLabel,
                     onValueChange = { renameLabel = it },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
             },
             confirmButton = {
@@ -3068,7 +2973,7 @@ private fun AddProfileLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) 
                     onValueChange = { label = it },
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_display_name)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     enabled = !working,
                 )
                 OutlinedTextField(
@@ -3077,7 +2982,7 @@ private fun AddProfileLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) 
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_server_url)) },
                     placeholder = { Text("https://…trycloudflare.com") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     enabled = !working,
                 )
@@ -3086,7 +2991,7 @@ private fun AddProfileLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) 
                     onValueChange = { username = it },
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_username)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     enabled = !working,
                 )
                 OutlinedTextField(
@@ -3094,7 +2999,7 @@ private fun AddProfileLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) 
                     onValueChange = { password = it },
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_password)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
@@ -3176,7 +3081,7 @@ private fun ReLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) {
                     onValueChange = { password = it },
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_label_password)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
@@ -3271,7 +3176,7 @@ fun ChangePasswordDialog(vm: SettingsViewModel, forced: Boolean, onDone: () -> U
                         onValueChange = { oldPw = it },
                         label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pw_current_label)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.small,
                         visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         enabled = !working,
@@ -3282,7 +3187,7 @@ fun ChangePasswordDialog(vm: SettingsViewModel, forced: Boolean, onDone: () -> U
                     onValueChange = { newPw = it },
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pw_new_label)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
@@ -3300,7 +3205,7 @@ fun ChangePasswordDialog(vm: SettingsViewModel, forced: Boolean, onDone: () -> U
                     onValueChange = { newPw2 = it },
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pw_new_repeat_label)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     visualTransformation = if (showPw) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     enabled = !working,
@@ -3368,90 +3273,82 @@ private fun SettingsTransferSection(vm: SettingsViewModel) {
         }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_intro),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    SettingsGroup {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_intro),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(
-                    onClick = { vm.exportAllSettings() },
-                    enabled = state !is SettingsViewModel.SettingsTransferState.Exporting &&
-                              state !is SettingsViewModel.SettingsTransferState.Importing,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(PocketIcons.Upload, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_export))
-                }
-                FilledTonalButton(
-                    onClick = {
-                        // OpenDocument expects MIME-Type-Array; JSON ist nicht überall
-                        // sauber registriert → application/* zulassen.
-                        pickerLauncher.launch(arrayOf("application/json", "application/*", "*/*"))
-                    },
-                    enabled = state !is SettingsViewModel.SettingsTransferState.Exporting &&
-                              state !is SettingsViewModel.SettingsTransferState.Importing,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(PocketIcons.Document, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import))
-                }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(
+                onClick = { vm.exportAllSettings() },
+                enabled = state !is SettingsViewModel.SettingsTransferState.Exporting &&
+                          state !is SettingsViewModel.SettingsTransferState.Importing,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(PocketIcons.Upload, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_export))
             }
+            FilledTonalButton(
+                onClick = {
+                    // OpenDocument expects MIME-Type-Array; JSON ist nicht überall
+                    // sauber registriert → application/* zulassen.
+                    pickerLauncher.launch(arrayOf("application/json", "application/*", "*/*"))
+                },
+                enabled = state !is SettingsViewModel.SettingsTransferState.Exporting &&
+                          state !is SettingsViewModel.SettingsTransferState.Importing,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(PocketIcons.Document, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import))
+            }
+        }
 
-            // State-Anzeige
-            when (val s = state) {
-                SettingsViewModel.SettingsTransferState.Idle -> Unit
-                SettingsViewModel.SettingsTransferState.Exporting,
-                SettingsViewModel.SettingsTransferState.Importing -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (s == SettingsViewModel.SettingsTransferState.Exporting)
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_exporting) else stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_importing),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+        // State-Anzeige
+        when (val s = state) {
+            SettingsViewModel.SettingsTransferState.Idle -> Unit
+            SettingsViewModel.SettingsTransferState.Exporting,
+            SettingsViewModel.SettingsTransferState.Importing -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (s == SettingsViewModel.SettingsTransferState.Exporting)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_exporting) else stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_importing),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            is SettingsViewModel.SettingsTransferState.Exported -> {
+                // Datei sofort sharen — User wählt Ziel (E-Mail, Files, Drive…)
+                LaunchedEffect(s) {
+                    shareSettingsJson(context, s.bytes, s.filename)
                 }
-                is SettingsViewModel.SettingsTransferState.Exported -> {
-                    // Datei sofort sharen — User wählt Ziel (E-Mail, Files, Drive…)
-                    LaunchedEffect(s) {
-                        shareSettingsJson(context, s.bytes, s.filename)
-                    }
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_exported_msg, s.filename, s.bytes.size),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
-                }
-                is SettingsViewModel.SettingsTransferState.ImportSuccess -> {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import_success, s.appliedServer, s.ttsKeysImported),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
-                }
-                is SettingsViewModel.SettingsTransferState.Failure -> {
-                    Text(
-                        s.reason,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
-                }
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_exported_msg, s.filename, s.bytes.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
+            }
+            is SettingsViewModel.SettingsTransferState.ImportSuccess -> {
+                Text(
+                    stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import_success, s.appliedServer, s.ttsKeysImported),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
+            }
+            is SettingsViewModel.SettingsTransferState.Failure -> {
+                Text(
+                    s.reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
             }
         }
     }
@@ -3705,7 +3602,7 @@ private fun TtsGeminiApiKeyField(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = MaterialTheme.shapes.small,
         )
         OutlinedTextField(
             value = labelInput,
@@ -3713,7 +3610,7 @@ private fun TtsGeminiApiKeyField(
             label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pool_label_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = MaterialTheme.shapes.small,
         )
         FilledTonalButton(
             onClick = {
@@ -3724,7 +3621,6 @@ private fun TtsGeminiApiKeyField(
                 }
             },
             enabled = !ttsBusy && input.isNotBlank(),
-            shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (ttsBusy) {
@@ -3751,40 +3647,34 @@ private fun TtsGeminiApiKeyField(
 private fun ImageGenSection(vm: SettingsViewModel) {
     val cfg by vm.imageConfig.collectAsState()
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_image_intro),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            // Standardwerte für erzeugte Bilder. Gelten auch für Bilder, die
-            // ein Modell mitten im Chat erzeugt.
-            ImageDefaultsRow(
-                cfg = cfg,
-                onSetSize = { vm.setImageDefaults(size = it) },
-                onSetAspect = { vm.setImageDefaults(aspectRatio = it) },
-                onSetProvider = { vm.setImageDefaults(provider = it) },
-            )
+    SettingsGroup {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_image_intro),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // Standardwerte für erzeugte Bilder. Gelten auch für Bilder, die
+        // ein Modell mitten im Chat erzeugt.
+        ImageDefaultsRow(
+            cfg = cfg,
+            onSetSize = { vm.setImageDefaults(size = it) },
+            onSetAspect = { vm.setImageDefaults(aspectRatio = it) },
+            onSetProvider = { vm.setImageDefaults(provider = it) },
+        )
 
-            if (cfg == null) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_image_loading_status),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
+        if (cfg == null) {
             Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_image_help_text),
+                stringResource(de.smartzone.pocketclaude.R.string.settings_image_loading_status),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_image_help_text),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -3805,99 +3695,92 @@ private fun VoiceSection(vm: SettingsViewModel) {
     var apiKey by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_voice_intro),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            cfg?.let { c ->
-                if (c.configured) {
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(PocketIcons.CheckCircle, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        Text(
-                            stringResource(
-                                de.smartzone.pocketclaude.R.string.settings_voice_configured,
-                                c.apiKeyMasked ?: "", c.model,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                } else {
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_no_key),
-                         style = MaterialTheme.typography.bodySmall,
-                         color = MaterialTheme.colorScheme.error)
+    SettingsGroup {
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_voice_intro),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        cfg?.let { c ->
+            if (c.configured) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(PocketIcons.CheckCircle, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    Text(
+                        stringResource(
+                            de.smartzone.pocketclaude.R.string.settings_voice_configured,
+                            c.apiKeyMasked ?: "", c.model,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
-            } ?: Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_loading_status),
-                      style = MaterialTheme.typography.bodySmall,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_no_key),
+                     style = MaterialTheme.typography.bodySmall,
+                     color = MaterialTheme.colorScheme.error)
+            }
+        } ?: Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_loading_status),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_new_api_key)) },
-                placeholder = { Text("gsk_…") },
-                singleLine = true,
-                visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showKey = !showKey }) {
-                        Icon(if (showKey) PocketIcons.VisibilityOff else PocketIcons.Visibility,
-                             contentDescription = null)
-                    }
-                },
-                shape = RoundedCornerShape(14.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(
-                    onClick = { vm.setVoiceApiKey(apiKey); apiKey = "" },
-                    enabled = !busy && apiKey.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp),
-                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_save_btn)) }
-                TextButton(
-                    onClick = { vm.deleteVoiceApiKey() },
-                    enabled = !busy && cfg?.configured == true,
-                ) {
-                    Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_remove_btn),
-                         color = MaterialTheme.colorScheme.error)
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = { apiKey = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_new_api_key)) },
+            placeholder = { Text("gsk_…") },
+            singleLine = true,
+            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { showKey = !showKey }) {
+                    Icon(if (showKey) PocketIcons.VisibilityOff else PocketIcons.Visibility,
+                         contentDescription = null)
                 }
-                if (busy) {
-                    Spacer(Modifier.width(8.dp))
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-                }
+            },
+            shape = MaterialTheme.shapes.small,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(
+                onClick = { vm.setVoiceApiKey(apiKey); apiKey = "" },
+                enabled = !busy && apiKey.isNotBlank(),
+            ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_save_btn)) }
+            TextButton(
+                onClick = { vm.deleteVoiceApiKey() },
+                enabled = !busy && cfg?.configured == true,
+            ) {
+                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_remove_btn),
+                     color = MaterialTheme.colorScheme.error)
             }
-            msg?.let { m ->
-                Text(m, style = MaterialTheme.typography.bodySmall,
-                     color = if (m.startsWith("Fehler") || m.startsWith("Error"))
-                                 MaterialTheme.colorScheme.error
-                             else MaterialTheme.colorScheme.onSurfaceVariant)
+            if (busy) {
+                Spacer(Modifier.width(8.dp))
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
             }
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_voice_help_text),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        }
+        msg?.let { m ->
+            Text(m, style = MaterialTheme.typography.bodySmall,
+                 color = if (m.startsWith("Fehler") || m.startsWith("Error"))
+                             MaterialTheme.colorScheme.error
+                         else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            stringResource(de.smartzone.pocketclaude.R.string.settings_voice_help_text),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-            // ── 2. Sprach-Wahl ──
-            cfg?.let { c ->
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                VoiceLanguagePicker(
-                    cfg = c,
-                    translateStatus = translateStatus,
-                    translateMsg = translateMsg,
-                    onSetAuto = { vm.setVoiceLangAuto() },
-                    onSetOverride = { vm.setVoiceLangOverride(it) },
-                    onRetranslate = { loc -> vm.translateVoicePrompt(loc, force = true) },
-                    onResetCache = { loc -> vm.resetVoicePromptCache(loc) },
-                )
-            }
+        // ── 2. Sprach-Wahl ──
+        cfg?.let { c ->
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            VoiceLanguagePicker(
+                cfg = c,
+                translateStatus = translateStatus,
+                translateMsg = translateMsg,
+                onSetAuto = { vm.setVoiceLangAuto() },
+                onSetOverride = { vm.setVoiceLangOverride(it) },
+                onRetranslate = { loc -> vm.translateVoicePrompt(loc, force = true) },
+                onResetCache = { loc -> vm.resetVoicePromptCache(loc) },
+            )
         }
     }
 }
@@ -3963,7 +3846,6 @@ private fun VoiceLanguagePicker(
                 OutlinedButton(
                     onClick = { dropdownOpen = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
                 ) {
                     val displayName = cfg.languageNames[current] ?: current
                     val cached = current in cfg.cachedLanguages
@@ -4015,12 +3897,11 @@ private fun VoiceLanguagePicker(
                         label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_lang_custom_label)) },
                         placeholder = { Text("sv, ko, eu, …") },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.small,
                     )
                     FilledTonalButton(
                         onClick = { onSetOverride(customLocale) },
                         enabled = customLocale.length in 2..6,
-                        shape = RoundedCornerShape(12.dp),
                     ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_lang_apply)) }
                 }
             }
@@ -4324,7 +4205,7 @@ private fun DefaultModelPicker(
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                 },
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.small,
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(),
@@ -4427,20 +4308,10 @@ private fun ImageDefaultsRow(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 cfg.providers.forEach { item ->
-                    FilterChip(
+                    PocketChoiceChip(
                         selected = cfg.defaults.provider == item.id,
                         onClick = { onSetProvider(item.id) },
-                        label = {
-                            Text(
-                                imageProviderLabel(item),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
+                        label = imageProviderLabel(item),
                     )
                 }
             }
@@ -4459,15 +4330,10 @@ private fun ImageDefaultsRow(
             modifier = Modifier.fillMaxWidth(),
         ) {
             cfg.imageSizes.forEach { item ->
-                FilterChip(
+                PocketChoiceChip(
                     selected = cfg.defaults.size == item.id,
                     onClick = { onSetSize(item.id) },
-                    label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
+                    label = item.label,
                 )
             }
         }
@@ -4480,15 +4346,10 @@ private fun ImageDefaultsRow(
             modifier = Modifier.fillMaxWidth(),
         ) {
             cfg.aspectRatios.forEach { item ->
-                FilterChip(
+                PocketChoiceChip(
                     selected = cfg.defaults.aspectRatio == item.id,
                     onClick = { onSetAspect(item.id) },
-                    label = { Text(item.label, style = MaterialTheme.typography.labelMedium) },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
+                    label = item.label,
                 )
             }
         }
@@ -4528,52 +4389,26 @@ private fun PalettePicker(
             val scheme = if (dark) spec.darkScheme else spec.lightScheme
             val isSelected = palette == selected
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.surfaceContainerHigh
-                    )
-                    .border(
-                        width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outlineVariant,
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                    .clickable { onSelect(palette.id) }
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-            ) {
-                // Drei Tupfer: Hintergrund, Primaerfarbe, Akzent. Das reicht,
-                // um zwei Schemata auf einen Blick zu unterscheiden.
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    listOf(scheme.background, scheme.primary, scheme.secondary).forEach { c ->
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .clip(CircleShape)
-                                .background(c)
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                        )
+            PocketChoiceChip(
+                selected = isSelected,
+                onClick = { onSelect(palette.id) },
+                label = palette.displayName,
+                leadingIcon = {
+                    // Drei Tupfer: Hintergrund, Primaerfarbe, Akzent. Das reicht,
+                    // um zwei Schemata auf einen Blick zu unterscheiden.
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        listOf(scheme.background, scheme.primary, scheme.secondary).forEach { c ->
+                            Box(
+                                modifier = Modifier
+                                    .size(PocketIconSize.Marker)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                            )
+                        }
                     }
-                }
-                Text(
-                    palette.displayName,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
-                )
-                if (isSelected) {
-                    Icon(
-                        PocketIcons.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
+                },
+            )
         }
     }
 }
@@ -4609,12 +4444,7 @@ private fun ProviderDefaultsBlock(
         else -> models.firstOrNull { it.key == selectedKey }?.label ?: selectedKey
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            familyLabel,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ExposedDropdownMenuBox(
             expanded = expanded && available,
             onExpandedChange = { if (available) expanded = !expanded },
@@ -4625,10 +4455,11 @@ private fun ProviderDefaultsBlock(
                 onValueChange = {},
                 readOnly = true,
                 enabled = available,
+                label = { Text(familyLabel) },
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && available)
                 },
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.small,
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(),

@@ -116,6 +116,7 @@ import de.smartzone.pocketclaude.data.familyForKey
 import de.smartzone.pocketclaude.data.shortModelLabel
 import androidx.compose.ui.graphics.vector.ImageVector
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -975,7 +976,7 @@ fun ChatScreen(
                     onValueChange = { renameInput = it },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
             },
             confirmButton = {
@@ -1783,14 +1784,10 @@ private fun RewindDialog(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         models.forEach { option ->
-                            FilterChip(
+                            PocketChoiceChip(
                                 selected = option.key == chosenKey,
                                 onClick = { chosenKey = option.key },
-                                label = {
-                                    Text(option.label,
-                                         style = MaterialTheme.typography.labelMedium)
-                                },
-                                shape = RoundedCornerShape(10.dp),
+                                label = option.label,
                             )
                         }
                     }
@@ -2078,10 +2075,10 @@ private fun ModelSheet(
             ) {
                 displayEfforts.forEach { effort ->
                     val isEffortSelected = effort == currentEffort
-                    FilterChip(
+                    PocketChoiceChip(
                         selected = isEffortSelected,
                         onClick = { onSelectEffort(selectedFamily, effort) },
-                        label = { Text(effortLabel(effort)) },
+                        label = effortLabel(effort),
                     )
                 }
             }

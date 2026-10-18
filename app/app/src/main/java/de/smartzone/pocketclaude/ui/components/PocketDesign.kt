@@ -6,16 +6,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,6 +44,7 @@ import de.smartzone.pocketclaude.ui.theme.AtelierCoral
 import de.smartzone.pocketclaude.ui.theme.AtelierGold
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
@@ -195,4 +201,56 @@ fun PocketStatusPill(
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/**
+ * Karte der obersten Ebene. Einstellungen, Bilder und Gem-Editor nutzen
+ * dieselbe Form; vorher hatte fast jede Karte ihren eigenen Radius (20, 24,
+ * 26, 28 dp) und ihr eigenes Innenmass.
+ */
+@Composable
+fun PocketCard(
+    modifier: Modifier = Modifier,
+    contentPadding: Dp = 16.dp,
+    spacing: Dp = 12.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(PocketRadius.Large),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
+    ) {
+        Column(
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(spacing),
+            content = content,
+        )
+    }
+}
+
+/**
+ * Auswahl-Chip fuer Einfach- und Mehrfachauswahl. Ausgewaehlt heisst ueberall
+ * dasselbe: Flaeche in secondaryContainer, wie es Material 3 vorsieht. Vorher
+ * waren manche Chips in der Akzentfarbe gefuellt und andere nicht.
+ */
+@Composable
+fun PocketChoiceChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    leadingIcon: (@Composable () -> Unit)? = null,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        modifier = modifier,
+        enabled = enabled,
+        leadingIcon = leadingIcon,
+        shape = CircleShape,
+    )
 }

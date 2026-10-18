@@ -329,7 +329,7 @@ fun ConversationsScreen(
                     onValueChange = { renamingTitle = it },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
             },
             confirmButton = {
@@ -766,7 +766,6 @@ private fun NeedsSetupView(onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onOpenSettings,
-            shape = RoundedCornerShape(14.dp),
         ) {
             Icon(PocketIcons.Settings, contentDescription = null)
             Spacer(Modifier.width(8.dp))

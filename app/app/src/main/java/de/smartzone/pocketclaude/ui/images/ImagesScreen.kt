@@ -87,6 +87,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -411,7 +412,7 @@ private fun GeneratorCard(
                 },
                 maxLines = 4,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.small,
                 enabled = !state.isGenerating,
             )
 
@@ -420,10 +421,10 @@ private fun GeneratorCard(
             if (cfg.providers.size > 1) {
                 SubsectionRow(stringResource(R.string.image_provider_label)) {
                     cfg.providers.forEach { p ->
-                        FilterChip(
+                        PocketChoiceChip(
                             selected = p.id == state.selectedProvider,
                             onClick = { vm.setProvider(p.id) },
-                            label = { Text(imageProviderLabel(p)) },
+                            label = imageProviderLabel(p),
                             enabled = !state.isGenerating,
                         )
                     }
@@ -436,10 +437,10 @@ private fun GeneratorCard(
             if (cfg.imageSizes.isNotEmpty()) {
                 SubsectionRow(stringResource(R.string.image_size_label)) {
                     cfg.imageSizes.forEach { s ->
-                        FilterChip(
+                        PocketChoiceChip(
                             selected = s.id == state.selectedSize,
                             onClick = { vm.setSize(s.id) },
-                            label = { Text(s.id) },
+                            label = s.id,
                             enabled = !state.isGenerating,
                         )
                     }
@@ -465,10 +466,10 @@ private fun GeneratorCard(
             // Seitenverhaeltnis
             SubsectionRow(stringResource(R.string.image_aspect_label)) {
                 cfg.aspectRatios.forEach { a ->
-                    FilterChip(
+                    PocketChoiceChip(
                         selected = a.id == state.selectedAspect,
                         onClick = { vm.setAspect(a.id) },
-                        label = { Text(a.id) },
+                        label = a.id,
                         enabled = !state.isGenerating,
                     )
                 }
@@ -482,12 +483,11 @@ private fun GeneratorCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 for (n in 1..cfg.maxCandidates) {
-                    FilterChip(
+                    PocketChoiceChip(
                         selected = n == state.count,
                         onClick = { vm.setCount(n) },
-                        label = { Text(n.toString()) },
+                        label = n.toString(),
                         enabled = !state.isGenerating,
-                        colors = FilterChipDefaults.filterChipColors(),
                     )
                 }
             }

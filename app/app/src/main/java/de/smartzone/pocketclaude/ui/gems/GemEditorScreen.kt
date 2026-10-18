@@ -120,7 +120,6 @@ fun GemEditorScreen(
                         Button(
                             onClick = { vm.save(onBack) },
                             enabled = st.canSave,
-                            shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.padding(end = 8.dp),
                         ) {
                             Text(stringResource(R.string.gem_save))
@@ -166,7 +165,7 @@ fun GemEditorScreen(
                     singleLine = true,
                     enabled = !st.isBuiltin,
                     modifier = Modifier.width(96.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
                 OutlinedTextField(
                     value = st.name,
@@ -175,7 +174,7 @@ fun GemEditorScreen(
                     singleLine = true,
                     enabled = !st.isBuiltin,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
             }
 
@@ -185,7 +184,7 @@ fun GemEditorScreen(
                 label = { Text(stringResource(R.string.gem_field_description)) },
                 enabled = !st.isBuiltin,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.small,
             )
 
             OutlinedTextField(
@@ -195,7 +194,7 @@ fun GemEditorScreen(
                 placeholder = { Text(stringResource(R.string.gem_field_instructions_hint)) },
                 enabled = !st.isBuiltin,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.small,
             )
 
             // Conversation starters
@@ -208,7 +207,7 @@ fun GemEditorScreen(
                             singleLine = true,
                             enabled = !st.isBuiltin,
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = MaterialTheme.shapes.small,
                         )
                         IconButton(onClick = { vm.removeStarter(idx) }, enabled = !st.isBuiltin) {
                             Icon(PocketIcons.Close, contentDescription = stringResource(R.string.chat_remove))
@@ -359,7 +358,7 @@ private fun LabeledDropdown(
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth().menuAnchor(),
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.small,
             )
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 entries.forEach { (value, text) ->
