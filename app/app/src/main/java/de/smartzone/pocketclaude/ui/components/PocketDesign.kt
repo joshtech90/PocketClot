@@ -254,3 +254,44 @@ fun PocketChoiceChip(
         shape = CircleShape,
     )
 }
+
+enum class StatusKind { Success, Warning, Info }
+
+/**
+ * Statuszeile mit Symbol: Erfolg, Warnung oder Hinweis. Ersetzt die frueher in
+ * die Texte geschriebenen Zeichen ✓, ⚠ und ⓘ, die als Schriftzeichen anders
+ * aussahen als alle anderen Symbole der App.
+ */
+@Composable
+fun PocketStatusLine(
+    text: String,
+    kind: StatusKind,
+    modifier: Modifier = Modifier,
+    textColor: Color? = null,
+) {
+    val tint = when (kind) {
+        StatusKind.Success -> PocketTheme.colors.success
+        StatusKind.Warning -> MaterialTheme.colorScheme.error
+        StatusKind.Info -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(modifier = modifier, verticalAlignment = Alignment.Top) {
+        Icon(
+            imageVector = when (kind) {
+                StatusKind.Success -> PocketIcons.CheckCircle
+                StatusKind.Warning -> PocketIcons.Error
+                StatusKind.Info -> PocketIcons.Info
+            },
+            contentDescription = null,
+            tint = tint,
+            // Eine Zeile bodySmall ist 16 dp hoch: das 14-dp-Symbol sitzt mit
+            // 1 dp Versatz mittig auf der ersten Zeile.
+            modifier = Modifier.padding(top = 1.dp).size(PocketIconSize.Marker),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor ?: if (kind == StatusKind.Warning) tint else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}

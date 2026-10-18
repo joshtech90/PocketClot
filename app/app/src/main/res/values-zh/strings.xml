@@ -285,7 +285,7 @@
     <string name="next_match">下一个匹配</string>
     <string name="thinking_label">思考中</string>
     <string name="skills_for_this_chat">本次聊天的技能</string>
-    <string name="skills_for_this_chat_done">本次聊天的技能 ✓</string>
+    <string name="skills_for_this_chat_done">本次聊天的技能</string>
     <string name="auto_speak_for_this_chat">本次聊天自动朗读…%1$s</string>
     <string name="conversation_compacting">正在压缩会话…</string>
     <string name="scroll_to_bottom">滚动到底部</string>
@@ -299,13 +299,13 @@
     <string name="chat_audio_prefix">朗读:%1$s</string>
     <string name="chat_context_status">%1$d%% 上下文 · %2$s%3$s</string>
     <string name="chat_cache_suffix"> · %1$dK 已缓存</string>
-    <string name="chat_compaction_notice">↑ 很久之前的历史已被压缩(紧急压缩)</string>
+    <string name="chat_compaction_notice">很久之前的历史已被压缩(紧急压缩)</string>
     <string name="chat_compacting_chip">正在压缩会话…</string>
     <string name="chat_scroll_to_bottom_cd">滚动到底部</string>
     <string name="chat_auto_speak_on">开</string>
     <string name="chat_auto_speak_off">关</string>
-    <string name="chat_auto_speak_marker_on"> ✓ 开</string>
-    <string name="chat_auto_speak_marker_off"> ✗ 关</string>
+    <string name="chat_auto_speak_marker_on">开</string>
+    <string name="chat_auto_speak_marker_off">关</string>
     <string name="chat_skills_dialog_title">本次聊天的技能</string>
     <string name="chat_skills_dialog_body_override">本次聊天有独立的技能设置,与你的默认设置不同。</string>
     <string name="chat_skills_dialog_body_default">当前使用设置页中的默认设置。此处的修改仅对本次聊天生效。</string>
@@ -426,7 +426,7 @@
     <string name="settings_server_url_placeholder">https://pocket-claude.your-domain.com</string>
     <string name="settings_username">用户名</string>
     <string name="settings_not_logged_in">(未登录)</string>
-    <string name="settings_session_active">✓ 会话有效</string>
+    <string name="settings_session_active">会话有效</string>
     <string name="settings_not_logged_in_hint">未登录 — 请在下方登录。</string>
     <string name="settings_test_connection">测试连接</string>
     <string name="settings_relogin">重新登录</string>
@@ -560,8 +560,8 @@
     <string name="settings_tts_provider_web_short">Gemini Web</string>
     <string name="settings_tts_provider_web_label">Gemini Web (默认，无需设置):</string>
     <string name="settings_tts_provider_web_body">gemini.google.com 的朗读语音，由你服务器上保持 Google 登录状态的小型服务提供。免费、无需 API 密钥、无需服务账号，速度约为实时的 40 倍。声音不可自选。</string>
-    <string name="settings_tts_status_web_active">✓ Gemini Web 已激活 — 免费、无需设置、速度遥遥领先。声音固定不可选。</string>
-    <string name="settings_tts_status_web_down">⚠ 朗读服务未响应，或其 Google 会话已过期。请在服务器上重新登录，或先在此处选择其他提供商。</string>
+    <string name="settings_tts_status_web_active">Gemini Web 已激活 — 免费、无需设置、速度遥遥领先。声音固定不可选。</string>
+    <string name="settings_tts_status_web_down">朗读服务未响应，或其 Google 会话已过期。请在服务器上重新登录，或先在此处选择其他提供商。</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web 只有一种声音。Google 的朗读调用根本没有提供相关参数。</string>
     <string name="settings_tts_provider_edge_label">Edge(默认,无需配置):</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edge 的朗读语音。完全免费,无需 API 密钥,无需服务账户。质量比 Gemini/Chirp 弱,但满足快速朗读需求。</string>
@@ -579,21 +579,21 @@
     <string name="settings_tts_chunking_info_gemini_label">对于 Gemini API:</string>
     <string name="settings_tts_chunking_info_gemini_body">默认关闭。每个块 = 一次 API 调用。在免费档密钥(每个密钥 10 RPD)的情况下,分块回复会迅速耗尽每日预算。如果你有大型多密钥池,可手动启用 — 服务器会在所有密钥间轮询分发块。</string>
     <string name="settings_tts_back_to_default">回到自动默认</string>
-    <string name="settings_tts_status_edge_active">✓ Edge TTS 已启用 — 免费,无需配置。质量为标准(Microsoft Edge 语音)。如需更高质量,可稍后切换到 Gemini API 或 Cloud TTS。</string>
-    <string name="settings_tts_status_gemini_pool_chunk_on">✓ 密钥池中有 %1$d 个密钥,分块开启。每条回复被拆分为多个并行块 — 在所有密钥间轮询路由。有效突发:约 %2$d 次并行 TTS 调用(每个密钥 3 RPM)。流式启动最快,但会快速消耗每日预算。</string>
-    <string name="settings_tts_status_gemini_pool_chunk_off">✓ 密钥池中有 %1$d 个密钥,分块关闭。每条回复仅使用一个密钥(轮询)。无突发负载。对每日预算友好。如想更快流式启动,可在下方开启分块。</string>
-    <string name="settings_tts_status_gemini_1key_tts">✓ Gemini API 使用 1 个 TTS 密钥。免费档:每个密钥 3 RPM / 10 RPD。下方分块开启时,长回复会迅速耗尽每日预算。在下方添加更多密钥以获得更高吞吐量。</string>
-    <string name="settings_tts_status_gemini_image_shared">ⓘ 当前图片 API 密钥也用于 TTS。请在下方添加一个独立的免费档密钥(或多个),避免 TTS 与图片配额竞争。</string>
-    <string name="settings_tts_status_gemini_no_key">⚠ 未设置 API 密钥。请将你的 AI Studio 密钥粘贴到下方字段(免费档足够 — 见字段旁的 ⓘ)。</string>
-    <string name="settings_tts_status_cloud_chunk_on">✓ Cloud TTS 已启用 + 分块开启。Chirp 3 HD 每月免费 100 万字符,无显著 RPM 限制 — 分块可加快流式启动,无副作用。</string>
-    <string name="settings_tts_status_cloud_ok">✓ Cloud TTS 已启用。Chirp 3 HD 每月免费 100 万字符。你可启用分块(下方)— 加快流式启动且不影响配额。</string>
-    <string name="settings_tts_status_cloud_no_json">⚠ 未加载服务账户 JSON。管理员需在服务器 GUI 中上传(已启用结算的 Cloud 项目)。</string>
+    <string name="settings_tts_status_edge_active">Edge TTS 已启用 — 免费,无需配置。质量为标准(Microsoft Edge 语音)。如需更高质量,可稍后切换到 Gemini API 或 Cloud TTS。</string>
+    <string name="settings_tts_status_gemini_pool_chunk_on">密钥池中有 %1$d 个密钥,分块开启。每条回复被拆分为多个并行块 — 在所有密钥间轮询路由。有效突发:约 %2$d 次并行 TTS 调用(每个密钥 3 RPM)。流式启动最快,但会快速消耗每日预算。</string>
+    <string name="settings_tts_status_gemini_pool_chunk_off">密钥池中有 %1$d 个密钥,分块关闭。每条回复仅使用一个密钥(轮询)。无突发负载。对每日预算友好。如想更快流式启动,可在下方开启分块。</string>
+    <string name="settings_tts_status_gemini_1key_tts">Gemini API 使用 1 个 TTS 密钥。免费档:每个密钥 3 RPM / 10 RPD。下方分块开启时,长回复会迅速耗尽每日预算。在下方添加更多密钥以获得更高吞吐量。</string>
+    <string name="settings_tts_status_gemini_image_shared">当前图片 API 密钥也用于 TTS。请在下方添加一个独立的免费档密钥(或多个),避免 TTS 与图片配额竞争。</string>
+    <string name="settings_tts_status_gemini_no_key">未设置 API 密钥。请将你的 AI Studio 密钥粘贴到下方字段(免费档足够 — 见字段旁的 ⓘ)。</string>
+    <string name="settings_tts_status_cloud_chunk_on">Cloud TTS 已启用 + 分块开启。Chirp 3 HD 每月免费 100 万字符,无显著 RPM 限制 — 分块可加快流式启动,无副作用。</string>
+    <string name="settings_tts_status_cloud_ok">Cloud TTS 已启用。Chirp 3 HD 每月免费 100 万字符。你可启用分块(下方)— 加快流式启动且不影响配额。</string>
+    <string name="settings_tts_status_cloud_no_json">未加载服务账户 JSON。管理员需在服务器 GUI 中上传(已启用结算的 Cloud 项目)。</string>
     <string name="settings_tts_remove_credentials">移除 Cloud TTS 凭证</string>
     <string name="settings_tts_provider_ready">当前服务提供方已就绪</string>
     <string name="settings_tts_provider_not_ready">当前服务提供方未就绪</string>
     <string name="settings_tts_need_server_config">请先保存服务器地址和令牌,然后才能上传 TTS JSON。</string>
     <string name="settings_voice_label">语音</string>
-    <string name="settings_voice_incompatible">⚠ %1$s(与 %2$s 不兼容)</string>
+    <string name="settings_voice_incompatible">%1$s(与 %2$s 不兼容)</string>
     <string name="settings_tier_label_edge">Edge(免费,无需配置)</string>
     <string name="settings_tier_label_gemini">Gemini(AI 语音 — 下方可选模型)</string>
     <string name="settings_tier_label_chirp3hd">Chirp 3 HD(每月免费 100 万字符,超出 $30/M)</string>
@@ -686,8 +686,8 @@
     <string name="settings_transfer_import">导入</string>
     <string name="settings_transfer_exporting">导出中…</string>
     <string name="settings_transfer_importing">导入中…</string>
-    <string name="settings_transfer_exported_msg">✓ 已导出:%1$s(%2$d 字节)。已打开分享对话框。</string>
-    <string name="settings_transfer_import_success">✓ 导入成功:已应用 %1$d 项服务器设置,导入 %2$d 个 API 密钥。</string>
+    <string name="settings_transfer_exported_msg">已导出:%1$s(%2$d 字节)。已打开分享对话框。</string>
+    <string name="settings_transfer_import_success">导入成功:已应用 %1$d 项服务器设置,导入 %2$d 个 API 密钥。</string>
     <string name="settings_transfer_share_chooser">分享设置导出</string>
     <string name="settings_pool_info_title">多密钥池 &amp; 免费档限制</string>
     <string name="settings_pool_info_intro">在此添加多个 AI Studio API 密钥。服务器以轮询方式分发 TTS 调用,并限速 — 由此绕过免费档的单项目限制。</string>
@@ -729,7 +729,7 @@
     <string name="settings_info_voice_automode_label">自动模式:</string>
     <string name="settings_info_voice_automode_body">位于聊天的 ⋮ 菜单中。录音结束后消息自动发送,回复自动朗读,然后麦克风自行启动 — 双手解放对话。点击 “自动模式启用中” 标签可停止循环。</string>
     <string name="settings_voice_intro">你自己的 Groq API 密钥。仅为你保存,不会共享。</string>
-    <string name="settings_voice_configured">✓ Groq API 密钥已设置: %1$s · %2$s</string>
+    <string name="settings_voice_configured">Groq API 密钥已设置: %1$s · %2$s</string>
     <string name="settings_voice_no_key">未设置 Groq API 密钥。</string>
     <string name="settings_voice_loading_status">正在加载状态…</string>
     <string name="settings_voice_new_api_key">新 Groq API 密钥</string>
@@ -750,7 +750,7 @@
     <string name="settings_voice_lang_custom_label">ISO 639-1 代码</string>
     <string name="settings_voice_lang_apply">应用</string>
     <string name="settings_voice_translate_running">正在通过 Claude 翻译提示…</string>
-    <string name="settings_voice_translate_success">✓ 提示翻译成功</string>
+    <string name="settings_voice_translate_success">提示翻译成功</string>
     <string name="settings_voice_translate_error">翻译失败: %1$s</string>
     <string name="settings_voice_prompt_preview_label">Bias 提示 (%1$s)</string>
     <string name="settings_voice_retranslate">重新翻译</string>
@@ -790,8 +790,8 @@
     <string name="settings_billing_this_month_gross">本月:%1$s(税前,估算)</string>
     <string name="settings_billing_credit_remaining">AI-Pro 剩余额度:%1$s / %2$s</string>
     <string name="settings_billing_budget_cap">预算上限:%1$s = %2$s</string>
-    <string name="settings_billing_real_cost">⚠ 月末估算真实费用:%1$s(超出额度)</string>
-    <string name="settings_billing_in_credit">✓ 在额度内 — 不会扣信用卡。</string>
+    <string name="settings_billing_real_cost">月末估算真实费用:%1$s(超出额度)</string>
+    <string name="settings_billing_in_credit">在额度内 — 不会扣信用卡。</string>
     <string name="settings_billing_project_label">项目:%1$s</string>
     <string name="settings_billing_updated_label">更新时间:%1$s UTC</string>
     <string name="settings_skills_loading">加载技能设置中…</string>

@@ -422,23 +422,13 @@ fun CompactionNotice(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                .border(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                    RoundedCornerShape(50),
-                )
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                text,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // Gleiche Pille wie die Status-Pillen; das Verdichten-Symbol ersetzt
+        // den frueher vorangestellten Pfeil im Text.
+        PocketStatusPill(
+            text = text,
+            tint = MaterialTheme.colorScheme.primary,
+            icon = PocketIcons.Compress,
+        )
     }
 }
 

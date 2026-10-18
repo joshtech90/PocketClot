@@ -288,7 +288,7 @@
     <string name="next_match">Nächster Treffer</string>
     <string name="thinking_label">Denkt nach</string>
     <string name="skills_for_this_chat">Skills für diesen Chat</string>
-    <string name="skills_for_this_chat_done">Skills für diesen Chat ✓</string>
+    <string name="skills_for_this_chat_done">Skills für diesen Chat</string>
     <string name="auto_speak_for_this_chat">Auto-Vorlesen für diesen Chat…%1$s</string>
     <string name="conversation_compacting">Gespräch wird verdichtet…</string>
     <string name="scroll_to_bottom">Nach unten scrollen</string>
@@ -302,13 +302,13 @@
     <string name="chat_audio_prefix">Vorgelesen: %1$s</string>
     <string name="chat_context_status">%1$d%% Kontext · %2$s%3$s</string>
     <string name="chat_cache_suffix"> · %1$dK im Cache</string>
-    <string name="chat_compaction_notice">↑ Sehr alte Historie wurde verdichtet (Notfall-Verdichtung)</string>
+    <string name="chat_compaction_notice">Sehr alte Historie wurde verdichtet (Notfall-Verdichtung)</string>
     <string name="chat_compacting_chip">Gespräch wird verdichtet…</string>
     <string name="chat_scroll_to_bottom_cd">Nach unten scrollen</string>
     <string name="chat_auto_speak_on">an</string>
     <string name="chat_auto_speak_off">aus</string>
-    <string name="chat_auto_speak_marker_on"> ✓ an</string>
-    <string name="chat_auto_speak_marker_off"> ✗ aus</string>
+    <string name="chat_auto_speak_marker_on">an</string>
+    <string name="chat_auto_speak_marker_off">aus</string>
     <string name="chat_skills_dialog_title">Skills für diesen Chat</string>
     <string name="chat_skills_dialog_body_override">Dieser Chat hat eigene Skill-Einstellungen, die von deinem Standard abweichen.</string>
     <string name="chat_skills_dialog_body_default">Standardeinstellungen aus den Einstellungen sind aktiv. Änderungen hier überschreiben nur diesen Chat.</string>
@@ -429,7 +429,7 @@
     <string name="settings_server_url_placeholder">https://pocket-claude.deine-domain.com</string>
     <string name="settings_username">Benutzername</string>
     <string name="settings_not_logged_in">(nicht angemeldet)</string>
-    <string name="settings_session_active">✓ Session aktiv</string>
+    <string name="settings_session_active">Session aktiv</string>
     <string name="settings_not_logged_in_hint">Nicht angemeldet — bitte unten anmelden.</string>
     <string name="settings_test_connection">Verbindung testen</string>
     <string name="settings_relogin">Erneut anmelden</string>
@@ -563,8 +563,8 @@
     <string name="settings_tts_provider_web_short">Gemini Web</string>
     <string name="settings_tts_provider_web_label">Gemini Web (Standard, kein Setup):</string>
     <string name="settings_tts_provider_web_body">Die Vorlese-Stimme von gemini.google.com, geliefert von einem kleinen Dienst auf deinem Server, der eine angemeldete Google-Sitzung hält. Kostenlos, kein API-Key, kein Service-Account, und rund 40-mal schneller als Echtzeit. Die Stimme ist nicht wählbar.</string>
-    <string name="settings_tts_status_web_active">✓ Gemini Web aktiv — kostenlos, kein Setup, mit Abstand am schnellsten. Die Stimme ist fest vorgegeben.</string>
-    <string name="settings_tts_status_web_down">⚠ Der Vorlese-Dienst antwortet nicht, oder seine Google-Sitzung ist abgelaufen. Auf dem Server neu anmelden, oder hier solange einen anderen Anbieter wählen.</string>
+    <string name="settings_tts_status_web_active">Gemini Web aktiv — kostenlos, kein Setup, mit Abstand am schnellsten. Die Stimme ist fest vorgegeben.</string>
+    <string name="settings_tts_status_web_down">Der Vorlese-Dienst antwortet nicht, oder seine Google-Sitzung ist abgelaufen. Auf dem Server neu anmelden, oder hier solange einen anderen Anbieter wählen.</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web hat genau eine Stimme. Der Vorlese-Aufruf von Google kennt dafür schlicht keinen Parameter.</string>
     <string name="settings_tts_provider_edge_label">Edge (Standard, kein Setup):</string>
     <string name="settings_tts_provider_edge_body">Vorlese-Stimmen von Microsoft Edge. Komplett kostenlos, kein API-Key, kein Service-Account. Qualität schwächer als Gemini/Chirp, aber gut für schnelles Vorlesen.</string>
@@ -582,21 +582,21 @@
     <string name="settings_tts_chunking_info_gemini_label">Für Gemini API:</string>
     <string name="settings_tts_chunking_info_gemini_body">Standard AUS. Jeder Chunk = ein API-Aufruf. Mit Free-Tier-Keys (10 RPD/Key) verbrennt eine gechunkte Antwort schnell dein Tagesbudget. Mit einem großen Multi-Key-Pool kannst du es manuell aktivieren — der Server verteilt die Chunks dann round-robin über alle Keys.</string>
     <string name="settings_tts_back_to_default">Zurück zum Auto-Default</string>
-    <string name="settings_tts_status_edge_active">✓ Edge TTS aktiv — kostenlos, kein Setup. Qualität ist Standard (Microsoft-Edge-Stimmen). Später auf Gemini API oder Cloud TTS wechseln für höhere Qualität.</string>
-    <string name="settings_tts_status_gemini_pool_chunk_on">✓ %1$d Keys im Pool, Chunking AN. Jede Antwort wird in mehrere parallele Chunks zerlegt — sie werden round-robin auf alle Keys verteilt. Effektiver Burst: ≈ %2$d parallele TTS-Aufrufe (3 RPM pro Key). Schnellster Stream-Start, brennt aber das Tagesbudget schnell durch.</string>
-    <string name="settings_tts_status_gemini_pool_chunk_off">✓ %1$d Keys im Pool, Chunking AUS. Jede Antwort nutzt genau einen Key (round-robin). Keine Burst-Last. Schonend fürs Tagesbudget. Schalte Chunking unten an, wenn du einen schnelleren Stream-Start willst.</string>
-    <string name="settings_tts_status_gemini_1key_tts">✓ Gemini API mit 1 TTS-Key. Free Tier: 3 RPM / 10 RPD pro Key. Mit Chunking AN (unten) brennt eine lange Antwort das Tagesbudget schnell durch. Unten weitere Keys hinzufügen für mehr Durchsatz.</string>
-    <string name="settings_tts_status_gemini_image_shared">ⓘ Der Bild-API-Key wird aktuell auch für TTS verwendet. Füge unten einen separaten Free-Tier-Key (oder mehrere) hinzu, damit TTS und Bild-Kontingent nicht konkurrieren.</string>
-    <string name="settings_tts_status_gemini_no_key">⚠ Kein API-Key gesetzt. Füge unten deinen AI-Studio-Key ins Feld ein (Free Tier reicht — siehe ⓘ neben dem Feld).</string>
-    <string name="settings_tts_status_cloud_chunk_on">✓ Cloud TTS aktiv + Chunking AN. 1 Mio Zeichen/Monat gratis (Chirp 3 HD), keine relevante RPM-Bremse — Chunking bringt einen schnelleren Stream-Start ohne Nachteile.</string>
-    <string name="settings_tts_status_cloud_ok">✓ Cloud TTS aktiv. 1 Mio Zeichen/Monat gratis (Chirp 3 HD). Du könntest Chunking aktivieren (unten) — bringt schnelleren Stream-Start ohne Kontingent-Risiko.</string>
-    <string name="settings_tts_status_cloud_no_json">⚠ Keine Service-Account-JSON geladen. Admin muss eine im Server-GUI hochladen (Cloud-Projekt mit aktivem Billing).</string>
+    <string name="settings_tts_status_edge_active">Edge TTS aktiv — kostenlos, kein Setup. Qualität ist Standard (Microsoft-Edge-Stimmen). Später auf Gemini API oder Cloud TTS wechseln für höhere Qualität.</string>
+    <string name="settings_tts_status_gemini_pool_chunk_on">%1$d Keys im Pool, Chunking AN. Jede Antwort wird in mehrere parallele Chunks zerlegt — sie werden round-robin auf alle Keys verteilt. Effektiver Burst: ≈ %2$d parallele TTS-Aufrufe (3 RPM pro Key). Schnellster Stream-Start, brennt aber das Tagesbudget schnell durch.</string>
+    <string name="settings_tts_status_gemini_pool_chunk_off">%1$d Keys im Pool, Chunking AUS. Jede Antwort nutzt genau einen Key (round-robin). Keine Burst-Last. Schonend fürs Tagesbudget. Schalte Chunking unten an, wenn du einen schnelleren Stream-Start willst.</string>
+    <string name="settings_tts_status_gemini_1key_tts">Gemini API mit 1 TTS-Key. Free Tier: 3 RPM / 10 RPD pro Key. Mit Chunking AN (unten) brennt eine lange Antwort das Tagesbudget schnell durch. Unten weitere Keys hinzufügen für mehr Durchsatz.</string>
+    <string name="settings_tts_status_gemini_image_shared">Der Bild-API-Key wird aktuell auch für TTS verwendet. Füge unten einen separaten Free-Tier-Key (oder mehrere) hinzu, damit TTS und Bild-Kontingent nicht konkurrieren.</string>
+    <string name="settings_tts_status_gemini_no_key">Kein API-Key gesetzt. Füge unten deinen AI-Studio-Key ins Feld ein (Free Tier reicht — siehe ⓘ neben dem Feld).</string>
+    <string name="settings_tts_status_cloud_chunk_on">Cloud TTS aktiv + Chunking AN. 1 Mio Zeichen/Monat gratis (Chirp 3 HD), keine relevante RPM-Bremse — Chunking bringt einen schnelleren Stream-Start ohne Nachteile.</string>
+    <string name="settings_tts_status_cloud_ok">Cloud TTS aktiv. 1 Mio Zeichen/Monat gratis (Chirp 3 HD). Du könntest Chunking aktivieren (unten) — bringt schnelleren Stream-Start ohne Kontingent-Risiko.</string>
+    <string name="settings_tts_status_cloud_no_json">Keine Service-Account-JSON geladen. Admin muss eine im Server-GUI hochladen (Cloud-Projekt mit aktivem Billing).</string>
     <string name="settings_tts_remove_credentials">Cloud-TTS-Credentials entfernen</string>
     <string name="settings_tts_provider_ready">Aktueller Provider bereit</string>
     <string name="settings_tts_provider_not_ready">Aktueller Provider nicht bereit</string>
     <string name="settings_tts_need_server_config">Bitte zuerst Server-URL und Token speichern, dann kannst du die TTS-JSON hochladen.</string>
     <string name="settings_voice_label">Stimme</string>
-    <string name="settings_voice_incompatible">⚠ %1$s (nicht kompatibel mit %2$s)</string>
+    <string name="settings_voice_incompatible">%1$s (nicht kompatibel mit %2$s)</string>
     <string name="settings_tier_label_edge">Edge (kostenlos, kein Setup nötig)</string>
     <string name="settings_tier_label_gemini">Gemini (KI-Stimmen — Modell unten wählbar)</string>
     <string name="settings_tier_label_chirp3hd">Chirp 3 HD (1 Mio Zeichen/Monat gratis, danach $30/M)</string>
@@ -689,8 +689,8 @@
     <string name="settings_transfer_import">Importieren</string>
     <string name="settings_transfer_exporting">Exportiere…</string>
     <string name="settings_transfer_importing">Importiere…</string>
-    <string name="settings_transfer_exported_msg">✓ Exportiert: %1$s (%2$d Bytes). Teilen-Dialog geöffnet.</string>
-    <string name="settings_transfer_import_success">✓ Import erfolgreich: %1$d Server-Einstellungen übernommen, %2$d API-Keys importiert.</string>
+    <string name="settings_transfer_exported_msg">Exportiert: %1$s (%2$d Bytes). Teilen-Dialog geöffnet.</string>
+    <string name="settings_transfer_import_success">Import erfolgreich: %1$d Server-Einstellungen übernommen, %2$d API-Keys importiert.</string>
     <string name="settings_transfer_share_chooser">Einstellungs-Export teilen</string>
     <string name="settings_pool_info_title">Multi-Key-Pool &amp; Free-Tier-Limits</string>
     <string name="settings_pool_info_intro">Füge hier mehrere AI-Studio-API-Keys hinzu. Der Server verteilt TTS-Aufrufe round-robin mit Rate-Limiting — damit umgehst du die Pro-Projekt-Limits des Free Tier.</string>
@@ -732,7 +732,7 @@
     <string name="settings_info_voice_automode_label">Auto-Modus:</string>
     <string name="settings_info_voice_automode_body">Im Chat-Overflow-Menü (⋮). Nach der Aufnahme schickt die Nachricht ab, die Antwort wird vorgelesen und das Mikro startet von alleine wieder — Freihand-Konversation. Tap auf den „Auto-Modus aktiv"-Pill stoppt den Loop.</string>
     <string name="settings_voice_intro">Dein eigener Groq-API-Key. Wird nur für Dich gespeichert, nicht geteilt.</string>
-    <string name="settings_voice_configured">✓ Groq-API-Key gesetzt: %1$s · %2$s</string>
+    <string name="settings_voice_configured">Groq-API-Key gesetzt: %1$s · %2$s</string>
     <string name="settings_voice_no_key">Kein Groq-API-Key gesetzt.</string>
     <string name="settings_voice_loading_status">Status wird geladen…</string>
     <string name="settings_voice_new_api_key">Neuer Groq-API-Key</string>
@@ -753,7 +753,7 @@
     <string name="settings_voice_lang_custom_label">ISO-639-1-Code</string>
     <string name="settings_voice_lang_apply">Übernehmen</string>
     <string name="settings_voice_translate_running">Transkriptionsprompt wird übersetzt …</string>
-    <string name="settings_voice_translate_success">✓ Prompt erfolgreich übersetzt</string>
+    <string name="settings_voice_translate_success">Prompt erfolgreich übersetzt</string>
     <string name="settings_voice_translate_error">Übersetzung fehlgeschlagen: %1$s</string>
     <string name="settings_voice_prompt_preview_label">Bias-Prompt (%1$s)</string>
     <string name="settings_voice_retranslate">Neu übersetzen</string>
@@ -793,8 +793,8 @@
     <string name="settings_billing_this_month_gross">Diesen Monat: %1$s (brutto, geschätzt)</string>
     <string name="settings_billing_credit_remaining">AI-Pro-Credit verbleibend: %1$s von %2$s</string>
     <string name="settings_billing_budget_cap">Budget-Cap: %1$s = %2$s</string>
-    <string name="settings_billing_real_cost">⚠ Geschätzte echte Kosten zum Monatsende: %1$s (über dem Credit)</string>
-    <string name="settings_billing_in_credit">✓ Im Credit — Kreditkarte wird nicht belastet.</string>
+    <string name="settings_billing_real_cost">Geschätzte echte Kosten zum Monatsende: %1$s (über dem Credit)</string>
+    <string name="settings_billing_in_credit">Im Credit — Kreditkarte wird nicht belastet.</string>
     <string name="settings_billing_project_label">Projekt: %1$s</string>
     <string name="settings_billing_updated_label">Aktualisiert: %1$s UTC</string>
     <string name="settings_skills_loading">Skill-Einstellungen werden geladen…</string>

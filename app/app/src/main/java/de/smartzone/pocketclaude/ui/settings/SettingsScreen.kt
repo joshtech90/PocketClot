@@ -112,6 +112,8 @@ import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import androidx.compose.foundation.layout.ColumnScope
 import de.smartzone.pocketclaude.ui.components.PocketCard
+import de.smartzone.pocketclaude.ui.components.PocketStatusLine
+import de.smartzone.pocketclaude.ui.components.StatusKind
 import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketRadius
@@ -177,7 +179,7 @@ fun SettingsScreen(
                 .consumeWindowInsets(pad)
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // ─── Quick-Setup-Banner — nur sichtbar bis alles eingerichtet ───
@@ -488,10 +490,10 @@ private fun ProfileAndServerCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(PocketRadius.Small))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 stringResource(de.smartzone.pocketclaude.R.string.settings_username),
@@ -501,14 +503,11 @@ private fun ProfileAndServerCard(
             Text(
                 activeUsername.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in) },
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (activeUsername.isNotBlank()) FW.Medium else FW.Normal,
             )
-            Text(
-                if (sessionOk) stringResource(de.smartzone.pocketclaude.R.string.settings_session_active)
-                else stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (sessionOk) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error,
+            PocketStatusLine(
+                text = if (sessionOk) stringResource(de.smartzone.pocketclaude.R.string.settings_session_active)
+                       else stringResource(de.smartzone.pocketclaude.R.string.settings_not_logged_in_hint),
+                kind = if (sessionOk) StatusKind.Success else StatusKind.Warning,
             )
         }
 
@@ -820,7 +819,7 @@ private fun GemsSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(PocketRadius.Small))
                     .clickable(enabled = !gem.isBuiltin) { onEdit(gem.id) }
                     .padding(vertical = 8.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -828,7 +827,7 @@ private fun GemsSection(
                 Text(
                     gem.emoji.ifBlank { "🤖" },
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(end = 10.dp),
+                    modifier = Modifier.padding(end = 12.dp),
                 )
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -877,7 +876,7 @@ private fun GemsSection(
         }
         FilledTonalButton(onClick = { onEdit(null) }, modifier = Modifier.fillMaxWidth()) {
             Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
             Text(stringResource(de.smartzone.pocketclaude.R.string.gem_new))
         }
     }
@@ -1735,62 +1734,57 @@ private fun TtsSection(
             // Vorher stand „Round-Robin + Rate-Limiter" im selben Satz —
             // das war irreführend, weil der Rate-Limiter nur greift wenn
             // Chunking AN ist und parallele Calls rausgehen.
-            data class Hint(val text: String, val emphasis: Boolean)
+            data class Hint(val text: String, val kind: StatusKind)
             val keySource = ttsStatus?.geminiApiKeySource ?: "none"
             val keyCount = ttsStatus?.geminiApiKeyCount ?: 0
             val chunkOn = ttsStatus?.chunkingEnabled ?: false
             val hint = when {
                 isWeb && ttsStatus?.configured == false -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_down),
-                    emphasis = true,
+                    kind = StatusKind.Warning,
                 )
                 isWeb -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_active),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 isEdge -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_edge_active),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 isGemini && keyCount >= 2 && chunkOn -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_on, keyCount, keyCount * 3),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 isGemini && keyCount >= 2 && !chunkOn -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_off, keyCount),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "tts" -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_1key_tts),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "image" -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_image_shared),
-                    emphasis = false,
+                    kind = StatusKind.Info,
                 )
                 isGemini -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_no_key),
-                    emphasis = true,
+                    kind = StatusKind.Warning,
                 )
                 isCloud && ttsStatus?.cloudTtsConfigured == true && chunkOn -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_chunk_on),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 isCloud && ttsStatus?.cloudTtsConfigured == true -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_ok),
-                    emphasis = false,
+                    kind = StatusKind.Success,
                 )
                 else -> Hint(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_no_json),
-                    emphasis = true,
+                    kind = StatusKind.Warning,
                 )
             }
-            Text(
-                hint.text,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (hint.emphasis) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            PocketStatusLine(text = hint.text, kind = hint.kind)
 
             // === Chunking-Toggle ===
             // Bewusst HIER in derselben Card wie der Status-Hint, weil
@@ -1872,13 +1866,13 @@ private fun TtsSection(
             // Felder?"-Verständnis-Problem.
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(PocketRadius.Small),
                 color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
             ) {
                 Text(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_tts_image_shared_key_tip),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(12.dp),
                 )
             }
             TtsGeminiApiKeyField(vm = vm, ttsStatus = ttsStatus, ttsBusy = ttsBusy)
@@ -2013,6 +2007,9 @@ private fun TtsSection(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_label)) },
+                    leadingIcon = if (currentVoiceIncompatible) {
+                        { Icon(PocketIcons.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                    } else null,
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = voiceMenuOpen)
                     },
@@ -2268,7 +2265,7 @@ private fun TtsSection(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = jsonText,
                         onValueChange = { jsonText = it },
@@ -2805,77 +2802,71 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
     var renameId by remember { mutableStateOf<String?>(null) }
     var renameLabel by remember { mutableStateOf("") }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (settings.profiles.isEmpty()) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_profile_first_run),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(8.dp),
-                )
-            } else {
-                for (p in settings.profiles) {
-                    val isActive = p.id == settings.activeProfileId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                                else androidx.compose.ui.graphics.Color.Transparent
-                            )
-                            .clickable { vm.activateProfile(p.id) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            if (isActive) PocketIcons.CheckCircle else PocketIcons.RadioUnchecked,
-                            contentDescription = null,
-                            tint = if (isActive) MaterialTheme.colorScheme.primary
-                                   else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(PocketIconSize.Regular),
+    PocketCard(contentPadding = 8.dp, spacing = 4.dp) {
+        if (settings.profiles.isEmpty()) {
+            Text(
+                stringResource(de.smartzone.pocketclaude.R.string.settings_profile_first_run),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(8.dp),
+            )
+        } else {
+            for (p in settings.profiles) {
+                val isActive = p.id == settings.activeProfileId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(PocketRadius.Small))
+                        .background(
+                            if (isActive) MaterialTheme.colorScheme.secondaryContainer
+                            else androidx.compose.ui.graphics.Color.Transparent
                         )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                p.label.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_profile_default) },
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isActive) FW.SemiBold else FW.Normal,
-                            )
-                            Text(
-                                p.serverUrl.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_profile_no_url) },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                            )
-                        }
-                        IconButton(onClick = { renameId = p.id; renameLabel = p.label }) {
-                            Icon(PocketIcons.Edit, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_profile_rename),
+                        .clickable { vm.activateProfile(p.id) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (isActive) PocketIcons.CheckCircle else PocketIcons.RadioUnchecked,
+                        contentDescription = null,
+                        tint = if (isActive) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(PocketIconSize.Regular),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            p.label.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_profile_default) },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isActive) FW.SemiBold else FW.Normal,
+                        )
+                        Text(
+                            p.serverUrl.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.settings_profile_no_url) },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                    IconButton(onClick = { renameId = p.id; renameLabel = p.label }) {
+                        Icon(PocketIcons.Edit, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_profile_rename),
+                            modifier = Modifier.size(PocketIconSize.Regular))
+                    }
+                    if (settings.profiles.size > 1) {
+                        IconButton(onClick = { confirmDeleteId = p.id }) {
+                            Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_delete_profile_cd),
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(PocketIconSize.Regular))
-                        }
-                        if (settings.profiles.size > 1) {
-                            IconButton(onClick = { confirmDeleteId = p.id }) {
-                                Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_delete_profile_cd),
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(PocketIconSize.Regular))
-                            }
                         }
                     }
                 }
             }
-            TextButton(
-                onClick = { addDialogOpen = true },
-                modifier = Modifier.padding(start = 4.dp),
-            ) {
-                Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(de.smartzone.pocketclaude.R.string.settings_add_profile))
-            }
+        }
+        TextButton(
+            onClick = { addDialogOpen = true },
+            modifier = Modifier.padding(start = 4.dp),
+        ) {
+            Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(de.smartzone.pocketclaude.R.string.settings_add_profile))
         }
     }
 
@@ -3327,18 +3318,16 @@ private fun SettingsTransferSection(vm: SettingsViewModel) {
                 LaunchedEffect(s) {
                     shareSettingsJson(context, s.bytes, s.filename)
                 }
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_exported_msg, s.filename, s.bytes.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                PocketStatusLine(
+                    text = stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_exported_msg, s.filename, s.bytes.size),
+                    kind = StatusKind.Success,
                 )
                 TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
             }
             is SettingsViewModel.SettingsTransferState.ImportSuccess -> {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import_success, s.appliedServer, s.ttsKeysImported),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                PocketStatusLine(
+                    text = stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import_success, s.appliedServer, s.ttsKeysImported),
+                    kind = StatusKind.Success,
                 )
                 TextButton(onClick = vm::resetSettingsTransfer) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
             }
@@ -3396,9 +3385,9 @@ private fun SkillsDefaultsSection(vm: SettingsViewModel) {
         if (current == null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    strokeWidth = 2.dp, modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp, modifier = Modifier.size(PocketIconSize.Small),
                 )
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_skills_loading),
                     style = MaterialTheme.typography.bodySmall,
@@ -3546,9 +3535,9 @@ private fun TtsGeminiApiKeyField(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(PocketRadius.Small))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3703,18 +3692,13 @@ private fun VoiceSection(vm: SettingsViewModel) {
         )
         cfg?.let { c ->
             if (c.configured) {
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(PocketIcons.CheckCircle, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(PocketIconSize.Marker))
-                    Text(
-                        stringResource(
-                            de.smartzone.pocketclaude.R.string.settings_voice_configured,
-                            c.apiKeyMasked ?: "", c.model,
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                PocketStatusLine(
+                    text = stringResource(
+                        de.smartzone.pocketclaude.R.string.settings_voice_configured,
+                        c.apiKeyMasked ?: "", c.model,
+                    ),
+                    kind = StatusKind.Success,
+                )
             } else {
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_no_key),
                      style = MaterialTheme.typography.bodySmall,
@@ -3912,14 +3896,13 @@ private fun VoiceLanguagePicker(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(PocketIconSize.Marker))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_translate_running),
                          style = MaterialTheme.typography.bodySmall)
                 }
-                SettingsViewModel.TranslateStatus.Success -> Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_voice_translate_success),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                SettingsViewModel.TranslateStatus.Success -> PocketStatusLine(
+                    text = stringResource(de.smartzone.pocketclaude.R.string.settings_voice_translate_success),
+                    kind = StatusKind.Success,
                 )
                 SettingsViewModel.TranslateStatus.Error -> Text(
                     stringResource(de.smartzone.pocketclaude.R.string.settings_voice_translate_error,
@@ -3935,10 +3918,10 @@ private fun VoiceLanguagePicker(
         // sieht was Whisper als Bias kriegt
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(PocketRadius.Small),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         ) {
-            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()) {
@@ -3997,12 +3980,12 @@ private fun CloudBillingWidget(vm: SettingsViewModel) {
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(PocketRadius.Small),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         tonalElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -4085,7 +4068,7 @@ private fun CloudBillingWidget(vm: SettingsViewModel) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
+                                    .clip(CircleShape),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                             )
@@ -4110,16 +4093,14 @@ private fun CloudBillingWidget(vm: SettingsViewModel) {
 
                     // Real-Cost-Hinweis: wenn über Credit raus → Warnung
                     if (realCost > 0.01) {
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_billing_real_cost, fmt(realCost)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+                        PocketStatusLine(
+                            text = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_real_cost, fmt(realCost)),
+                            kind = StatusKind.Warning,
                         )
                     } else if (creditOrig > 0.0) {
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_billing_in_credit),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success,
+                        PocketStatusLine(
+                            text = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_in_credit),
+                            kind = StatusKind.Success,
                         )
                     }
 
@@ -4295,7 +4276,7 @@ private fun ImageDefaultsRow(
     if (cfg == null) return
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         // Anbieter. Nur zeigen, wenn es hier ueberhaupt etwas zu waehlen gibt:

@@ -285,7 +285,7 @@
     <string name="next_match">Correspondance suivante</string>
     <string name="thinking_label">Réflexion</string>
     <string name="skills_for_this_chat">Compétences pour cette discussion</string>
-    <string name="skills_for_this_chat_done">Compétences pour cette discussion ✓</string>
+    <string name="skills_for_this_chat_done">Compétences pour cette discussion</string>
     <string name="auto_speak_for_this_chat">Lecture automatique pour cette discussion…%1$s</string>
     <string name="conversation_compacting">Compactage de la conversation…</string>
     <string name="scroll_to_bottom">Aller en bas</string>
@@ -299,13 +299,13 @@
     <string name="chat_audio_prefix">Lecture à voix haute : %1$s</string>
     <string name="chat_context_status">%1$d %% de contexte · %2$s%3$s</string>
     <string name="chat_cache_suffix"> · %1$d K en cache</string>
-    <string name="chat_compaction_notice">↑ L\'historique très ancien a été condensé (compactage d\'urgence)</string>
+    <string name="chat_compaction_notice">L\'historique très ancien a été condensé (compactage d\'urgence)</string>
     <string name="chat_compacting_chip">Compactage de la conversation…</string>
     <string name="chat_scroll_to_bottom_cd">Aller en bas</string>
     <string name="chat_auto_speak_on">activée</string>
     <string name="chat_auto_speak_off">désactivée</string>
-    <string name="chat_auto_speak_marker_on"> ✓ activée</string>
-    <string name="chat_auto_speak_marker_off"> ✗ désactivée</string>
+    <string name="chat_auto_speak_marker_on">activée</string>
+    <string name="chat_auto_speak_marker_off">désactivée</string>
     <string name="chat_skills_dialog_title">Compétences pour cette discussion</string>
     <string name="chat_skills_dialog_body_override">Cette discussion a ses propres paramètres de compétences qui diffèrent de vos valeurs par défaut.</string>
     <string name="chat_skills_dialog_body_default">Les paramètres par défaut des Paramètres sont actifs. Les modifications ici ne s\'appliquent qu\'à cette discussion.</string>
@@ -426,7 +426,7 @@
     <string name="settings_server_url_placeholder">https://pocket-claude.votre-domaine.com</string>
     <string name="settings_username">Nom d\'utilisateur</string>
     <string name="settings_not_logged_in">(non connecté)</string>
-    <string name="settings_session_active">✓ Session active</string>
+    <string name="settings_session_active">Session active</string>
     <string name="settings_not_logged_in_hint">Non connecté — veuillez vous connecter ci-dessous.</string>
     <string name="settings_test_connection">Tester la connexion</string>
     <string name="settings_relogin">Se reconnecter</string>
@@ -560,8 +560,8 @@
     <string name="settings_tts_provider_web_short">Gemini Web</string>
     <string name="settings_tts_provider_web_label">Gemini Web (par défaut, sans configuration) :</string>
     <string name="settings_tts_provider_web_body">La voix de lecture de gemini.google.com, fournie par un petit service sur ton serveur qui maintient une session Google connectée. Gratuit, sans clé API, sans compte de service et environ 40 fois plus rapide que le temps réel. La voix ne peut pas être choisie.</string>
-    <string name="settings_tts_status_web_active">✓ Gemini Web actif — gratuit, sans configuration, de loin le plus rapide. La voix est fixe.</string>
-    <string name="settings_tts_status_web_down">⚠ Le service de lecture ne répond pas ou sa session Google a expiré. Reconnecte-toi sur le serveur ou choisis un autre fournisseur ici en attendant.</string>
+    <string name="settings_tts_status_web_active">Gemini Web actif — gratuit, sans configuration, de loin le plus rapide. La voix est fixe.</string>
+    <string name="settings_tts_status_web_down">Le service de lecture ne répond pas ou sa session Google a expiré. Reconnecte-toi sur le serveur ou choisis un autre fournisseur ici en attendant.</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web a exactement une voix. L\'appel de lecture de Google ne comporte tout simplement aucun paramètre pour cela.</string>
     <string name="settings_tts_provider_edge_label">Edge (par défaut, aucune configuration) :</string>
     <string name="settings_tts_provider_edge_body">Voix de lecture de Microsoft Edge. Complètement gratuit, aucune clé API, aucun compte de service. Qualité plus faible que Gemini/Chirp mais correcte pour une lecture rapide.</string>
@@ -579,21 +579,21 @@
     <string name="settings_tts_chunking_info_gemini_label">Pour l\'API Gemini :</string>
     <string name="settings_tts_chunking_info_gemini_body">Par défaut DÉSACTIVÉ. Chaque segment = un appel API. Avec des clés free tier (10 RPD/clé), une réponse segmentée épuise rapidement votre budget quotidien. Avec un large pool multi-clés, vous pouvez l\'activer manuellement — le serveur répartira alors les segments en round-robin sur toutes les clés.</string>
     <string name="settings_tts_back_to_default">Revenir à la valeur auto par défaut</string>
-    <string name="settings_tts_status_edge_active">✓ Edge TTS actif — gratuit, aucune configuration. La qualité est standard (voix Microsoft Edge). Passez plus tard à l\'API Gemini ou Cloud TTS pour une meilleure qualité.</string>
-    <string name="settings_tts_status_gemini_pool_chunk_on">✓ %1$d clés dans le pool, segmentation ACTIVÉE. Chaque réponse est divisée en plusieurs segments parallèles — ils sont routés en round-robin sur toutes les clés. Burst effectif : ≈ %2$d appels TTS parallèles (3 RPM par clé). Démarrage du flux le plus rapide mais épuise vite votre budget quotidien.</string>
-    <string name="settings_tts_status_gemini_pool_chunk_off">✓ %1$d clés dans le pool, segmentation DÉSACTIVÉE. Chaque réponse utilise exactement une clé (round-robin). Aucune charge de burst. Économe sur le budget quotidien. Activez la segmentation ci-dessous si vous voulez un démarrage du flux plus rapide.</string>
-    <string name="settings_tts_status_gemini_1key_tts">✓ API Gemini avec 1 clé TTS. Free Tier : 3 RPM / 10 RPD par clé. Avec la segmentation ACTIVÉE (ci-dessous), une longue réponse épuise rapidement le budget quotidien. Ajoutez plus de clés ci-dessous pour plus de débit.</string>
-    <string name="settings_tts_status_gemini_image_shared">ⓘ La clé API images est actuellement utilisée aussi pour le TTS. Ajoutez une clé free tier séparée (ou plusieurs) ci-dessous afin que les quotas TTS et images ne se concurrencent pas.</string>
-    <string name="settings_tts_status_gemini_no_key">⚠ Aucune clé API définie. Collez votre clé AI Studio dans le champ ci-dessous (le free tier suffit — voir ⓘ à côté du champ).</string>
-    <string name="settings_tts_status_cloud_chunk_on">✓ Cloud TTS actif + segmentation ACTIVÉE. 1 M caractères/mois gratuits (Chirp 3 HD), pas de frein RPM significatif — la segmentation accélère le démarrage du flux sans inconvénient.</string>
-    <string name="settings_tts_status_cloud_ok">✓ Cloud TTS actif. 1 M caractères/mois gratuits (Chirp 3 HD). Vous pourriez activer la segmentation (ci-dessous) — elle accélère le démarrage du flux sans risque pour le quota.</string>
-    <string name="settings_tts_status_cloud_no_json">⚠ Aucun JSON de compte de service chargé. L\'administrateur doit en téléverser un dans l\'interface du serveur (projet Cloud avec facturation active).</string>
+    <string name="settings_tts_status_edge_active">Edge TTS actif — gratuit, aucune configuration. La qualité est standard (voix Microsoft Edge). Passez plus tard à l\'API Gemini ou Cloud TTS pour une meilleure qualité.</string>
+    <string name="settings_tts_status_gemini_pool_chunk_on">%1$d clés dans le pool, segmentation ACTIVÉE. Chaque réponse est divisée en plusieurs segments parallèles — ils sont routés en round-robin sur toutes les clés. Burst effectif : ≈ %2$d appels TTS parallèles (3 RPM par clé). Démarrage du flux le plus rapide mais épuise vite votre budget quotidien.</string>
+    <string name="settings_tts_status_gemini_pool_chunk_off">%1$d clés dans le pool, segmentation DÉSACTIVÉE. Chaque réponse utilise exactement une clé (round-robin). Aucune charge de burst. Économe sur le budget quotidien. Activez la segmentation ci-dessous si vous voulez un démarrage du flux plus rapide.</string>
+    <string name="settings_tts_status_gemini_1key_tts">API Gemini avec 1 clé TTS. Free Tier : 3 RPM / 10 RPD par clé. Avec la segmentation ACTIVÉE (ci-dessous), une longue réponse épuise rapidement le budget quotidien. Ajoutez plus de clés ci-dessous pour plus de débit.</string>
+    <string name="settings_tts_status_gemini_image_shared">La clé API images est actuellement utilisée aussi pour le TTS. Ajoutez une clé free tier séparée (ou plusieurs) ci-dessous afin que les quotas TTS et images ne se concurrencent pas.</string>
+    <string name="settings_tts_status_gemini_no_key">Aucune clé API définie. Collez votre clé AI Studio dans le champ ci-dessous (le free tier suffit — voir ⓘ à côté du champ).</string>
+    <string name="settings_tts_status_cloud_chunk_on">Cloud TTS actif + segmentation ACTIVÉE. 1 M caractères/mois gratuits (Chirp 3 HD), pas de frein RPM significatif — la segmentation accélère le démarrage du flux sans inconvénient.</string>
+    <string name="settings_tts_status_cloud_ok">Cloud TTS actif. 1 M caractères/mois gratuits (Chirp 3 HD). Vous pourriez activer la segmentation (ci-dessous) — elle accélère le démarrage du flux sans risque pour le quota.</string>
+    <string name="settings_tts_status_cloud_no_json">Aucun JSON de compte de service chargé. L\'administrateur doit en téléverser un dans l\'interface du serveur (projet Cloud avec facturation active).</string>
     <string name="settings_tts_remove_credentials">Supprimer les identifiants Cloud TTS</string>
     <string name="settings_tts_provider_ready">Fournisseur actuel prêt</string>
     <string name="settings_tts_provider_not_ready">Fournisseur actuel non prêt</string>
     <string name="settings_tts_need_server_config">Veuillez d\'abord enregistrer l\'URL du serveur et le jeton, puis vous pourrez téléverser le JSON TTS.</string>
     <string name="settings_voice_label">Voix</string>
-    <string name="settings_voice_incompatible">⚠ %1$s (non compatible avec %2$s)</string>
+    <string name="settings_voice_incompatible">%1$s (non compatible avec %2$s)</string>
     <string name="settings_tier_label_edge">Edge (gratuit, aucune configuration requise)</string>
     <string name="settings_tier_label_gemini">Gemini (voix IA — modèle sélectionnable ci-dessous)</string>
     <string name="settings_tier_label_chirp3hd">Chirp 3 HD (1 M caractères/mois gratuits, puis 30 $/M)</string>
@@ -686,8 +686,8 @@
     <string name="settings_transfer_import">Importer</string>
     <string name="settings_transfer_exporting">Exportation…</string>
     <string name="settings_transfer_importing">Importation…</string>
-    <string name="settings_transfer_exported_msg">✓ Exporté : %1$s (%2$d octets). Boîte de dialogue de partage ouverte.</string>
-    <string name="settings_transfer_import_success">✓ Importation réussie : %1$d paramètres serveur appliqués, %2$d clés API importées.</string>
+    <string name="settings_transfer_exported_msg">Exporté : %1$s (%2$d octets). Boîte de dialogue de partage ouverte.</string>
+    <string name="settings_transfer_import_success">Importation réussie : %1$d paramètres serveur appliqués, %2$d clés API importées.</string>
     <string name="settings_transfer_share_chooser">Partager l\'export des paramètres</string>
     <string name="settings_pool_info_title">Pool multi-clés &amp; limites du free tier</string>
     <string name="settings_pool_info_intro">Ajoutez ici plusieurs clés API AI Studio. Le serveur distribue les appels TTS en round-robin avec limitation de débit — cela contourne les limites par projet du free tier.</string>
@@ -729,7 +729,7 @@
     <string name="settings_info_voice_automode_label">Mode auto :</string>
     <string name="settings_info_voice_automode_body">Dans le menu ⋮ du chat. Après enregistrement, le message part, la réponse est lue à haute voix et le micro redémarre tout seul — conversation mains libres. Touchez la pastille « Mode auto actif » pour arrêter.</string>
     <string name="settings_voice_intro">Votre propre clé API Groq. Stockée uniquement pour vous, jamais partagée.</string>
-    <string name="settings_voice_configured">✓ Clé API Groq configurée : %1$s · %2$s</string>
+    <string name="settings_voice_configured">Clé API Groq configurée : %1$s · %2$s</string>
     <string name="settings_voice_no_key">Aucune clé API Groq définie.</string>
     <string name="settings_voice_loading_status">Chargement du statut…</string>
     <string name="settings_voice_new_api_key">Nouvelle clé API Groq</string>
@@ -750,7 +750,7 @@
     <string name="settings_voice_lang_custom_label">Code ISO 639-1</string>
     <string name="settings_voice_lang_apply">Appliquer</string>
     <string name="settings_voice_translate_running">Traduction de l\'amorce via Claude…</string>
-    <string name="settings_voice_translate_success">✓ Amorce traduite</string>
+    <string name="settings_voice_translate_success">Amorce traduite</string>
     <string name="settings_voice_translate_error">Échec de la traduction : %1$s</string>
     <string name="settings_voice_prompt_preview_label">Amorce (%1$s)</string>
     <string name="settings_voice_retranslate">Re-traduire</string>
@@ -790,8 +790,8 @@
     <string name="settings_billing_this_month_gross">Ce mois-ci : %1$s (brut, estimé)</string>
     <string name="settings_billing_credit_remaining">Crédit AI-Pro restant : %1$s sur %2$s</string>
     <string name="settings_billing_budget_cap">Plafond budgétaire : %1$s = %2$s</string>
-    <string name="settings_billing_real_cost">⚠ Coût réel estimé en fin de mois : %1$s (au-dessus du crédit)</string>
-    <string name="settings_billing_in_credit">✓ Dans le crédit — la carte de crédit ne sera pas débitée.</string>
+    <string name="settings_billing_real_cost">Coût réel estimé en fin de mois : %1$s (au-dessus du crédit)</string>
+    <string name="settings_billing_in_credit">Dans le crédit — la carte de crédit ne sera pas débitée.</string>
     <string name="settings_billing_project_label">Projet : %1$s</string>
     <string name="settings_billing_updated_label">Mis à jour : %1$s UTC</string>
     <string name="settings_skills_loading">Chargement des paramètres de compétences…</string>

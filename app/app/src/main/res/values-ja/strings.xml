@@ -285,7 +285,7 @@
     <string name="next_match">次の一致</string>
     <string name="thinking_label">思考中</string>
     <string name="skills_for_this_chat">このチャットのスキル</string>
-    <string name="skills_for_this_chat_done">このチャットのスキル ✓</string>
+    <string name="skills_for_this_chat_done">このチャットのスキル</string>
     <string name="auto_speak_for_this_chat">このチャットの自動読み上げ…%1$s</string>
     <string name="conversation_compacting">会話を圧縮中…</string>
     <string name="scroll_to_bottom">最下部へスクロール</string>
@@ -299,13 +299,13 @@
     <string name="chat_audio_prefix">読み上げ: %1$s</string>
     <string name="chat_context_status">%1$d%% コンテキスト · %2$s%3$s</string>
     <string name="chat_cache_suffix"> · %1$dKキャッシュ</string>
-    <string name="chat_compaction_notice">↑ 非常に古い履歴が要約されました（緊急圧縮）</string>
+    <string name="chat_compaction_notice">非常に古い履歴が要約されました（緊急圧縮）</string>
     <string name="chat_compacting_chip">会話を圧縮中…</string>
     <string name="chat_scroll_to_bottom_cd">最下部へスクロール</string>
     <string name="chat_auto_speak_on">オン</string>
     <string name="chat_auto_speak_off">オフ</string>
-    <string name="chat_auto_speak_marker_on"> ✓ オン</string>
-    <string name="chat_auto_speak_marker_off"> ✗ オフ</string>
+    <string name="chat_auto_speak_marker_on">オン</string>
+    <string name="chat_auto_speak_marker_off">オフ</string>
     <string name="chat_skills_dialog_title">このチャットのスキル</string>
     <string name="chat_skills_dialog_body_override">このチャットには、デフォルトとは異なる独自のスキル設定があります。</string>
     <string name="chat_skills_dialog_body_default">設定のデフォルト値が有効です。ここでの変更はこのチャットのみに上書き適用されます。</string>
@@ -426,7 +426,7 @@
     <string name="settings_server_url_placeholder">https://pocket-claude.your-domain.com</string>
     <string name="settings_username">ユーザー名</string>
     <string name="settings_not_logged_in">（サインインしていません）</string>
-    <string name="settings_session_active">✓ セッションがアクティブです</string>
+    <string name="settings_session_active">セッションがアクティブです</string>
     <string name="settings_not_logged_in_hint">サインインしていません — 下からサインインしてください。</string>
     <string name="settings_test_connection">接続をテスト</string>
     <string name="settings_relogin">再サインイン</string>
@@ -560,8 +560,8 @@
     <string name="settings_tts_provider_web_short">Gemini Web</string>
     <string name="settings_tts_provider_web_label">Gemini Web (デフォルト、設定不要):</string>
     <string name="settings_tts_provider_web_body">gemini.google.com の読み上げ音声です。お使いのサーバー上の小さなサービスがログイン済みの Google セッションを保持して提供します。無料、API キー不要、サービスアカウント不要で、リアルタイムの約40倍高速です。音声は選択できません。</string>
-    <string name="settings_tts_status_web_active">✓ Gemini Web 有効 — 無料、設定不要、圧倒的に最速。音声は固定です。</string>
-    <string name="settings_tts_status_web_down">⚠ 読み上げサービスが応答しないか、Google セッションの有効期限が切れています。サーバーで再度ログインするか、それまでの間はここで別のプロバイダーを選択してください。</string>
+    <string name="settings_tts_status_web_active">Gemini Web 有効 — 無料、設定不要、圧倒的に最速。音声は固定です。</string>
+    <string name="settings_tts_status_web_down">読み上げサービスが応答しないか、Google セッションの有効期限が切れています。サーバーで再度ログインするか、それまでの間はここで別のプロバイダーを選択してください。</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web の音声は1種類のみです。Google の読み上げ呼び出しには、そのためのパラメーターが存在しません。</string>
     <string name="settings_tts_provider_edge_label">Edge（デフォルト、設定不要）:</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edgeの読み上げ音声。完全無料、APIキーやサービスアカウント不要。品質はGemini/Chirpより劣りますが、高速な読み上げには十分です。</string>
@@ -579,21 +579,21 @@
     <string name="settings_tts_chunking_info_gemini_label">Gemini APIの場合:</string>
     <string name="settings_tts_chunking_info_gemini_body">デフォルトはオフ。各チャンク = 1 APIコール。無料枠のキー（キーあたり10 RPD）では、チャンク化された回答は1日の予算をすぐに使い切ります。大規模なマルチキープールがあれば手動で有効化できます — その場合、サーバーはすべてのキーにチャンクをラウンドロビンで分配します。</string>
     <string name="settings_tts_back_to_default">自動デフォルトに戻す</string>
-    <string name="settings_tts_status_edge_active">✓ Edge TTSがアクティブ — 無料、設定不要。品質は標準（Microsoft Edge音声）。より高い品質のためにGemini APIまたはCloud TTSに後で切り替え可能。</string>
-    <string name="settings_tts_status_gemini_pool_chunk_on">✓ プールに%1$d個のキー、チャンク化オン。各返信は複数の並列チャンクに分割され、すべてのキーにラウンドロビンでルーティングされます。実効バースト: 約%2$d個の並列TTSコール（キーあたり3 RPM）。最速のストリーム開始ですが、1日の予算を急速に消費します。</string>
-    <string name="settings_tts_status_gemini_pool_chunk_off">✓ プールに%1$d個のキー、チャンク化オフ。各返信は1つのキーを使用（ラウンドロビン）。バースト負荷なし。1日の予算に優しい。ストリーム開始を高速化するには、下でチャンク化をオンにしてください。</string>
-    <string name="settings_tts_status_gemini_1key_tts">✓ Gemini APIを1つのTTSキーで使用中。無料枠: キーあたり3 RPM / 10 RPD。チャンク化オン（下記）の場合、長い回答は1日の予算をすぐに使い切ります。スループットを上げるには、下にキーを追加してください。</string>
-    <string name="settings_tts_status_gemini_image_shared">ⓘ 画像APIキーが現在TTSにも使用されています。TTSと画像のクォータが競合しないように、下に別の無料枠キー（または複数）を追加してください。</string>
-    <string name="settings_tts_status_gemini_no_key">⚠ APIキーが設定されていません。下のフィールドにAI Studioキーを貼り付けてください（無料枠で十分 — フィールド横のⓘを参照）。</string>
-    <string name="settings_tts_status_cloud_chunk_on">✓ Cloud TTSアクティブ + チャンク化オン。月100万文字無料（Chirp 3 HD）、実質的なRPM制限なし — チャンク化はデメリットなしでストリーム開始を高速化します。</string>
-    <string name="settings_tts_status_cloud_ok">✓ Cloud TTSアクティブ。月100万文字無料（Chirp 3 HD）。チャンク化（下記）を有効にできます — クォータリスクなしでストリーム開始が高速になります。</string>
-    <string name="settings_tts_status_cloud_no_json">⚠ サービスアカウントJSONがロードされていません。管理者がサーバーGUIでアップロードする必要があります（請求が有効なCloudプロジェクト）。</string>
+    <string name="settings_tts_status_edge_active">Edge TTSがアクティブ — 無料、設定不要。品質は標準（Microsoft Edge音声）。より高い品質のためにGemini APIまたはCloud TTSに後で切り替え可能。</string>
+    <string name="settings_tts_status_gemini_pool_chunk_on">プールに%1$d個のキー、チャンク化オン。各返信は複数の並列チャンクに分割され、すべてのキーにラウンドロビンでルーティングされます。実効バースト: 約%2$d個の並列TTSコール（キーあたり3 RPM）。最速のストリーム開始ですが、1日の予算を急速に消費します。</string>
+    <string name="settings_tts_status_gemini_pool_chunk_off">プールに%1$d個のキー、チャンク化オフ。各返信は1つのキーを使用（ラウンドロビン）。バースト負荷なし。1日の予算に優しい。ストリーム開始を高速化するには、下でチャンク化をオンにしてください。</string>
+    <string name="settings_tts_status_gemini_1key_tts">Gemini APIを1つのTTSキーで使用中。無料枠: キーあたり3 RPM / 10 RPD。チャンク化オン（下記）の場合、長い回答は1日の予算をすぐに使い切ります。スループットを上げるには、下にキーを追加してください。</string>
+    <string name="settings_tts_status_gemini_image_shared">画像APIキーが現在TTSにも使用されています。TTSと画像のクォータが競合しないように、下に別の無料枠キー（または複数）を追加してください。</string>
+    <string name="settings_tts_status_gemini_no_key">APIキーが設定されていません。下のフィールドにAI Studioキーを貼り付けてください（無料枠で十分 — フィールド横のⓘを参照）。</string>
+    <string name="settings_tts_status_cloud_chunk_on">Cloud TTSアクティブ + チャンク化オン。月100万文字無料（Chirp 3 HD）、実質的なRPM制限なし — チャンク化はデメリットなしでストリーム開始を高速化します。</string>
+    <string name="settings_tts_status_cloud_ok">Cloud TTSアクティブ。月100万文字無料（Chirp 3 HD）。チャンク化（下記）を有効にできます — クォータリスクなしでストリーム開始が高速になります。</string>
+    <string name="settings_tts_status_cloud_no_json">サービスアカウントJSONがロードされていません。管理者がサーバーGUIでアップロードする必要があります（請求が有効なCloudプロジェクト）。</string>
     <string name="settings_tts_remove_credentials">Cloud TTS認証情報を削除</string>
     <string name="settings_tts_provider_ready">現在のプロバイダーは準備完了</string>
     <string name="settings_tts_provider_not_ready">現在のプロバイダーは準備未完了</string>
     <string name="settings_tts_need_server_config">まずサーバーURLとトークンを保存してから、TTSのJSONをアップロードできます。</string>
     <string name="settings_voice_label">音声</string>
-    <string name="settings_voice_incompatible">⚠ %1$s（%2$sと互換性なし）</string>
+    <string name="settings_voice_incompatible">%1$s（%2$sと互換性なし）</string>
     <string name="settings_tier_label_edge">Edge（無料、設定不要）</string>
     <string name="settings_tier_label_gemini">Gemini（AI音声 — 下でモデル選択可能）</string>
     <string name="settings_tier_label_chirp3hd">Chirp 3 HD（月100万文字無料、その後 $30/M）</string>
@@ -686,8 +686,8 @@
     <string name="settings_transfer_import">インポート</string>
     <string name="settings_transfer_exporting">エクスポート中…</string>
     <string name="settings_transfer_importing">インポート中…</string>
-    <string name="settings_transfer_exported_msg">✓ エクスポート完了: %1$s（%2$d バイト）。共有ダイアログを開きました。</string>
-    <string name="settings_transfer_import_success">✓ インポート成功: %1$d件のサーバー設定を適用、%2$d件のAPIキーをインポートしました。</string>
+    <string name="settings_transfer_exported_msg">エクスポート完了: %1$s（%2$d バイト）。共有ダイアログを開きました。</string>
+    <string name="settings_transfer_import_success">インポート成功: %1$d件のサーバー設定を適用、%2$d件のAPIキーをインポートしました。</string>
     <string name="settings_transfer_share_chooser">設定エクスポートを共有</string>
     <string name="settings_pool_info_title">マルチキープール &amp; 無料枠の制限</string>
     <string name="settings_pool_info_intro">複数のAI Studio APIキーをここに追加します。サーバーはレート制限付きでラウンドロビン方式でTTSコールを分配します — これにより無料枠のプロジェクトごとの制限を回避できます。</string>
@@ -729,7 +729,7 @@
     <string name="settings_info_voice_automode_label">オートモード:</string>
     <string name="settings_info_voice_automode_body">チャットの ⋮ メニューから。録音後にメッセージが送信され、返信が読み上げられ、マイクが自動で再開 — ハンズフリーで往復会話。「オートモード有効中」のチップをタップで停止。</string>
     <string name="settings_voice_intro">あなた専用の Groq API キー。共有されることはありません。</string>
-    <string name="settings_voice_configured">✓ Groq API キー設定済み: %1$s · %2$s</string>
+    <string name="settings_voice_configured">Groq API キー設定済み: %1$s · %2$s</string>
     <string name="settings_voice_no_key">Groq API キーが未設定です。</string>
     <string name="settings_voice_loading_status">状態を読み込み中…</string>
     <string name="settings_voice_new_api_key">新しい Groq API キー</string>
@@ -750,7 +750,7 @@
     <string name="settings_voice_lang_custom_label">ISO 639-1 コード</string>
     <string name="settings_voice_lang_apply">適用</string>
     <string name="settings_voice_translate_running">Claude でプロンプト翻訳中…</string>
-    <string name="settings_voice_translate_success">✓ プロンプト翻訳完了</string>
+    <string name="settings_voice_translate_success">プロンプト翻訳完了</string>
     <string name="settings_voice_translate_error">翻訳失敗: %1$s</string>
     <string name="settings_voice_prompt_preview_label">バイアスプロンプト (%1$s)</string>
     <string name="settings_voice_retranslate">再翻訳</string>
@@ -790,8 +790,8 @@
     <string name="settings_billing_this_month_gross">今月: %1$s（税込、見積もり）</string>
     <string name="settings_billing_credit_remaining">AI-Pro残りクレジット: %1$s / %2$s</string>
     <string name="settings_billing_budget_cap">予算上限: %1$s = %2$s</string>
-    <string name="settings_billing_real_cost">⚠ 月末の見積実費: %1$s（クレジット超過）</string>
-    <string name="settings_billing_in_credit">✓ クレジット内 — クレジットカードへの請求はありません。</string>
+    <string name="settings_billing_real_cost">月末の見積実費: %1$s（クレジット超過）</string>
+    <string name="settings_billing_in_credit">クレジット内 — クレジットカードへの請求はありません。</string>
     <string name="settings_billing_project_label">プロジェクト: %1$s</string>
     <string name="settings_billing_updated_label">更新: %1$s UTC</string>
     <string name="settings_skills_loading">スキル設定を読み込み中…</string>

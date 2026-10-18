@@ -288,7 +288,7 @@
     <string name="next_match">Next match</string>
     <string name="thinking_label">Thinking</string>
     <string name="skills_for_this_chat">Skills for this chat</string>
-    <string name="skills_for_this_chat_done">Skills for this chat ✓</string>
+    <string name="skills_for_this_chat_done">Skills for this chat</string>
     <string name="auto_speak_for_this_chat">Auto-read for this chat…%1$s</string>
     <string name="conversation_compacting">Compacting conversation…</string>
     <string name="scroll_to_bottom">Scroll to bottom</string>
@@ -302,13 +302,13 @@
     <string name="chat_audio_prefix">Read aloud: %1$s</string>
     <string name="chat_context_status">%1$d%% context · %2$s%3$s</string>
     <string name="chat_cache_suffix"> · %1$dK cached</string>
-    <string name="chat_compaction_notice">↑ Very old history was condensed (emergency compaction)</string>
+    <string name="chat_compaction_notice">Very old history was condensed (emergency compaction)</string>
     <string name="chat_compacting_chip">Compacting conversation…</string>
     <string name="chat_scroll_to_bottom_cd">Scroll to bottom</string>
     <string name="chat_auto_speak_on">on</string>
     <string name="chat_auto_speak_off">off</string>
-    <string name="chat_auto_speak_marker_on"> ✓ on</string>
-    <string name="chat_auto_speak_marker_off"> ✗ off</string>
+    <string name="chat_auto_speak_marker_on">on</string>
+    <string name="chat_auto_speak_marker_off">off</string>
     <string name="chat_skills_dialog_title">Skills for this chat</string>
     <string name="chat_skills_dialog_body_override">This chat has its own skill settings that differ from your default.</string>
     <string name="chat_skills_dialog_body_default">Default settings from Settings are active. Changes here only override for this chat.</string>
@@ -429,7 +429,7 @@
     <string name="settings_server_url_placeholder">https://pocket-claude.your-domain.com</string>
     <string name="settings_username">Username</string>
     <string name="settings_not_logged_in">(not signed in)</string>
-    <string name="settings_session_active">✓ Session active</string>
+    <string name="settings_session_active">Session active</string>
     <string name="settings_not_logged_in_hint">Not signed in — please sign in below.</string>
     <string name="settings_test_connection">Test connection</string>
     <string name="settings_relogin">Sign in again</string>
@@ -563,8 +563,8 @@
     <string name="settings_tts_provider_web_short">Gemini Web</string>
     <string name="settings_tts_provider_web_label">Gemini Web (default, no setup):</string>
     <string name="settings_tts_provider_web_body">The read-aloud voice of gemini.google.com, delivered by a small service on your server that keeps a signed-in Google session. Free, no API key, no service account, and around 40 times faster than real time. The voice cannot be chosen.</string>
-    <string name="settings_tts_status_web_active">✓ Gemini Web active — free, no setup, by far the fastest. The voice is fixed.</string>
-    <string name="settings_tts_status_web_down">⚠ The read-aloud service is not answering, or its Google session has expired. Sign in again on the server, or pick another provider here in the meantime.</string>
+    <string name="settings_tts_status_web_active">Gemini Web active — free, no setup, by far the fastest. The voice is fixed.</string>
+    <string name="settings_tts_status_web_down">The read-aloud service is not answering, or its Google session has expired. Sign in again on the server, or pick another provider here in the meantime.</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web has exactly one voice. Google\'s read-aloud call simply has no parameter for it.</string>
     <string name="settings_tts_provider_edge_label">Edge (default, no setup):</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edge\'s reading voices. Completely free, no API key, no service account. Quality weaker than Gemini/Chirp but fine for fast read-aloud.</string>
@@ -582,21 +582,21 @@
     <string name="settings_tts_chunking_info_gemini_label">For Gemini API:</string>
     <string name="settings_tts_chunking_info_gemini_body">Default OFF. Each chunk = one API call. With free-tier keys (10 RPD/key) a chunked answer quickly burns through your daily budget. With a large multi-key pool you can enable it manually — the server will then round-robin chunks across all keys.</string>
     <string name="settings_tts_back_to_default">Back to auto-default</string>
-    <string name="settings_tts_status_edge_active">✓ Edge TTS active — free, no setup. Quality is standard (Microsoft Edge voices). Switch later to Gemini API or Cloud TTS for higher quality.</string>
-    <string name="settings_tts_status_gemini_pool_chunk_on">✓ %1$d keys in pool, chunking ON. Each reply is split into multiple parallel chunks — they are round-robin routed across all keys. Effective burst: ≈ %2$d parallel TTS calls (3 RPM per key). Fastest stream start but burns your daily budget fast.</string>
-    <string name="settings_tts_status_gemini_pool_chunk_off">✓ %1$d keys in pool, chunking OFF. Each reply uses exactly one key (round-robin). No burst load. Gentle on the daily budget. Turn chunking on below if you want faster stream start.</string>
-    <string name="settings_tts_status_gemini_1key_tts">✓ Gemini API with 1 TTS key. Free Tier: 3 RPM / 10 RPD per key. With chunking ON (below) a long answer quickly burns the daily budget. Add more keys below for more throughput.</string>
-    <string name="settings_tts_status_gemini_image_shared">ⓘ The image API key is currently used for TTS as well. Add a separate free-tier key (or several) below so TTS and image quotas don\'t compete.</string>
-    <string name="settings_tts_status_gemini_no_key">⚠ No API key set. Paste your AI Studio key into the field below (free tier is enough — see ⓘ next to the field).</string>
-    <string name="settings_tts_status_cloud_chunk_on">✓ Cloud TTS active + chunking ON. 1M chars/month free (Chirp 3 HD), no relevant RPM brake — chunking gives faster stream start without downsides.</string>
-    <string name="settings_tts_status_cloud_ok">✓ Cloud TTS active. 1M chars/month free (Chirp 3 HD). You could enable chunking (below) — it gives faster stream start without quota risk.</string>
-    <string name="settings_tts_status_cloud_no_json">⚠ No service-account JSON loaded. Admin needs to upload one in the server GUI (Cloud project with active billing).</string>
+    <string name="settings_tts_status_edge_active">Edge TTS active — free, no setup. Quality is standard (Microsoft Edge voices). Switch later to Gemini API or Cloud TTS for higher quality.</string>
+    <string name="settings_tts_status_gemini_pool_chunk_on">%1$d keys in pool, chunking ON. Each reply is split into multiple parallel chunks — they are round-robin routed across all keys. Effective burst: ≈ %2$d parallel TTS calls (3 RPM per key). Fastest stream start but burns your daily budget fast.</string>
+    <string name="settings_tts_status_gemini_pool_chunk_off">%1$d keys in pool, chunking OFF. Each reply uses exactly one key (round-robin). No burst load. Gentle on the daily budget. Turn chunking on below if you want faster stream start.</string>
+    <string name="settings_tts_status_gemini_1key_tts">Gemini API with 1 TTS key. Free Tier: 3 RPM / 10 RPD per key. With chunking ON (below) a long answer quickly burns the daily budget. Add more keys below for more throughput.</string>
+    <string name="settings_tts_status_gemini_image_shared">The image API key is currently used for TTS as well. Add a separate free-tier key (or several) below so TTS and image quotas don\'t compete.</string>
+    <string name="settings_tts_status_gemini_no_key">No API key set. Paste your AI Studio key into the field below (free tier is enough — see ⓘ next to the field).</string>
+    <string name="settings_tts_status_cloud_chunk_on">Cloud TTS active + chunking ON. 1M chars/month free (Chirp 3 HD), no relevant RPM brake — chunking gives faster stream start without downsides.</string>
+    <string name="settings_tts_status_cloud_ok">Cloud TTS active. 1M chars/month free (Chirp 3 HD). You could enable chunking (below) — it gives faster stream start without quota risk.</string>
+    <string name="settings_tts_status_cloud_no_json">No service-account JSON loaded. Admin needs to upload one in the server GUI (Cloud project with active billing).</string>
     <string name="settings_tts_remove_credentials">Remove Cloud TTS credentials</string>
     <string name="settings_tts_provider_ready">Current provider ready</string>
     <string name="settings_tts_provider_not_ready">Current provider not ready</string>
     <string name="settings_tts_need_server_config">Please save the server URL and token first, then you can upload the TTS JSON.</string>
     <string name="settings_voice_label">Voice</string>
-    <string name="settings_voice_incompatible">⚠ %1$s (not compatible with %2$s)</string>
+    <string name="settings_voice_incompatible">%1$s (not compatible with %2$s)</string>
     <string name="settings_tier_label_edge">Edge (free, no setup needed)</string>
     <string name="settings_tier_label_gemini">Gemini (AI voices — model selectable below)</string>
     <string name="settings_tier_label_chirp3hd">Chirp 3 HD (1M chars/month free, then $30/M)</string>
@@ -689,8 +689,8 @@
     <string name="settings_transfer_import">Import</string>
     <string name="settings_transfer_exporting">Exporting…</string>
     <string name="settings_transfer_importing">Importing…</string>
-    <string name="settings_transfer_exported_msg">✓ Exported: %1$s (%2$d bytes). Share dialog opened.</string>
-    <string name="settings_transfer_import_success">✓ Import successful: %1$d server settings applied, %2$d API keys imported.</string>
+    <string name="settings_transfer_exported_msg">Exported: %1$s (%2$d bytes). Share dialog opened.</string>
+    <string name="settings_transfer_import_success">Import successful: %1$d server settings applied, %2$d API keys imported.</string>
     <string name="settings_transfer_share_chooser">Share settings export</string>
     <string name="settings_pool_info_title">Multi-key pool &amp; free-tier limits</string>
     <string name="settings_pool_info_intro">Add multiple AI Studio API keys here. The server distributes TTS calls round-robin with rate limiting — this bypasses the per-project limits of the free tier.</string>
@@ -732,7 +732,7 @@
     <string name="settings_info_voice_automode_label">Auto-Mode:</string>
     <string name="settings_info_voice_automode_body">In the chat overflow (⋮) menu. After recording the message sends, the reply is read aloud, and the mic starts again — for hands-free back-and-forth. Tap the “Auto-mode active” pill to stop the loop.</string>
     <string name="settings_voice_intro">Your own Groq API key. Stored only for you, never shared.</string>
-    <string name="settings_voice_configured">✓ Groq API key set: %1$s · %2$s</string>
+    <string name="settings_voice_configured">Groq API key set: %1$s · %2$s</string>
     <string name="settings_voice_no_key">No Groq API key set.</string>
     <string name="settings_voice_loading_status">Loading status…</string>
     <string name="settings_voice_new_api_key">New Groq API key</string>
@@ -753,7 +753,7 @@
     <string name="settings_voice_lang_custom_label">ISO 639-1 code</string>
     <string name="settings_voice_lang_apply">Apply</string>
     <string name="settings_voice_translate_running">Translating prompt via Claude…</string>
-    <string name="settings_voice_translate_success">✓ Prompt translated</string>
+    <string name="settings_voice_translate_success">Prompt translated</string>
     <string name="settings_voice_translate_error">Translation failed: %1$s</string>
     <string name="settings_voice_prompt_preview_label">Bias prompt (%1$s)</string>
     <string name="settings_voice_retranslate">Re-translate</string>
@@ -793,8 +793,8 @@
     <string name="settings_billing_this_month_gross">This month: %1$s (gross, estimated)</string>
     <string name="settings_billing_credit_remaining">AI-Pro credit remaining: %1$s of %2$s</string>
     <string name="settings_billing_budget_cap">Budget cap: %1$s = %2$s</string>
-    <string name="settings_billing_real_cost">⚠ Estimated real cost at month\'s end: %1$s (over the credit)</string>
-    <string name="settings_billing_in_credit">✓ Within credit — credit card will not be charged.</string>
+    <string name="settings_billing_real_cost">Estimated real cost at month\'s end: %1$s (over the credit)</string>
+    <string name="settings_billing_in_credit">Within credit — credit card will not be charged.</string>
     <string name="settings_billing_project_label">Project: %1$s</string>
     <string name="settings_billing_updated_label">Updated: %1$s UTC</string>
     <string name="settings_skills_loading">Loading skills settings…</string>

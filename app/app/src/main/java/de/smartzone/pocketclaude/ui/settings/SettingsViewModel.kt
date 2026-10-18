@@ -188,25 +188,6 @@ class SettingsViewModel(
         refreshGems()
     }
 
-    init {
-        // Auf DataStore warten — beim Screen-Open ist settings.value erst noch der
-        // Default (leerer URL/Token), DataStore-Emission kommt asynchron.
-        viewModelScope.launch {
-            settings.first { it.isConfigured }
-            refreshTtsStatus()
-            refreshImageConfig()
-            refreshVoiceConfig()
-            refreshDefaultSkills()
-            refreshTtsKeyPool()
-            refreshBillingStatus()
-            refreshClaudeAuth()
-            refreshChatModels(force = false)
-            refreshUsage()
-            refreshGems()
-            refreshChatLock()
-        }
-    }
-
     // ---------- Skills (User-Default — gilt für alle neuen Chats) ----------
 
     private val _defaultSkills = MutableStateFlow<SkillsDto?>(null)
@@ -1081,6 +1062,32 @@ class SettingsViewModel(
                     "Export-Datei von PocketClot ist."
             else (e.message ?: e::class.java.simpleName)
             _settingsTransfer.value = SettingsTransferState.Failure("Import fehlgeschlagen: $hint")
+        }
+    }
+
+    // Bewusst als letzter Block der Klasse: Kotlin initialisiert Properties und
+    // init-Bloecke in Quelltext-Reihenfolge. Stand dieser Block weiter oben und
+    // lieferte DataStore den Wert ohne zu suspendieren (Main.immediate), liefen
+    // die refresh-Aufrufe noch im Konstruktor und trafen auf MutableStateFlows,
+    // die weiter unten deklariert und damit noch null waren. Folge war ein
+    // gelegentlicher Absturz beim Oeffnen der Einstellungen
+    // (NullPointerException in refreshChatModels).
+    init {
+        // Auf DataStore warten — beim Screen-Open ist settings.value erst noch der
+        // Default (leerer URL/Token), DataStore-Emission kommt asynchron.
+        viewModelScope.launch {
+            settings.first { it.isConfigured }
+            refreshTtsStatus()
+            refreshImageConfig()
+            refreshVoiceConfig()
+            refreshDefaultSkills()
+            refreshTtsKeyPool()
+            refreshBillingStatus()
+            refreshClaudeAuth()
+            refreshChatModels(force = false)
+            refreshUsage()
+            refreshGems()
+            refreshChatLock()
         }
     }
 

@@ -561,6 +561,18 @@ fun ChatScreen(
                                 leadingIcon = {
                                     Icon(PocketIcons.Extension, contentDescription = null)
                                 },
+                                // Eigene Skills fuer diesen Chat: Haken am rechten Rand
+                                // statt eines ✓-Zeichens im Text.
+                                trailingIcon = if (state.skillsIsOverride) {
+                                    {
+                                        Icon(
+                                            PocketIcons.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(PocketIconSize.Small),
+                                        )
+                                    }
+                                } else null,
                                 onClick = {
                                     moreMenuOpen = false
                                     skillsDialogOpen = true
@@ -568,10 +580,23 @@ fun ChatScreen(
                             )
                             DropdownMenuItem(
                                 text = {
-                                    val markOn = stringResource(de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_on)
-                                    val markOff = stringResource(de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_off)
-                                    val mark = state.autoSpeakOverride?.let { if (it) markOn else markOff }.orEmpty()
-                                    Text(stringResource(de.smartzone.pocketclaude.R.string.auto_speak_for_this_chat, mark))
+                                    Text(stringResource(de.smartzone.pocketclaude.R.string.auto_speak_for_this_chat, ""))
+                                },
+                                // Ein fester Wert fuer diesen Chat steht als kurzer
+                                // Zustand am rechten Rand (an/aus), wie in den
+                                // Systemeinstellungen.
+                                trailingIcon = state.autoSpeakOverride?.let { on ->
+                                    {
+                                        Text(
+                                            stringResource(
+                                                if (on) de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_on
+                                                else de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_off
+                                            ),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (on) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 },
                                 leadingIcon = {
                                     Icon(
@@ -816,12 +841,13 @@ fun ChatScreen(
                         leadingIcon = {
                             CircularProgressIndicator(
                                 strokeWidth = 2.dp,
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(PocketIconSize.Marker),
                             )
                         },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = MaterialTheme.colorScheme.surface,
                         ),
+                        shape = CircleShape,
                         modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
                     )
                 }
@@ -836,6 +862,7 @@ fun ChatScreen(
                         },
                         containerColor = MaterialTheme.colorScheme.surface,
                         contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = CircleShape,
                         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
