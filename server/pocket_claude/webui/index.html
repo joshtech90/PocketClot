@@ -3,54 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0E0E10">
+<meta name="theme-color" content="#100E14">
 <title>PocketClot</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234A90C2' d='M12 2a9 9 0 0 0-9 9c0 2 .6 3.8 1.7 5.3L3 21l4.9-1.6c1.3.7 2.7 1 4.1 1a9 9 0 1 0 0-18zm0 16c-1.2 0-2.4-.3-3.4-.9l-.4-.2-2.4.8.8-2.3-.2-.4A7 7 0 1 1 12 18z'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=20261012a">
+<link rel="icon" type="image/png" href="brand-mark.png">
+<link rel="stylesheet" href="style.css?v=20261018a">
 <!-- Feste Versionen mit Pruefsumme: DOMPurify schuetzt auch den Gedaechtnis-Schluessel im Browser -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL" crossorigin="anonymous"></script>
-<script src="i18n.js?v=20261012a"></script>
+<script src="i18n.js?v=20261018a"></script>
 </head>
 <body>
 
 <!-- =========================================================
-     SVG-Icon-Sprite — wird über <use href="#icon-x"/> referenziert.
-     Alle Strokes 1.5, viewBox 24×24, currentColor.
+     SVG-Icon-Sprite — wird ueber <use href="#icon-x"/> referenziert.
+     Material Symbols Rounded (Google, Apache 2.0), Gewicht 400, optische
+     Groesse 24: dieselben Pfade wie in der Android-App. Gefuellte Varianten
+     (*-filled, stop) nur fuer Zustaende.
      ========================================================= -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></symbol>
-    <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
-    <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="12" cy="6" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="18" r="1.6" fill="currentColor"/></symbol>
-    <symbol id="icon-send" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-attach" viewBox="0 0 24 24"><path d="M21.4 11.05 12.6 19.9a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M16 3 21 8l-4.5 4.5L18 18l-2 2-5-5-4.5 4.5L4 21l-1-1 .5-2.5L8 13l-5-5 2-2 5.5 1.5L15 3l1 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-share" viewBox="0 0 24 24"><path d="M12 4v12M8 8l4-4 4 4M6 14v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v2M12 20v2M4.9 4.9 6.3 6.3M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
-    <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m18 6-12 12M6 6l12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
-    <symbol id="icon-speaker" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5zM16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></symbol>
-    <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
-    <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 17V5M7 10l5-5 5 5M5 21h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6zM14 3v6h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></symbol>
-    <symbol id="icon-loop" viewBox="0 0 24 24"><path d="M17 2v4h-4M3 12a9 9 0 0 1 14-7l3 3M7 22v-4h4M21 12a9 9 0 0 1-14 7l-3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.6"/></symbol>
-    <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9" r="1.5" fill="currentColor"/><path d="M21 16l-5-5-9 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" fill="currentColor"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" fill="currentColor" opacity="0.7"/></symbol>
-    <symbol id="icon-wand" viewBox="0 0 24 24"><path d="M3 21l11-11M14 5l5 5M16 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zM21 12l.5 1.5 1.5.5-1.5.5L21 16l-.5-1.5L19 14l1.5-.5L21 12z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
-    <symbol id="icon-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 0 1 7.5-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="icon-plus" viewBox="0 -960 960 960"><path fill="currentColor" d="M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z"/></symbol>
+    <symbol id="icon-search" viewBox="0 -960 960 960"><path fill="currentColor" d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 -960 960 960"><path fill="currentColor" d="M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm7-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></symbol>
+    <symbol id="icon-more" viewBox="0 -960 960 960"><path fill="currentColor" d="M480-160q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm0-240q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm0-240q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Z"/></symbol>
+    <symbol id="icon-send" viewBox="0 -960 960 960"><path fill="currentColor" d="M440-647 244-451q-12 12-28 11.5T188-452q-11-12-11.5-28t11.5-28l264-264q6-6 13-8.5t15-2.5q8 0 15 2.5t13 8.5l264 264q11 11 11 27.5T772-452q-12 12-28.5 12T715-452L520-647v447q0 17-11.5 28.5T480-160q-17 0-28.5-11.5T440-200v-447Z"/></symbol>
+    <symbol id="icon-attach" viewBox="0 -960 960 960"><path fill="currentColor" d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-330q0-17 11.5-28.5T400-720q17 0 28.5 11.5T440-680v330q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-350q0-17 11.5-28.5T680-720q17 0 28.5 11.5T720-680v350Z"/></symbol>
+    <symbol id="icon-edit" viewBox="0 -960 960 960"><path fill="currentColor" d="M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></symbol>
+    <symbol id="icon-pin" viewBox="0 -960 960 960"><path fill="currentColor" d="M640-760v280l68 68q6 6 9 13.5t3 15.5v23q0 17-11.5 28.5T680-320H520v234q0 17-11.5 28.5T480-46q-17 0-28.5-11.5T440-86v-234H280q-17 0-28.5-11.5T240-360v-23q0-8 3-15.5t9-13.5l68-68v-280q-17 0-28.5-11.5T280-800q0-17 11.5-28.5T320-840h320q17 0 28.5 11.5T680-800q0 17-11.5 28.5T640-760ZM354-400h252l-46-46v-314H400v314l-46 46Zm126 0Z"/></symbol>
+    <symbol id="icon-pin-filled" viewBox="0 -960 960 960"><path fill="currentColor" d="M640-760v280l68 68q6 6 9 13.5t3 15.5v23q0 17-11.5 28.5T680-320H520v234q0 17-11.5 28.5T480-46q-17 0-28.5-11.5T440-86v-234H280q-17 0-28.5-11.5T240-360v-23q0-8 3-15.5t9-13.5l68-68v-280q-17 0-28.5-11.5T280-800q0-17 11.5-28.5T320-840h320q17 0 28.5 11.5T680-800q0 17-11.5 28.5T640-760Z"/></symbol>
+    <symbol id="icon-trash" viewBox="0 -960 960 960"><path fill="currentColor" d="M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z"/></symbol>
+    <symbol id="icon-share" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h80q17 0 28.5 11.5T360-600q0 17-11.5 28.5T320-560h-80v400h480v-400h-80q-17 0-28.5-11.5T600-600q0-17 11.5-28.5T640-640h80q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm211.5-251.5Q440-343 440-360v-407l-36 36q-12 12-28 11.5T348-732q-11-12-11.5-28t11.5-28l104-104q6-6 13-8.5t15-2.5q8 0 15 2.5t13 8.5l104 104q11 11 11 27.5T612-732q-12 12-28.5 12T555-732l-35-35v407q0 17-11.5 28.5T480-320q-17 0-28.5-11.5Z"/></symbol>
+    <symbol id="icon-sun" viewBox="0 -960 960 960"><path fill="currentColor" d="M565-395q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35Zm-226.5 56.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM80-440q-17 0-28.5-11.5T40-480q0-17 11.5-28.5T80-520h80q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440H80Zm720 0q-17 0-28.5-11.5T760-480q0-17 11.5-28.5T800-520h80q17 0 28.5 11.5T920-480q0 17-11.5 28.5T880-440h-80ZM451.5-771.5Q440-783 440-800v-80q0-17 11.5-28.5T480-920q17 0 28.5 11.5T520-880v80q0 17-11.5 28.5T480-760q-17 0-28.5-11.5Zm0 720Q440-63 440-80v-80q0-17 11.5-28.5T480-200q17 0 28.5 11.5T520-160v80q0 17-11.5 28.5T480-40q-17 0-28.5-11.5ZM226-678l-43-42q-12-11-11.5-28t11.5-29q12-12 29-12t28 12l42 43q11 12 11 28t-11 28q-11 12-27.5 11.5T226-678Zm494 495-42-43q-11-12-11-28.5t11-27.5q11-12 27.5-11.5T734-282l43 42q12 11 11.5 28T777-183q-12 12-29 12t-28-12Zm-42-495q-12-11-11.5-27.5T678-734l42-43q11-12 28-11.5t29 11.5q12 12 12 29t-12 28l-43 42q-12 11-28 11t-28-11ZM183-183q-12-12-12-29t12-28l43-42q12-11 28.5-11t27.5 11q12 11 11.5 27.5T282-226l-42 43q-11 12-28 11.5T183-183Zm297-297Z"/></symbol>
+    <symbol id="icon-moon" viewBox="0 -960 960 960"><path fill="currentColor" d="M480-120q-151 0-255.5-104.5T120-480q0-138 90-239.5T440-838q13-2 23 3.5t16 14.5q6 9 6.5 21t-7.5 23q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q11-7 22.5-6.5T819-479q10 5 15.5 15t3.5 24q-14 138-117.5 229T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z"/></symbol>
+    <symbol id="icon-logout" viewBox="0 -960 960 960"><path fill="currentColor" d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h240q17 0 28.5 11.5T480-800q0 17-11.5 28.5T440-760H200v560h240q17 0 28.5 11.5T480-160q0 17-11.5 28.5T440-120H200Zm487-320H400q-17 0-28.5-11.5T360-480q0-17 11.5-28.5T400-520h287l-75-75q-11-11-11-27t11-28q11-12 28-12.5t29 11.5l143 143q12 12 12 28t-12 28L669-309q-12 12-28.5 11.5T612-310q-11-12-10.5-28.5T613-366l74-74Z"/></symbol>
+    <symbol id="icon-close" viewBox="0 -960 960 960"><path fill="currentColor" d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></symbol>
+    <symbol id="icon-menu" viewBox="0 -960 960 960"><path fill="currentColor" d="M160-240q-17 0-28.5-11.5T120-280q0-17 11.5-28.5T160-320h640q17 0 28.5 11.5T840-280q0 17-11.5 28.5T800-240H160Zm0-200q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520h640q17 0 28.5 11.5T840-480q0 17-11.5 28.5T800-440H160Zm0-200q-17 0-28.5-11.5T120-680q0-17 11.5-28.5T160-720h640q17 0 28.5 11.5T840-680q0 17-11.5 28.5T800-640H160Z"/></symbol>
+    <symbol id="icon-speaker" viewBox="0 -960 960 960"><path fill="currentColor" d="M760-481q0-83-44-151.5T598-735q-15-7-22-21.5t-2-29.5q6-16 21.5-23t31.5 0q97 43 155 131.5T840-481q0 108-58 196.5T627-153q-16 7-31.5 0T574-176q-5-15 2-29.5t22-21.5q74-34 118-102.5T760-481ZM280-360H160q-17 0-28.5-11.5T120-400v-160q0-17 11.5-28.5T160-600h120l132-132q19-19 43.5-8.5T480-703v446q0 27-24.5 37.5T412-228L280-360Zm380-120q0 42-19 79.5T591-339q-10 6-20.5.5T560-356v-250q0-12 10.5-17.5t20.5.5q31 25 50 63t19 80ZM400-606l-86 86H200v80h114l86 86v-252ZM300-480Z"/></symbol>
+    <symbol id="icon-stop" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-320v-320q0-33 23.5-56.5T320-720h320q33 0 56.5 23.5T720-640v320q0 33-23.5 56.5T640-240H320q-33 0-56.5-23.5T240-320Z"/></symbol>
+    <symbol id="icon-copy" viewBox="0 -960 960 960"><path fill="currentColor" d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-520q0-17 11.5-28.5T160-720q17 0 28.5 11.5T200-680v520h400q17 0 28.5 11.5T640-120q0 17-11.5 28.5T600-80H200Zm160-240v-480 480Z"/></symbol>
+    <symbol id="icon-download" viewBox="0 -960 960 960"><path fill="currentColor" d="M465-339.5q-7-2.5-13-8.5L308-492q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T365-549l75 75v-286q0-17 11.5-28.5T480-800q17 0 28.5 11.5T520-760v286l75-75q12-12 28.5-11.5T652-548q11 12 11.5 28T652-492L508-348q-6 6-13 8.5t-15 2.5q-8 0-15-2.5ZM240-160q-33 0-56.5-23.5T160-240v-80q0-17 11.5-28.5T200-360q17 0 28.5 11.5T240-320v80h480v-80q0-17 11.5-28.5T760-360q17 0 28.5 11.5T800-320v80q0 33-23.5 56.5T720-160H240Z"/></symbol>
+    <symbol id="icon-upload" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-160q-33 0-56.5-23.5T160-240v-80q0-17 11.5-28.5T200-360q17 0 28.5 11.5T240-320v80h480v-80q0-17 11.5-28.5T760-360q17 0 28.5 11.5T800-320v80q0 33-23.5 56.5T720-160H240Zm200-486-75 75q-12 12-28.5 11.5T308-572q-11-12-11.5-28t11.5-28l144-144q6-6 13-8.5t15-2.5q8 0 15 2.5t13 8.5l144 144q12 12 11.5 28T652-572q-12 12-28.5 12.5T595-571l-75-75v286q0 17-11.5 28.5T480-320q-17 0-28.5-11.5T440-360v-286Z"/></symbol>
+    <symbol id="icon-check" viewBox="0 -960 960 960"><path fill="currentColor" d="m382-354 339-339q12-12 28-12t28 12q12 12 12 28.5T777-636L410-268q-12 12-28 12t-28-12L182-440q-12-12-11.5-28.5T183-497q12-12 28.5-12t28.5 12l142 143Z"/></symbol>
+    <symbol id="icon-file" viewBox="0 -960 960 960"><path fill="currentColor" d="M360-240h240q17 0 28.5-11.5T640-280q0-17-11.5-28.5T600-320H360q-17 0-28.5 11.5T320-280q0 17 11.5 28.5T360-240Zm0-160h240q17 0 28.5-11.5T640-440q0-17-11.5-28.5T600-480H360q-17 0-28.5 11.5T320-440q0 17 11.5 28.5T360-400ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h287q16 0 30.5 6t25.5 17l194 194q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T720-80H240Zm280-560v-160H240v640h480v-440H560q-17 0-28.5-11.5T520-640ZM240-800v200-200 640-640Z"/></symbol>
+    <symbol id="icon-mic" viewBox="0 -960 960 960"><path fill="currentColor" d="M395-435q-35-35-35-85v-240q0-50 35-85t85-35q50 0 85 35t35 85v240q0 50-35 85t-85 35q-50 0-85-35Zm85-205Zm-40 480v-83q-92-13-157.5-78T203-479q-2-17 9-29t28-12q17 0 28.5 11.5T284-480q14 70 69.5 115T480-320q72 0 127-45.5T676-480q4-17 15.5-28.5T720-520q17 0 28 12t9 29q-14 91-79 157t-158 79v83q0 17-11.5 28.5T480-120q-17 0-28.5-11.5T440-160Zm68.5-331.5Q520-503 520-520v-240q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760v240q0 17 11.5 28.5T480-480q17 0 28.5-11.5Z"/></symbol>
+    <symbol id="icon-loop" viewBox="0 -960 960 960"><path fill="currentColor" d="M280-280v-400q0-17 11.5-28.5T320-720q17 0 28.5 11.5T360-680v400q0 17-11.5 28.5T320-240q-17 0-28.5-11.5T280-280Zm160 160v-720q0-17 11.5-28.5T480-880q17 0 28.5 11.5T520-840v720q0 17-11.5 28.5T480-80q-17 0-28.5-11.5T440-120ZM120-440v-80q0-17 11.5-28.5T160-560q17 0 28.5 11.5T200-520v80q0 17-11.5 28.5T160-400q-17 0-28.5-11.5T120-440Zm480 160v-400q0-17 11.5-28.5T640-720q17 0 28.5 11.5T680-680v400q0 17-11.5 28.5T640-240q-17 0-28.5-11.5T600-280Zm160-160v-80q0-17 11.5-28.5T800-560q17 0 28.5 11.5T840-520v80q0 17-11.5 28.5T800-400q-17 0-28.5-11.5T760-440Z"/></symbol>
+    <symbol id="icon-refresh" viewBox="0 -960 960 960"><path fill="currentColor" d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-70q0-17 11.5-28.5T760-800q17 0 28.5 11.5T800-760v200q0 17-11.5 28.5T760-520H560q-17 0-28.5-11.5T520-560q0-17 11.5-28.5T560-600h128q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q68 0 124.5-34.5T692-367q8-14 22.5-19.5t29.5-.5q16 5 23 21t-1 30q-41 80-117 128t-169 48Z"/></symbol>
+    <symbol id="icon-chevron-down" viewBox="0 -960 960 960"><path fill="currentColor" d="M465-364.5q-7-2.5-13-8.5L268-557q-11-11-11-28t11-28q11-11 28-11t28 11l156 156 156-156q11-11 28-11t28 11q11 11 11 28t-11 28L508-373q-6 6-13 8.5t-15 2.5q-8 0-15-2.5Z"/></symbol>
+    <symbol id="icon-sidebar" viewBox="0 -960 960 960"><path fill="currentColor" d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"/></symbol>
+    <symbol id="icon-image" viewBox="0 -960 960 960"><path fill="currentColor" d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0 0v-560 560Zm80-80h400q12 0 18-11t-2-21L586-459q-6-8-16-8t-16 8L450-320l-74-99q-6-8-16-8t-16 8l-80 107q-8 10-2 21t18 11Z"/></symbol>
+    <symbol id="icon-sparkle" viewBox="0 -960 960 960"><path fill="currentColor" d="m706-706-70-32q-6-3-8.5-8t-2.5-10q0-5 2.5-10t8.5-8l70-32 32-70q3-6 8-9t10-3q5 0 10 3t8 9l32 70 70 32q6 3 9 8t3 10q0 5-3 10t-9 8l-70 32-32 70q-3 6-8 8.5t-10 2.5q-5 0-10-2.5t-8-8.5l-32-70ZM260-380l-160-73q-9-4-13-11.5T83-480q0-8 4-15.5t13-11.5l160-73 73-160q4-9 11.5-13t15.5-4q8 0 15.5 4t11.5 13l73 160 160 73q9 4 13 11.5t4 15.5q0 8-4 15.5T620-453l-160 73-73 160q-4 9-11.5 13t-15.5 4q-8 0-15.5-4T333-220l-73-160Zm100 26 40-86 86-40-86-40-40-86-40 86-86 40 86 40 40 86Zm350 204-70-32q-6-3-9-8t-3-10q0-5 3-10t9-8l70-32 32-70q3-6 8-9t10-3q5 0 10 3t8 9l32 70 70 32q6 3 9 8t3 10q0 5-3 10t-9 8l-70 32-32 70q-3 6-8 9t-10 3q-5 0-10-3t-8-9l-32-70ZM360-480Z"/></symbol>
+    <symbol id="icon-wand" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-120q-45 0-89-22t-71-58q26 0 53-20.5t27-59.5q0-50 35-85t85-35q50 0 85 35t35 85q0 66-47 113t-113 47Zm0-80q33 0 56.5-23.5T320-280q0-17-11.5-28.5T280-320q-17 0-28.5 11.5T240-280q0 23-5.5 42T220-202q5 2 10 2h10Zm230-160L360-470l358-358q11-11 27.5-11.5T774-828l54 54q12 12 12 28t-12 28L470-360Zm-190 80Z"/></symbol>
+    <symbol id="icon-zoom" viewBox="0 -960 960 960"><path fill="currentColor" d="M340-540h-40q-17 0-28.5-11.5T260-580q0-17 11.5-28.5T300-620h40v-40q0-17 11.5-28.5T380-700q17 0 28.5 11.5T420-660v40h40q17 0 28.5 11.5T500-580q0 17-11.5 28.5T460-540h-40v40q0 17-11.5 28.5T380-460q-17 0-28.5-11.5T340-500v-40Zm40 220q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+    <symbol id="icon-lock" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></symbol>
+    <symbol id="icon-lock-filled" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm296.5-223.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80Z"/></symbol>
+    <symbol id="icon-unlock" viewBox="0 -960 960 960"><path fill="currentColor" d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h360v-80q0-50-35-85t-85-35q-42 0-73.5 25.5T364-751q-4 14-16.5 22.5T320-720q-17 0-28.5-11t-8.5-26q14-69 69-116t128-47q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM240-160v-400 400Z"/></symbol>
+    <symbol id="icon-new-chat" viewBox="0 -960 960 960"><path fill="currentColor" d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h261q20 0 30 12.5t10 27.5q0 15-10.5 27.5T460-760H200v560h560v-261q0-20 12.5-30t27.5-10q15 0 27.5 10t12.5 30v261q0 33-23.5 56.5T760-120H200Zm280-360Zm-120 80v-97q0-16 6-30.5t17-25.5l344-344q12-12 27-18t30-6q16 0 30.5 6t26.5 18l56 57q11 12 17 26.5t6 29.5q0 15-5.5 29.5T897-728L553-384q-11 11-25.5 17.5T497-360h-97q-17 0-28.5-11.5T360-400Zm481-384-56-56 56 56ZM440-440h56l232-232-28-28-29-28-231 231v57Zm260-260-29-28 29 28 28 28-28-28Z"/></symbol>
   </defs>
 </svg>
 
@@ -60,10 +67,7 @@
 <div id="login" class="login hidden">
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
-      <div class="login-logo">
-        <svg viewBox="0 0 24 24" width="40" height="40"><circle cx="12" cy="12" r="10" fill="url(#brand-grad)"/><path d="M12 8v6m-3-3 3 3 3-3" stroke="white" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
-        <defs><linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#5BC0DE"/><stop offset="100%" stop-color="#4A90C2"/></linearGradient></defs>
-      </div>
+      <div class="login-logo"><img class="brand-mark" src="brand-mark.png" alt=""></div>
       <h1 data-i18n="app_name">PocketClot</h1>
       <p data-i18n="login_subtitle">Mit Deinem Server verbinden.</p>
     </div>
@@ -124,7 +128,7 @@
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-section">
       <button id="new-chat-btn" class="ghost-btn new-chat">
-        <svg class="icon"><use href="#icon-plus"/></svg>
+        <svg class="icon"><use href="#icon-new-chat"/></svg>
         <span data-i18n="new_chat">Neuer Chat</span>
       </button>
     </div>
@@ -314,8 +318,8 @@
       <section class="settings-section">
         <h3 data-i18n="appearance">Darstellung</h3>
         <p class="hint" data-i18n="appearance_hint">Visuelle Optionen für den Chat-Bereich.</p>
-        <label class="field" style="flex-direction:row;align-items:flex-start;gap:14px">
-          <input id="setting-collapse-user-msgs" type="checkbox" style="margin-top:3px">
+        <label class="field" style="display:flex;flex-direction:row;align-items:flex-start;gap:12px">
+          <input id="setting-collapse-user-msgs" type="checkbox" style="margin-top:4px">
           <span style="display:flex;flex-direction:column;gap:2px">
             <strong style="font-weight:500" data-i18n="collapse_user_msgs_label">Lange eigene Nachrichten einklappen</strong>
             <em class="hint" style="font-style:normal" data-i18n="collapse_user_msgs_hint">
@@ -332,12 +336,12 @@
         <div class="row-gap" style="margin-top:8px;flex-wrap:wrap;align-items:center">
           <input id="image-api-key-input" type="password" placeholder="AIzaSy…"
                  autocomplete="off"
-                 style="flex:1;min-width:240px;padding:9px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;outline:none;font-family:SF Mono,Menlo,monospace;font-size:13px">
+                 class="text-input mono" style="flex:1;min-width:240px">
           <button id="image-api-key-save" type="button" class="btn-secondary" data-i18n="save">Speichern</button>
           <button id="image-api-key-delete" type="button" class="btn-ghost" data-i18n="remove">Entfernen</button>
         </div>
         <div id="image-api-key-status" class="backup-status"></div>
-        <p class="hint" style="margin-top:10px" data-i18n-html="images_get_key_html">
+        <p class="hint" style="margin-top:12px" data-i18n-html="images_get_key_html">
           Key holen: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>.
           Für Bild-Generation muss das Cloud-Projekt einen Billing-Account haben
           (<a href="https://console.cloud.google.com/billing" target="_blank" rel="noreferrer">Billing aktivieren</a>) — Free-Tier umfasst nur Text.
@@ -350,48 +354,46 @@
         <div class="row-gap" style="margin-top:8px;flex-wrap:wrap;align-items:center">
           <input id="voice-api-key-input" type="password" placeholder="gsk_…"
                  autocomplete="off"
-                 style="flex:1;min-width:240px;padding:9px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;outline:none;font-family:SF Mono,Menlo,monospace;font-size:13px">
+                 class="text-input mono" style="flex:1;min-width:240px">
           <button id="voice-api-key-save" type="button" class="btn-secondary" data-i18n="save">Speichern</button>
           <button id="voice-api-key-delete" type="button" class="btn-ghost" data-i18n="remove">Entfernen</button>
         </div>
         <div id="voice-api-key-status" class="backup-status"></div>
-        <p class="hint" style="margin-top:10px" data-i18n-html="voice_get_key_html">
+        <p class="hint" style="margin-top:12px" data-i18n-html="voice_get_key_html">
           Key holen: <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console.groq.com/keys</a>.
           Whisper Large v3 Turbo ist im Free Tier mit Rate-Limits für persönlichen Gebrauch enthalten.
         </p>
 
         <!-- ── Sprach-Override + Auto-Translate ── -->
-        <hr style="margin:14px 0;border:0;border-top:1px solid var(--border)">
-        <h4 style="margin:0 0 4px 0;font-size:13px;color:var(--text)" data-i18n="voice_lang_title">Transkriptions-Sprache</h4>
+        <hr>
+        <h4 data-i18n="voice_lang_title">Transkriptions-Sprache</h4>
         <p class="hint" style="margin:0 0 8px 0" data-i18n="voice_lang_hint">Standardmäßig folgt Whisper der App-Sprache. „Manuell" für Override — für nicht gebundelte Sprachen wird der Bias-Prompt von Claude übersetzt.</p>
         <div class="row-gap" style="flex-direction:column;align-items:flex-start;gap:6px">
-          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          <label class="inline-check">
             <input type="radio" name="voice-lang-mode" value="auto" id="voice-lang-mode-auto" checked>
             <span data-i18n="voice_lang_auto">Auto — folgt der App-Sprache</span>
           </label>
-          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          <label class="inline-check">
             <input type="radio" name="voice-lang-mode" value="override" id="voice-lang-mode-override">
             <span data-i18n="voice_lang_manual">Manuell — Sprache wählen</span>
           </label>
         </div>
         <div id="voice-lang-override-block" class="hidden" style="margin-top:8px">
-          <div class="row-gap" style="flex-wrap:wrap;align-items:center;gap:6px">
-            <select id="voice-lang-select"
-                    style="flex:1;min-width:200px;padding:8px 10px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;color:var(--text)"></select>
+          <div class="row-gap" style="flex-wrap:wrap;align-items:center">
+            <select id="voice-lang-select" class="text-input" style="flex:1;min-width:200px"></select>
             <input id="voice-lang-custom" type="text" placeholder="sv, ko, eu …" maxlength="6"
-                   class="hidden"
-                   style="width:90px;padding:8px 10px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;font-family:SF Mono,Menlo,monospace;font-size:13px;color:var(--text)">
+                   class="text-input mono hidden" style="width:96px">
             <button id="voice-lang-apply" type="button" class="btn-secondary hidden" data-i18n="voice_lang_apply">Übernehmen</button>
           </div>
           <div id="voice-translate-status" class="backup-status" style="margin-top:6px"></div>
         </div>
-        <div id="voice-prompt-preview" style="margin-top:10px;padding:8px 10px;background:var(--bg-elev);border-radius:10px;border:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <span id="voice-prompt-label" style="font-size:11px;color:var(--text-muted)" data-i18n="voice_prompt_preview_label">Bias-Prompt</span>
-            <span id="voice-prompt-source" style="font-size:11px;color:var(--text-muted)"></span>
+        <div id="voice-prompt-preview" class="note-box">
+          <div class="note-head">
+            <span id="voice-prompt-label" data-i18n="voice_prompt_preview_label">Bias-Prompt</span>
+            <span id="voice-prompt-source"></span>
           </div>
-          <div id="voice-prompt-text" style="font-size:13px;font-style:italic;color:var(--text)"></div>
-          <div id="voice-prompt-actions" class="hidden" style="margin-top:6px;display:flex;gap:8px">
+          <div id="voice-prompt-text" class="note-text"></div>
+          <div id="voice-prompt-actions" class="hidden" style="margin-top:8px;display:flex;gap:8px">
             <button id="voice-retranslate-btn" type="button" class="btn-ghost" data-i18n="voice_retranslate">Neu übersetzen</button>
             <button id="voice-reset-cache-btn" type="button" class="btn-ghost" data-i18n="voice_reset_default">Auf Default zurücksetzen</button>
           </div>
@@ -707,6 +709,6 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden"></div>
-<script src="app.js?v=20261012a"></script>
+<script src="app.js?v=20261018a"></script>
 </body>
 </html>
