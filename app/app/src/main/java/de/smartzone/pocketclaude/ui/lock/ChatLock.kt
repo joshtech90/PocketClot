@@ -53,6 +53,7 @@ import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 const val CHAT_LOCK_PIN_LENGTH = 5
@@ -226,16 +227,18 @@ fun ChatLockGate(
             verticalArrangement = Arrangement.Center,
         ) {
             Box(
+                // Hero-Kachel: Symbol halb so gross wie die Flaeche, wie bei
+                // den runden Knoepfen in der Kopfzeile.
                 modifier = Modifier
-                    .size(82.dp)
+                    .size(96.dp)
                     .background(
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                        RoundedCornerShape(28.dp),
+                        RoundedCornerShape(PocketRadius.Large),
                     )
                     .border(
                         1.dp,
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                        RoundedCornerShape(28.dp),
+                        RoundedCornerShape(PocketRadius.Large),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -246,12 +249,12 @@ fun ChatLockGate(
                     modifier = Modifier.size(PocketIconSize.Hero),
                 )
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
             Text(
                 stringResource(R.string.chat_lock_locked_heading),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             val isProblem = cooldown > 0 || wrong || error != null
             Text(
                 when {
@@ -266,7 +269,7 @@ fun ChatLockGate(
             )
             Spacer(Modifier.height(24.dp))
             PinDots(value = pin, isError = wrong)
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(32.dp))
             PinPad(
                 enabled = !busy && cooldown == 0,
                 onDigit = { d ->
@@ -279,9 +282,9 @@ fun ChatLockGate(
                 onBackspace = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
             )
             if (biometricUsable) {
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
                 TextButton(onClick = { triggerBiometric() }) {
-                    Icon(PocketIcons.Fingerprint, contentDescription = null)
+                    Icon(PocketIcons.Fingerprint, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.chat_lock_use_fingerprint))
                 }
@@ -404,7 +407,7 @@ fun PinDots(value: String, isError: Boolean, length: Int = CHAT_LOCK_PIN_LENGTH)
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .border(1.5.dp, border, RoundedCornerShape(12.dp)),
+                    .border(1.5.dp, border, RoundedCornerShape(PocketRadius.Small)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (filled) {
@@ -476,8 +479,9 @@ private fun PinKey(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        // Runde Tasten wie auf jedem Telefon-Ziffernblock.
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
         modifier = Modifier.size(64.dp),
     ) {

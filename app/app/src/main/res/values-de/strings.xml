@@ -381,7 +381,7 @@
     <string name="image_editing">Bearbeite</string>
     <string name="image_use_as_reference">Dieses Bild weiterbearbeiten</string>
     <string name="image_model_label">Modell</string>
-    <string name="image_variants_label">Varianten:</string>
+    <string name="image_variants_label">Varianten</string>
     <string name="image_generating">Erzeuge</string>
     <string name="image_generate_button">Erzeugen</string>
     <string name="image_remove_entry">Eintrag entfernen</string>

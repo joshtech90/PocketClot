@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +56,7 @@ import de.smartzone.pocketclaude.data.AttachmentRefDto
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @Composable
@@ -75,16 +77,18 @@ fun UserBubble(
     val maxLines = if (showCollapsed) COLLAPSE_MAX_LINES else Int.MAX_VALUE
     val copy = rememberCopyHandler(text)
     val bubbleShape = RoundedCornerShape(
-        topStart = 24.dp,
-        topEnd = 24.dp,
-        bottomStart = 24.dp,
-        bottomEnd = 7.dp,
+        topStart = PocketRadius.Large,
+        topEnd = PocketRadius.Large,
+        bottomStart = PocketRadius.Large,
+        bottomEnd = PocketRadius.XSmall,
     )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 52.dp, end = 10.dp, top = 7.dp, bottom = 7.dp),
+            // Rechts 16 dp wie links bei den Antworten: vorher klebte die
+            // eigene Nachricht mit 10 dp naeher am Rand als die Antwort.
+            .padding(start = 48.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.End,
     ) {
         Column(horizontalAlignment = Alignment.End) {
@@ -112,7 +116,7 @@ fun UserBubble(
                                 ) { expanded = !expanded }
                             } else Modifier
                         )
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
                     Text(
                         text = text,
@@ -125,9 +129,11 @@ fun UserBubble(
                 // Compact copy-button below the bubble — mirrors the
                 // assistant-side action so the user can lift their own
                 // long messages back to the clipboard for re-use.
+                // Um die halbe Knopf-Leerflaeche nach rechts versetzt, damit das
+                // Symbol buendig mit der Bubble-Kante abschliesst.
                 IconButton(
                     onClick = copy,
-                    modifier = Modifier.padding(top = 2.dp, end = 2.dp).size(48.dp),
+                    modifier = Modifier.offset(x = 15.dp).size(48.dp),
                 ) {
                     Icon(
                         PocketIcons.Copy,
@@ -176,7 +182,7 @@ private fun ThinkingBlock(text: String, isLive: Boolean) {
     Box(
         modifier = Modifier
             .widthIn(max = 320.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(PocketRadius.Medium))
             .background(pocket.bubbleAssistant.copy(alpha = 0.55f))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
@@ -184,9 +190,7 @@ private fun ThinkingBlock(text: String, isLive: Boolean) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = if (isLive) stringResource(R.string.bubble_thinking_live) else stringResource(R.string.bubble_thinking_label),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                    ),
+                    style = MaterialTheme.typography.labelSmall,
                     color = pocket.onBubbleAssistant.copy(alpha = 0.7f),
                 )
             }
@@ -230,7 +234,7 @@ fun AssistantBubble(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 10.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Das Markenzeichen wabert, solange auf das erste Wort gewartet wird,
@@ -238,7 +242,7 @@ fun AssistantBubble(
             // Die Komponente rendert im Ruhezustand PocketBrandMark, deshalb hier
             // kein hartes Umschalten: das gaebe einen sichtbaren Sprung.
             PocketThinkingBlob(
-                size = 25.dp,
+                size = PocketIconSize.Regular,
                 // isBlank statt isEmpty: faengt der Stream mit einem Umbruch oder
                 // Leerzeichen an, ist noch kein Wort da und die Masse darf nicht
                 // vorzeitig zur Ruhe kommen.
@@ -278,7 +282,7 @@ fun AssistantBubble(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     if (isStreaming) {
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(8.dp))
                         TypingDots(color = pocket.onBubbleAssistant.copy(alpha = 0.6f))
                     }
                 }
@@ -287,16 +291,17 @@ fun AssistantBubble(
         // Im Chat erzeugte Bilder. Sie erscheinen sofort, sobald das Werkzeug
         // fertig ist, und bleiben nach dem Neuladen an der Nachricht haengen.
         if (attachments.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             AttachmentsStrip(attachments, alignEnd = false)
         }
         // Tool-Row: Vorlese-Button + Copy-Button nebeneinander. Erscheint nur
         // wenn Streaming fertig und Text da ist.
         if (onSpeakClick != null && !isStreaming && text.isNotBlank()) {
+                // Um die halbe Knopf-Leerflaeche (48 - 18) / 2 nach links
+                // versetzt: so beginnt das erste Symbol genau an der Textkante.
                 Row(
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                    modifier = Modifier.offset(x = (-15).dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     when (ttsState) {
                         TtsState.Idle -> IconButton(
@@ -315,7 +320,7 @@ fun AssistantBubble(
                             contentAlignment = Alignment.Center,
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(PocketIconSize.Small),
                                 strokeWidth = 2.dp,
                             )
                         }
@@ -443,7 +448,7 @@ fun AttachmentsStrip(
     alignEnd: Boolean = false,
 ) {
     Row(
-        horizontalArrangement = if (alignEnd) Arrangement.spacedBy(6.dp, Alignment.End) else Arrangement.spacedBy(6.dp),
+        horizontalArrangement = if (alignEnd) Arrangement.spacedBy(8.dp, Alignment.End) else Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         attachments.take(3).forEach { att ->
@@ -489,7 +494,7 @@ private fun AttachmentChip(att: AttachmentRefDto) {
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = Modifier
                 .size(width = 200.dp, height = 200.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(PocketRadius.Medium))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         )
         return
@@ -497,9 +502,9 @@ private fun AttachmentChip(att: AttachmentRefDto) {
     // Nicht-Bilder weiterhin als Chip mit Icon + Filename
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(PocketRadius.Small))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .widthIn(max = 220.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -507,9 +512,9 @@ private fun AttachmentChip(att: AttachmentRefDto) {
             PocketIcons.Document,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(PocketIconSize.Small),
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             att.filename,
             style = MaterialTheme.typography.bodySmall,

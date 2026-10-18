@@ -316,13 +316,14 @@ private fun LaunchScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                PocketBrandMark(size = 112.dp)
-                Spacer(Modifier.height(22.dp))
+                // Gleiche Hero-Groesse und Titelstufe wie die leeren Zustaende.
+                PocketBrandMark(size = 96.dp)
+                Spacer(Modifier.height(24.dp))
                 Text(
                     stringResource(de.smartzone.pocketclaude.R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                 )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(16.dp))
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     strokeWidth = 2.dp,

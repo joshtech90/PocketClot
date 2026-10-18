@@ -378,7 +378,7 @@
     <string name="image_editing">编辑中</string>
     <string name="image_use_as_reference">继续编辑此图片</string>
     <string name="image_model_label">模型</string>
-    <string name="image_variants_label">变体数:</string>
+    <string name="image_variants_label">变体数</string>
     <string name="image_generating">生成中</string>
     <string name="image_generate_button">生成</string>
     <string name="image_remove_entry">移除条目</string>

@@ -381,7 +381,7 @@
     <string name="image_editing">Editing</string>
     <string name="image_use_as_reference">Edit this image further</string>
     <string name="image_model_label">Model</string>
-    <string name="image_variants_label">Variants:</string>
+    <string name="image_variants_label">Variants</string>
     <string name="image_generating">Generating</string>
     <string name="image_generate_button">Generate</string>
     <string name="image_remove_entry">Remove entry</string>

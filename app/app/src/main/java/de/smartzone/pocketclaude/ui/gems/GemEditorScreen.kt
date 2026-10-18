@@ -64,6 +64,7 @@ import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
+import de.smartzone.pocketclaude.ui.components.PocketCard
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
@@ -115,7 +116,9 @@ fun GemEditorScreen(
                     if (st.saving) {
                         CircularProgressIndicator(
                             strokeWidth = 2.dp,
-                            modifier = Modifier.size(20.dp).padding(end = 12.dp),
+                            // Erst Abstand, dann Groesse: andersherum blieb vom
+                            // Kreis nur ein 8 dp kleiner Rest uebrig.
+                            modifier = Modifier.padding(end = 16.dp).size(PocketIconSize.Regular),
                         )
                     } else {
                         Button(
@@ -147,7 +150,7 @@ fun GemEditorScreen(
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (st.isBuiltin) {
                 Text(
@@ -218,7 +221,7 @@ fun GemEditorScreen(
                 if (!st.isBuiltin) {
                     OutlinedButton(onClick = { vm.addStarter() }) {
                         Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.gem_add_starter))
                     }
                 }
@@ -268,7 +271,7 @@ fun GemEditorScreen(
                 if (!st.isBuiltin) {
                     OutlinedButton(onClick = { filePicker.launch(arrayOf("*/*")) }) {
                         Icon(PocketIcons.Document, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.gem_add_file))
                     }
                 }
@@ -285,22 +288,13 @@ fun GemEditorScreen(
 
 @Composable
 private fun EditorSection(title: String, hint: String?, content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        shape = RoundedCornerShape(26.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            if (hint != null) {
-                Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            content()
+    // Dieselbe Karte wie in den Einstellungen und im Bilder-Screen.
+    PocketCard {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        if (hint != null) {
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        content()
     }
 }
 
@@ -347,7 +341,7 @@ private fun LabeledDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.titleSmall)
         ExposedDropdownMenuBox(
             expanded = expanded && enabled,
             onExpandedChange = { if (enabled) expanded = it },

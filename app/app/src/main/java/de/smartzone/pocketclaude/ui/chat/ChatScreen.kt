@@ -116,6 +116,7 @@ import de.smartzone.pocketclaude.data.familyForKey
 import de.smartzone.pocketclaude.data.shortModelLabel
 import androidx.compose.ui.graphics.vector.ImageVector
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
 import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
@@ -1185,8 +1186,8 @@ private fun ChatAutoSpeakDialog(
                     ) {
                         val selected = override == value
                         Icon(
-                            imageVector = if (selected) PocketIcons.Check
-                                          else PocketIcons.ExpandMore,
+                            imageVector = if (selected) PocketIcons.CheckCircle
+                                          else PocketIcons.RadioUnchecked,
                             contentDescription = null,
                             tint = if (selected) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1229,8 +1230,7 @@ private fun GemWelcome(
         if (name.isNotBlank()) {
             Text(
                 name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.headlineSmall,
             )
         }
         if (description.isNotBlank()) {
@@ -1251,6 +1251,7 @@ private fun GemWelcome(
                     AssistChip(
                         onClick = { onStarter(s) },
                         label = { Text(s) },
+                        shape = CircleShape,
                     )
                 }
             }
@@ -1425,9 +1426,9 @@ private fun DrawerSectionLabel(text: String) {
 private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
@@ -1492,11 +1493,11 @@ private fun InputBar(
             .fillMaxWidth()
             // Max von IME und Navigation-Bar, damit beide Insets nicht addiert werden.
             .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-            .padding(horizontal = 10.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(PocketRadius.XLarge),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = androidx.compose.foundation.BorderStroke(
@@ -1504,10 +1505,10 @@ private fun InputBar(
             if (inputFocused) MaterialTheme.colorScheme.primary
             else PocketTheme.colors.outlineSoft,
         ),
-        shadowElevation = 10.dp,
+        shadowElevation = 8.dp,
     ) {
     Row(
-        modifier = Modifier.padding(5.dp),
+        modifier = Modifier.padding(4.dp),
         // Mittig statt unten: das Textfeld ist hoeher als die 48dp-Knoepfe,
         // deshalb sassen Heftklammer, Mikrofon und Senden bei einzeiliger
         // Eingabe sichtbar zu tief.
@@ -1969,7 +1970,7 @@ private fun ModelSheet(
                             Text(
                                 text = autoLabel,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isAutoSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (isAutoSelected) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         }
                     }
@@ -2000,7 +2001,7 @@ private fun ModelSheet(
                                 Text(
                                     text = model.label,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                 )
                                 if (model.gatewayLabel.isNotBlank()) {
                                     Text(

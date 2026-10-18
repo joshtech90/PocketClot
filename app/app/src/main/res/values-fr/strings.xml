@@ -378,7 +378,7 @@
     <string name="image_editing">Édition</string>
     <string name="image_use_as_reference">Continuer à modifier cette image</string>
     <string name="image_model_label">Modèle</string>
-    <string name="image_variants_label">Variantes :</string>
+    <string name="image_variants_label">Variantes</string>
     <string name="image_generating">Génération</string>
     <string name="image_generate_button">Générer</string>
     <string name="image_remove_entry">Supprimer l\'entrée</string>

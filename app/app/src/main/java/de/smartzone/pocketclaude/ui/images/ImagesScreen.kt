@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,6 +45,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -88,7 +91,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
+import de.smartzone.pocketclaude.ui.components.PocketCard
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -247,9 +252,6 @@ fun ImagesScreen(
                             },
                         )
                     }
-                    item(key = "divider") {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
                     if (state.history.isEmpty()) {
                         item(key = "empty") {
                             Box(
@@ -340,13 +342,17 @@ fun ImagesScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SubsectionRow(label: String, content: @Composable FlowRowScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), content = content)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = content,
+        )
     }
 }
 
@@ -377,170 +383,158 @@ private fun GeneratorCard(
     onPickImage: () -> Unit,
 ) {
     val cfg = state.config ?: return
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        shape = RoundedCornerShape(28.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, PocketTheme.colors.outlineSoft),
+    PocketCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        spacing = 16.dp,
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Vorlagen. Sind welche da, wird bearbeitet statt neu erzeugt.
-            ReferenceStrip(
-                references = state.references,
-                isUploading = state.isUploading,
-                enabled = state.canEditReferences,
-                serverBaseUrl = serverBaseUrl,
-                serverToken = serverToken,
-                onAdd = onPickImage,
-                onRemove = vm::removeReference,
-                onClear = vm::clearReferences,
-            )
+        // Vorlagen. Sind welche da, wird bearbeitet statt neu erzeugt.
+        ReferenceStrip(
+            references = state.references,
+            isUploading = state.isUploading,
+            enabled = state.canEditReferences,
+            serverBaseUrl = serverBaseUrl,
+            serverToken = serverToken,
+            onAdd = onPickImage,
+            onRemove = vm::removeReference,
+            onClear = vm::clearReferences,
+        )
 
-            // Prompt-Eingabe
-            OutlinedTextField(
-                value = state.prompt,
-                onValueChange = vm::setPrompt,
-                placeholder = {
-                    Text(stringResource(
-                        if (state.isEditing) R.string.image_edit_prompt_placeholder
-                        else R.string.image_prompt_placeholder
-                    ))
-                },
-                maxLines = 4,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.small,
-                enabled = !state.isGenerating,
-            )
+        // Prompt-Eingabe
+        OutlinedTextField(
+            value = state.prompt,
+            onValueChange = vm::setPrompt,
+            placeholder = {
+                Text(stringResource(
+                    if (state.isEditing) R.string.image_edit_prompt_placeholder
+                    else R.string.image_prompt_placeholder
+                ))
+            },
+            maxLines = 4,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            enabled = !state.isGenerating,
+        )
 
-            // Anbieter. Die frueher hier stehende Modellwahl ist entfallen:
-            // welches Bildmodell laeuft, sagt der jeweilige Anbieter.
-            if (cfg.providers.size > 1) {
-                SubsectionRow(stringResource(R.string.image_provider_label)) {
-                    cfg.providers.forEach { p ->
-                        PocketChoiceChip(
-                            selected = p.id == state.selectedProvider,
-                            onClick = { vm.setProvider(p.id) },
-                            label = imageProviderLabel(p),
-                            enabled = !state.isGenerating,
-                        )
-                    }
-                }
-            }
-
-            // Aufloesung. Fehlte bisher komplett, obwohl der Server sie laengst
-            // versteht: die Einstellung war nur als Vorgabe da und wurde vom
-            // Bilder-Screen nie mitgeschickt.
-            if (cfg.imageSizes.isNotEmpty()) {
-                SubsectionRow(stringResource(R.string.image_size_label)) {
-                    cfg.imageSizes.forEach { s ->
-                        PocketChoiceChip(
-                            selected = s.id == state.selectedSize,
-                            onClick = { vm.setSize(s.id) },
-                            label = s.id,
-                            enabled = !state.isGenerating,
-                        )
-                    }
-                }
-            }
-
-            // Je Auswahl ein eigener Hinweis. Frueher stand hier ein einziger
-            // Text, der von "beide zeichnen gleichzeitig" sprach: bei direkter
-            // GPT-Wahl war das schlicht falsch.
-            val providerHint = when (state.selectedProvider) {
-                "both" -> R.string.image_both_hint
-                "gpt" -> R.string.image_gpt_size_hint
-                else -> null
-            }
-            if (providerHint != null) {
-                Text(
-                    stringResource(providerHint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Seitenverhaeltnis
-            SubsectionRow(stringResource(R.string.image_aspect_label)) {
-                cfg.aspectRatios.forEach { a ->
+        // Anbieter. Die frueher hier stehende Modellwahl ist entfallen:
+        // welches Bildmodell laeuft, sagt der jeweilige Anbieter.
+        if (cfg.providers.size > 1) {
+            SubsectionRow(stringResource(R.string.image_provider_label)) {
+                cfg.providers.forEach { p ->
                     PocketChoiceChip(
-                        selected = a.id == state.selectedAspect,
-                        onClick = { vm.setAspect(a.id) },
-                        label = a.id,
+                        selected = p.id == state.selectedProvider,
+                        onClick = { vm.setProvider(p.id) },
+                        label = imageProviderLabel(p),
                         enabled = !state.isGenerating,
                     )
-                }
-            }
-
-            // Anzahl
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    stringResource(R.string.image_variants_label),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                for (n in 1..cfg.maxCandidates) {
-                    PocketChoiceChip(
-                        selected = n == state.count,
-                        onClick = { vm.setCount(n) },
-                        label = n.toString(),
-                        enabled = !state.isGenerating,
-                    )
-                }
-            }
-
-            // Der Knopf sagt, was wirklich passiert: mit Vorlage wird
-            // bearbeitet, ohne wird neu erzeugt.
-            FilledTonalButton(
-                onClick = { vm.generate() },
-                enabled = !state.isGenerating && !state.isUploading && state.prompt.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.isGenerating) {
-                    CircularProgressIndicator(
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    // Einzeilig und ohne Kuerzung: sonst schob sich der Text in
-                    // das Auslassungszeichen und es sah aus wie ein Fehler.
-                    Text(
-                        stringResource(
-                            if (state.isEditing) R.string.image_editing
-                            else R.string.image_generating
-                        ),
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                } else {
-                    Icon(
-                        if (state.isEditing) PocketIcons.Brush else PocketIcons.Sparkle,
-                        contentDescription = null, modifier = Modifier.size(PocketIconSize.Small),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(
-                        if (state.isEditing) R.string.image_edit_button
-                        else R.string.image_generate_button
-                    ))
-                }
-            }
-
-            state.generationError?.let { err ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        err,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = vm::clearError) { Text(stringResource(R.string.action_ok)) }
                 }
             }
         }
+
+        // Aufloesung. Fehlte bisher komplett, obwohl der Server sie laengst
+        // versteht: die Einstellung war nur als Vorgabe da und wurde vom
+        // Bilder-Screen nie mitgeschickt.
+        if (cfg.imageSizes.isNotEmpty()) {
+            SubsectionRow(stringResource(R.string.image_size_label)) {
+                cfg.imageSizes.forEach { s ->
+                    PocketChoiceChip(
+                        selected = s.id == state.selectedSize,
+                        onClick = { vm.setSize(s.id) },
+                        label = s.id,
+                        enabled = !state.isGenerating,
+                    )
+                }
+            }
+        }
+
+        // Je Auswahl ein eigener Hinweis. Frueher stand hier ein einziger
+        // Text, der von "beide zeichnen gleichzeitig" sprach: bei direkter
+        // GPT-Wahl war das schlicht falsch.
+        val providerHint = when (state.selectedProvider) {
+            "both" -> R.string.image_both_hint
+            "gpt" -> R.string.image_gpt_size_hint
+            else -> null
+        }
+        if (providerHint != null) {
+            Text(
+                stringResource(providerHint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Seitenverhaeltnis
+        SubsectionRow(stringResource(R.string.image_aspect_label)) {
+            cfg.aspectRatios.forEach { a ->
+                PocketChoiceChip(
+                    selected = a.id == state.selectedAspect,
+                    onClick = { vm.setAspect(a.id) },
+                    label = a.id,
+                    enabled = !state.isGenerating,
+                )
+            }
+        }
+
+        // Anzahl
+        SubsectionRow(stringResource(R.string.image_variants_label)) {
+            for (n in 1..cfg.maxCandidates) {
+                PocketChoiceChip(
+                    selected = n == state.count,
+                    onClick = { vm.setCount(n) },
+                    label = n.toString(),
+                    enabled = !state.isGenerating,
+                )
+            }
+        }
+
+        // Der Knopf sagt, was wirklich passiert: mit Vorlage wird
+        // bearbeitet, ohne wird neu erzeugt.
+        Button(
+            onClick = { vm.generate() },
+            enabled = !state.isGenerating && !state.isUploading && state.prompt.isNotBlank(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) {
+            if (state.isGenerating) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    color = LocalContentColor.current,
+                    modifier = Modifier.size(PocketIconSize.Small),
+                )
+                Spacer(Modifier.width(8.dp))
+                // Einzeilig und ohne Kuerzung: sonst schob sich der Text in
+                // das Auslassungszeichen und es sah aus wie ein Fehler.
+                Text(
+                    stringResource(
+                        if (state.isEditing) R.string.image_editing
+                        else R.string.image_generating
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            } else {
+                Icon(
+                    if (state.isEditing) PocketIcons.Brush else PocketIcons.Sparkle,
+                    contentDescription = null, modifier = Modifier.size(PocketIconSize.Small),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(
+                    if (state.isEditing) R.string.image_edit_button
+                    else R.string.image_generate_button
+                ))
+            }
+        }
+
+        state.generationError?.let { err ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    err,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = vm::clearError) { Text(stringResource(R.string.action_ok)) }
+            }
+        }
+    
     }
 }
 
@@ -564,15 +558,15 @@ private fun ReferenceStrip(
     onRemove: (String) -> Unit,
     onClear: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(
                     if (references.isEmpty()) R.string.image_reference_label
                     else R.string.image_reference_label_active
                 ),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
             if (references.isNotEmpty()) {
@@ -597,7 +591,7 @@ private fun ReferenceStrip(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(64.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(PocketRadius.Small))
                             .background(MaterialTheme.colorScheme.surface),
                     )
                     FilledTonalIconButton(
@@ -619,16 +613,16 @@ private fun ReferenceStrip(
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(PocketRadius.Small))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(10.dp))
+                                RoundedCornerShape(PocketRadius.Small))
                         .clickable(enabled = enabled && !isUploading) { onAdd() },
                     contentAlignment = Alignment.Center,
                 ) {
                     if (isUploading) {
                         CircularProgressIndicator(strokeWidth = 2.dp,
-                                                  modifier = Modifier.size(18.dp))
+                                                  modifier = Modifier.size(PocketIconSize.Small))
                     } else {
                         Icon(PocketIcons.AddPhoto,
                              contentDescription = stringResource(R.string.image_reference_add),
@@ -660,78 +654,68 @@ private fun HistoryRow(
     onImageClick: (ImageGenerateAttachment) -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        shape = RoundedCornerShape(14.dp),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Header: Prompt-Snippet + Delete-Button
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        entry.prompt,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        stringResource(R.string.image_meta_line, entry.model, entry.aspectRatio, entry.attachments.size),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        PocketIcons.Close,
-                        contentDescription = stringResource(R.string.image_remove_entry),
-                        modifier = Modifier.size(PocketIconSize.Regular),
-                    )
-                }
+    PocketCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        // Header: Prompt-Snippet + Delete-Button
+        Row(verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    entry.prompt,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.image_meta_line, entry.model, entry.aspectRatio, entry.attachments.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            // Bilder-Reihe (horizontal)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                entry.attachments.forEach { att ->
-                    val url = remember(serverBaseUrl, serverToken, att.id) {
-                        "$serverBaseUrl/attachments/${att.id}?token=${android.net.Uri.encode(serverToken)}"
-                    }
-                    Box {
-                        AsyncImage(
-                            model = url,
-                            contentDescription = att.filename,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(width = 140.dp, height = 140.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable { onImageClick(att) },
+            IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    PocketIcons.Delete,
+                    contentDescription = stringResource(R.string.image_remove_entry),
+                    modifier = Modifier.size(PocketIconSize.Regular),
+                )
+            }
+        }
+        // Bilder-Reihe (horizontal)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            entry.attachments.forEach { att ->
+                val url = remember(serverBaseUrl, serverToken, att.id) {
+                    "$serverBaseUrl/attachments/${att.id}?token=${android.net.Uri.encode(serverToken)}"
+                }
+                Box {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = att.filename,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 140.dp, height = 140.dp)
+                            .clip(RoundedCornerShape(PocketRadius.Small))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { onImageClick(att) },
+                    )
+                    // Ohne diesen Knopf muesste man ein erzeugtes Bild erst
+                    // herunterladen und wieder hochladen, um damit
+                    // weiterzuarbeiten.
+                    FilledTonalIconButton(
+                        onClick = { onEditImage(att) },
+                        enabled = canEdit,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .size(30.dp),
+                    ) {
+                        Icon(
+                            PocketIcons.Brush,
+                            contentDescription = stringResource(R.string.image_use_as_reference),
+                            modifier = Modifier.size(PocketIconSize.Small),
                         )
-                        // Ohne diesen Knopf muesste man ein erzeugtes Bild erst
-                        // herunterladen und wieder hochladen, um damit
-                        // weiterzuarbeiten.
-                        FilledTonalIconButton(
-                            onClick = { onEditImage(att) },
-                            enabled = canEdit,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(4.dp)
-                                .size(30.dp),
-                        ) {
-                            Icon(
-                                PocketIcons.Brush,
-                                contentDescription = stringResource(R.string.image_use_as_reference),
-                                modifier = Modifier.size(PocketIconSize.Small),
-                            )
-                        }
                     }
                 }
             }
         }
+    
     }
 }
 

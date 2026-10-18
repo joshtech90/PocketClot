@@ -378,7 +378,7 @@
     <string name="image_editing">編集中</string>
     <string name="image_use_as_reference">この画像をさらに編集</string>
     <string name="image_model_label">モデル</string>
-    <string name="image_variants_label">バリエーション:</string>
+    <string name="image_variants_label">バリエーション</string>
     <string name="image_generating">生成中</string>
     <string name="image_generate_button">生成</string>
     <string name="image_remove_entry">エントリを削除</string>
