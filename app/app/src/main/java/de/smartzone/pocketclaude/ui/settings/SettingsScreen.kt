@@ -1848,7 +1848,12 @@ private fun TtsSection(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        // Trenner nur, wenn darunter noch Zugangsdaten folgen. Bei Edge und
+        // Gemini Web stand er sonst direkt ueber dem Trenner zur naechsten
+        // Gruppe: zwei Linien untereinander.
+        if (isGemini || isCloud) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
 
         // Eigenes API-Key-Feld für TTS — nur wenn Provider = Gemini API.
         // Bewusst getrennt von der Image-Gen-API-Key-Eingabe, weil:
@@ -1923,10 +1928,10 @@ private fun TtsSection(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (ttsBusy) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(PocketIconSize.Small), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
                 }
-                Icon(PocketIcons.Upload, contentDescription = null)
+                Icon(PocketIcons.Upload, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                 Spacer(Modifier.width(8.dp))
                 Text(if (ttsStatus?.cloudTtsConfigured == true) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_replace_cloud_credentials) else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_paste_cloud_credentials))
             }
@@ -2123,7 +2128,7 @@ private fun TtsSection(
                 onClick = vm::testVoice,
                 enabled = ttsStatus?.configured == true && ttsTest !is TtsTestResult.Testing,
             ) {
-                Icon(PocketIcons.VolumeUp, contentDescription = null)
+                Icon(PocketIcons.VolumeUp, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_test_btn))
             }
@@ -2131,7 +2136,7 @@ private fun TtsSection(
             FilledTonalButton(
                 onClick = vm::stopAudio,
             ) {
-                Icon(PocketIcons.Stop, contentDescription = null)
+                Icon(PocketIcons.Stop, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_stop_btn))
             }
@@ -2377,7 +2382,7 @@ private fun BackupSection(vm: SettingsViewModel) {
                 onClick = { vm.startExport() },
                 enabled = !busy,
             ) {
-                Icon(PocketIcons.Upload, contentDescription = null)
+                Icon(PocketIcons.Upload, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_export))
             }
@@ -2395,7 +2400,7 @@ private fun BackupSection(vm: SettingsViewModel) {
                 },
                 enabled = !busy,
             ) {
-                Icon(PocketIcons.Play, contentDescription = null)
+                Icon(PocketIcons.Download, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_import))
             }
@@ -3270,8 +3275,8 @@ private fun SettingsTransferSection(vm: SettingsViewModel) {
                           state !is SettingsViewModel.SettingsTransferState.Importing,
                 modifier = Modifier.weight(1f),
             ) {
-                Icon(PocketIcons.Upload, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
+                Icon(PocketIcons.Upload, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
+                Spacer(Modifier.width(8.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_export))
             }
             FilledTonalButton(
@@ -3284,8 +3289,8 @@ private fun SettingsTransferSection(vm: SettingsViewModel) {
                           state !is SettingsViewModel.SettingsTransferState.Importing,
                 modifier = Modifier.weight(1f),
             ) {
-                Icon(PocketIcons.Document, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
+                Icon(PocketIcons.Download, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
+                Spacer(Modifier.width(8.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import))
             }
         }
@@ -3608,7 +3613,7 @@ private fun TtsGeminiApiKeyField(
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
             }
-            Icon(PocketIcons.Add, contentDescription = null)
+            Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pool_add_btn))
         }

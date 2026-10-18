@@ -88,7 +88,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    // Symbole kommen aus ui/theme/PocketIcons.kt (Material Symbols Rounded als
+    // Pfade). Die riesige material-icons-extended-Bibliothek wird nicht mehr
+    // gebraucht; Material 3 bringt fuer seine eigenen Pfeile material-icons-core mit.
     implementation("androidx.compose.animation:animation")
 
     // Navigation
