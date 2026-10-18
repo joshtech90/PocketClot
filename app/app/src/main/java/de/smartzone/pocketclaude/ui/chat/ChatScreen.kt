@@ -1,7 +1,6 @@
 package de.smartzone.pocketclaude.ui.chat
 
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.material.icons.filled.Restore
 import de.smartzone.pocketclaude.data.MessageDto
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,34 +38,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Loop
-import androidx.compose.material.icons.filled.DriveFileRenameOutline
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
@@ -84,7 +57,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SmallFloatingActionButton
@@ -132,7 +104,6 @@ import de.smartzone.pocketclaude.ui.components.TtsState
 import de.smartzone.pocketclaude.ui.components.UserBubble
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import kotlinx.coroutines.launch
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import de.smartzone.pocketclaude.data.ChatModelFamilies
@@ -143,6 +114,9 @@ import de.smartzone.pocketclaude.data.EFFORT_LEVELS_ALL
 import de.smartzone.pocketclaude.data.GatewayStatusDto
 import de.smartzone.pocketclaude.data.familyForKey
 import de.smartzone.pocketclaude.data.shortModelLabel
+import androidx.compose.ui.graphics.vector.ImageVector
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -502,11 +476,11 @@ fun ChatScreen(
                 navigationIcon = {
                     if (state.searchActive) {
                         IconButton(onClick = { vm.closeSearch() }) {
-                            Icon(Icons.Filled.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_close))
+                            Icon(PocketIcons.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_close))
                         }
                     } else {
                         PocketIconButton(
-                            icon = Icons.Filled.Menu,
+                            icon = PocketIcons.Menu,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_conversations),
                             onClick = { scope.launch { drawerState.open() } },
                             modifier = Modifier.padding(start = 8.dp),
@@ -517,20 +491,20 @@ fun ChatScreen(
                   if (state.searchActive) {
                     val hasMatches = state.searchMatches.isNotEmpty()
                     IconButton(onClick = { vm.previousMatch() }, enabled = hasMatches) {
-                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = null)
+                        Icon(PocketIcons.ExpandLess, contentDescription = null)
                     }
                     IconButton(
                         onClick = { vm.nextMatch() },
                         enabled = hasMatches,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null)
+                        Icon(PocketIcons.ExpandMore, contentDescription = null)
                     }
                   } else {
                     // Modell und Denktiefe. Das Sheet zeigt Claude zuerst,
                     // darunter die Zusatz-Modelle der erreichbaren Gateways.
                     PocketIconButton(
-                        icon = Icons.Filled.Psychology,
+                        icon = PocketIcons.Tune,
                         contentDescription = stringResource(de.smartzone.pocketclaude.R.string.model_sheet_title),
                         onClick = { modelSheetOpen = true },
                         contentColor = effortTint(appSettings.effortFor(familyForKey(state.modelKey))),
@@ -539,7 +513,7 @@ fun ChatScreen(
                     // Three-dot overflow — rename / pin / share / delete
                     Box(modifier = Modifier.padding(end = 8.dp)) {
                         PocketIconButton(
-                            icon = Icons.Filled.MoreVert,
+                            icon = PocketIcons.MoreVert,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_more),
                             onClick = { moreMenuOpen = true },
                         )
@@ -550,7 +524,7 @@ fun ChatScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_rename)) },
                                 leadingIcon = {
-                                    Icon(Icons.Filled.DriveFileRenameOutline, contentDescription = null)
+                                    Icon(PocketIcons.Edit, contentDescription = null)
                                 },
                                 onClick = {
                                     moreMenuOpen = false
@@ -564,7 +538,7 @@ fun ChatScreen(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        Icons.Filled.PushPin,
+                                        if (state.pinned) PocketIcons.PushPinFilled else PocketIcons.PushPin,
                                         contentDescription = null,
                                         tint = if (state.pinned) MaterialTheme.colorScheme.primary
                                                else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -583,7 +557,7 @@ fun ChatScreen(
                                     )
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Filled.AutoAwesome, contentDescription = null)
+                                    Icon(PocketIcons.Extension, contentDescription = null)
                                 },
                                 onClick = {
                                     moreMenuOpen = false
@@ -599,7 +573,7 @@ fun ChatScreen(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        Icons.AutoMirrored.Filled.VolumeUp,
+                                        PocketIcons.VolumeUp,
                                         contentDescription = null,
                                     )
                                 },
@@ -621,7 +595,7 @@ fun ChatScreen(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        Icons.Filled.Loop,
+                                        PocketIcons.VoiceMode,
                                         contentDescription = null,
                                         tint = if (state.autoMode) MaterialTheme.colorScheme.primary
                                                else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -657,7 +631,7 @@ fun ChatScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(de.smartzone.pocketclaude.R.string.search_in_chat)) },
                                 leadingIcon = {
-                                    Icon(Icons.Filled.Search, contentDescription = null)
+                                    Icon(PocketIcons.Search, contentDescription = null)
                                 },
                                 onClick = {
                                     moreMenuOpen = false
@@ -667,7 +641,7 @@ fun ChatScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(de.smartzone.pocketclaude.R.string.share_as_markdown)) },
                                 leadingIcon = {
-                                    Icon(Icons.Filled.IosShare, contentDescription = null)
+                                    Icon(PocketIcons.Share, contentDescription = null)
                                 },
                                 onClick = {
                                     moreMenuOpen = false
@@ -679,7 +653,7 @@ fun ChatScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(de.smartzone.pocketclaude.R.string.save_as_markdown)) },
                                 leadingIcon = {
-                                    Icon(Icons.Filled.Download, contentDescription = null)
+                                    Icon(PocketIcons.Download, contentDescription = null)
                                 },
                                 onClick = {
                                     moreMenuOpen = false
@@ -695,7 +669,7 @@ fun ChatScreen(
                                 text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_delete), color = MaterialTheme.colorScheme.error) },
                                 leadingIcon = {
                                     Icon(
-                                        Icons.Filled.Delete,
+                                        PocketIcons.Delete,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.error,
                                     )
@@ -866,7 +840,7 @@ fun ChatScreen(
                             .padding(end = 16.dp, bottom = 16.dp),
                     ) {
                         Icon(
-                            Icons.Filled.KeyboardArrowDown,
+                            PocketIcons.ExpandMore,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_scroll_to_bottom_cd),
                         )
                     }
@@ -1210,8 +1184,8 @@ private fun ChatAutoSpeakDialog(
                     ) {
                         val selected = override == value
                         Icon(
-                            imageVector = if (selected) Icons.Filled.Check
-                                          else Icons.Filled.KeyboardArrowDown,
+                            imageVector = if (selected) PocketIcons.Check
+                                          else PocketIcons.ExpandMore,
                             contentDescription = null,
                             tint = if (selected) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1312,132 +1286,100 @@ private fun ChatDrawerContent(
         drawerContainerColor = PocketTheme.colors.surfaceLow,
         drawerContentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        // Kopf: Logo + Titel + "Alle Chats"-Aufruf
+        // Kopf: Markenzeichen + Name + Einstellungen. Das Markenzeichen fuehrt
+        // wie bisher zur Liste aller Gespraeche.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
-                .clip(RoundedCornerShape(14.dp)),
+                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
+                    .clip(CircleShape)
                     .semantics { contentDescription = allConversationsLabel }
                     .clickable(role = Role.Button, onClick = onAllChats),
                 contentAlignment = Alignment.Center,
             ) {
-                PocketBrandMark(size = 42.dp)
+                PocketBrandMark(size = 40.dp)
             }
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.app_name),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    allConversationsLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                stringResource(de.smartzone.pocketclaude.R.string.app_name),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
             IconButton(onClick = onSettings) {
-                Icon(Icons.Filled.Settings, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_settings))
+                Icon(PocketIcons.Settings, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_settings))
             }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         Spacer(Modifier.height(8.dp))
-        NavigationDrawerItem(
-            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.new_chat)) },
-            selected = false,
+        DrawerEntry(
+            icon = PocketIcons.NewChat,
+            label = stringResource(de.smartzone.pocketclaude.R.string.new_chat),
             onClick = onNewChat,
-            colors = NavigationDrawerItemDefaults.colors(
-                unselectedContainerColor = MaterialTheme.colorScheme.background,
-            ),
-            modifier = Modifier.padding(horizontal = 12.dp),
         )
         // Image generation — only visible if an API key is configured
         // (otherwise the entry would do nothing useful). Setup flow runs via Settings.
         if (imageGenAvailable) {
-            NavigationDrawerItem(
-                icon = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
-                label = { Text(stringResource(de.smartzone.pocketclaude.R.string.title_images)) },
-                selected = false,
+            DrawerEntry(
+                icon = PocketIcons.Image,
+                label = stringResource(de.smartzone.pocketclaude.R.string.title_images),
                 onClick = onGenerateImages,
-                colors = NavigationDrawerItemDefaults.colors(
-                    unselectedContainerColor = MaterialTheme.colorScheme.background,
-                ),
-                modifier = Modifier.padding(horizontal = 12.dp),
             )
         }
-        NavigationDrawerItem(
-            icon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.all_conversations)) },
-            selected = false,
+        DrawerEntry(
+            icon = PocketIcons.Forum,
+            label = allConversationsLabel,
             onClick = onAllChats,
-            colors = NavigationDrawerItemDefaults.colors(
-                unselectedContainerColor = MaterialTheme.colorScheme.background,
-            ),
-            modifier = Modifier.padding(horizontal = 12.dp),
         )
 
         // Gems (Custom Agents) — Tippen startet einen frischen Chat mit dem Gem.
         if (gems.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.section_gems),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 4.dp),
-            )
+            DrawerSectionLabel(stringResource(de.smartzone.pocketclaude.R.string.section_gems))
             gems.forEach { gem ->
                 NavigationDrawerItem(
                     icon = {
-                        Text(
-                            gem.emoji.ifBlank { "🤖" },
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        // Das Emoji sitzt in derselben 24-dp-Flaeche wie die
+                        // Symbole, damit alle Beschriftungen buendig beginnen.
+                        Box(Modifier.size(PocketIconSize.Regular), contentAlignment = Alignment.Center) {
+                            Text(
+                                gem.emoji.ifBlank { "🤖" },
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
                     },
                     label = {
                         Text(gem.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     selected = false,
                     onClick = { onStartGem(gem.id) },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        unselectedContainerColor = MaterialTheme.colorScheme.background,
-                    ),
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(de.smartzone.pocketclaude.R.string.recent_chats),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 4.dp),
-        )
+        DrawerSectionLabel(stringResource(de.smartzone.pocketclaude.R.string.recent_chats))
 
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 12.dp),
         ) {
             items(chats, key = { it.id }) { conv ->
                 NavigationDrawerItem(
                     icon = {
                         if (conv.pinned) {
                             Icon(
-                                Icons.Filled.PushPin,
+                                PocketIcons.PushPinFilled,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                         } else {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                            Icon(PocketIcons.ChatBubble, contentDescription = null)
                         }
                     },
                     label = {
@@ -1449,13 +1391,33 @@ private fun ChatDrawerContent(
                     },
                     selected = conv.id == currentCid,
                     onClick = { onSwitch(conv.id) },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        unselectedContainerColor = MaterialTheme.colorScheme.background,
-                    ),
                 )
             }
         }
     }
+}
+
+/** Fester Drawer-Eintrag (Neuer Chat, Bilder, Alle Gespraeche). */
+@Composable
+private fun DrawerEntry(icon: ImageVector, label: String, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        icon = { Icon(icon, contentDescription = null) },
+        label = { Text(label) },
+        selected = false,
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 12.dp),
+    )
+}
+
+/** Abschnittsbeschriftung im Drawer, buendig mit den Symbolen der Eintraege. */
+@Composable
+private fun DrawerSectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 8.dp),
+    )
 }
 
 @Composable
@@ -1473,13 +1435,13 @@ private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
                 modifier = Modifier.size(14.dp),
             )
             p.error != null -> Icon(
-                Icons.Filled.Close,
+                PocketIcons.Close,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(16.dp),
             )
             else -> Icon(
-                Icons.Filled.Image,
+                PocketIcons.Image,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp),
@@ -1497,7 +1459,7 @@ private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onRemove, modifier = Modifier.size(20.dp)) {
             Icon(
-                Icons.Filled.Close,
+                PocketIcons.Close,
                 contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_remove),
                 modifier = Modifier.size(14.dp),
             )
@@ -1552,7 +1514,7 @@ private fun InputBar(
     ) {
         Box {
             IconButton(onClick = { attachMenu = true }) {
-                Icon(Icons.Filled.AttachFile, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_attach))
+                Icon(PocketIcons.AttachFile, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_attach))
             }
             DropdownMenu(
                 expanded = attachMenu,
@@ -1560,12 +1522,12 @@ private fun InputBar(
             ) {
                 DropdownMenuItem(
                     text = { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_attach_image_menu)) },
-                    leadingIcon = { Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null) },
+                    leadingIcon = { Icon(PocketIcons.AddPhoto, contentDescription = null) },
                     onClick = { attachMenu = false; onAttachImage() },
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_attach_file_menu)) },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null) },
+                    leadingIcon = { Icon(PocketIcons.Document, contentDescription = null) },
                     onClick = { attachMenu = false; onAttachDocument() },
                 )
             }
@@ -1642,7 +1604,7 @@ private fun SendButton(
             enabled = enabled,
         ) {
             Icon(
-                imageVector = if (sending) Icons.Filled.Stop else Icons.Filled.Send,
+                imageVector = if (sending) PocketIcons.Stop else PocketIcons.Send,
                 contentDescription = stringResource(if (sending) de.smartzone.pocketclaude.R.string.stop else de.smartzone.pocketclaude.R.string.send),
                 tint = contentColor,
             )
@@ -1798,7 +1760,7 @@ private fun RewindDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Filled.Restore, contentDescription = null) },
+        icon = { Icon(PocketIcons.History, contentDescription = null) },
         title = { Text(stringResource(de.smartzone.pocketclaude.R.string.rewind_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1923,7 +1885,7 @@ private fun ModelSheet(
                 } else {
                     IconButton(onClick = onRefresh) {
                         Icon(
-                            Icons.Filled.Refresh,
+                            PocketIcons.Refresh,
                             contentDescription = stringResource(
                                 de.smartzone.pocketclaude.R.string.model_refresh,
                             ),
@@ -1998,7 +1960,7 @@ private fun ModelSheet(
                         ) {
                             if (isAutoSelected) {
                                 Icon(
-                                    Icons.Filled.Check,
+                                    PocketIcons.Check,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp),
@@ -2028,7 +1990,7 @@ private fun ModelSheet(
                         ) {
                             if (isSelected) {
                                 Icon(
-                                    Icons.Filled.Check,
+                                    PocketIcons.Check,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp),

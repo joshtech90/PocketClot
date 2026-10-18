@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +43,7 @@ import com.halilibo.richtext.ui.material3.RichText
 import com.halilibo.richtext.ui.string.RichTextStringStyle
 import de.smartzone.pocketclaude.ui.theme.AtelierIce
 import de.smartzone.pocketclaude.ui.theme.AtelierIceDeep
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 /**
  * Markdown-Renderer mit Custom-Code-Block-Handling. Code-Blöcke werden aus dem
@@ -164,7 +163,7 @@ private fun CodeBlock(
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    Icons.Filled.ContentCopy,
+                    PocketIcons.Copy,
                     contentDescription = stringResource(R.string.markdown_copy_code),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp),

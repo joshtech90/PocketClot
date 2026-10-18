@@ -22,11 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
@@ -69,6 +64,7 @@ import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +104,7 @@ fun GemEditorScreen(
                 },
                 navigationIcon = {
                     PocketIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        icon = PocketIcons.ArrowBack,
                         contentDescription = stringResource(R.string.action_back),
                         onClick = onBack,
                         modifier = Modifier.padding(start = 8.dp),
@@ -215,13 +211,13 @@ fun GemEditorScreen(
                             shape = RoundedCornerShape(14.dp),
                         )
                         IconButton(onClick = { vm.removeStarter(idx) }, enabled = !st.isBuiltin) {
-                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.chat_remove))
+                            Icon(PocketIcons.Close, contentDescription = stringResource(R.string.chat_remove))
                         }
                     }
                 }
                 if (!st.isBuiltin) {
                     OutlinedButton(onClick = { vm.addStarter() }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.gem_add_starter))
                     }
@@ -271,7 +267,7 @@ fun GemEditorScreen(
                 }
                 if (!st.isBuiltin) {
                     OutlinedButton(onClick = { filePicker.launch(arrayOf("*/*")) }) {
-                        Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(PocketIcons.Document, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.gem_add_file))
                     }
@@ -324,7 +320,7 @@ private fun SkillSwitch(label: String, checked: Boolean, enabled: Boolean, onCha
 private fun FileRow(name: String, enabled: Boolean, onRemove: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.AutoMirrored.Filled.InsertDriveFile,
+            PocketIcons.Document,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -333,7 +329,7 @@ private fun FileRow(name: String, enabled: Boolean, onRemove: () -> Unit) {
         Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         if (enabled) {
             IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.chat_remove), modifier = Modifier.size(16.dp))
+                Icon(PocketIcons.Close, contentDescription = stringResource(R.string.chat_remove), modifier = Modifier.size(16.dp))
             }
         }
     }

@@ -15,9 +15,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -41,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.smartzone.pocketclaude.R
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 enum class MicState { Idle, Recording, Transcribing }
 
@@ -156,7 +154,7 @@ fun MicButton(
         when (state) {
             MicState.Idle -> {
                 Icon(
-                    Icons.Filled.Mic,
+                    PocketIcons.Mic,
                     contentDescription = stringResource(R.string.voice_mic_idle_cd),
                     tint = if (enabled) {
                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -213,7 +211,7 @@ fun MicButton(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Filled.Mic,
+                        PocketIcons.Mic,
                         contentDescription = stringResource(R.string.voice_mic_recording_cd),
                         tint = Color.White,
                         modifier = Modifier.size(iconSize),
@@ -252,7 +250,7 @@ fun MicCancelHint(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Filled.Close,
+            PocketIcons.Close,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(12.dp),

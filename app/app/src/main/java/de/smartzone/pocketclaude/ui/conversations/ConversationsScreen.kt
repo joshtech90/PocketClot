@@ -30,23 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Compress
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DriveFileRenameOutline
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.ui.graphics.Color
@@ -97,6 +80,7 @@ import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import de.smartzone.pocketclaude.util.formatRelative
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -160,7 +144,7 @@ fun ConversationsScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = { selectedIds = emptySet() }) {
-                            Icon(Icons.Filled.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_selection_cancel))
+                            Icon(PocketIcons.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_selection_cancel))
                         }
                     },
                     actions = {
@@ -170,13 +154,13 @@ fun ConversationsScreen(
                             }
                         ) {
                             Icon(
-                                Icons.Filled.SelectAll,
+                                PocketIcons.SelectAll,
                                 contentDescription = stringResource(if (allSelected) de.smartzone.pocketclaude.R.string.convo_deselect_all else de.smartzone.pocketclaude.R.string.convo_select_all),
                             )
                         }
                         IconButton(onClick = { confirmBulkDelete = true }) {
                             Icon(
-                                Icons.Filled.Delete,
+                                PocketIcons.Delete,
                                 contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_delete),
                                 tint = MaterialTheme.colorScheme.error,
                             )
@@ -202,7 +186,7 @@ fun ConversationsScreen(
                         if (onBack != null) {
                             IconButton(onClick = onBack) {
                                 Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    PocketIcons.ArrowBack,
                                     contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_back),
                                 )
                             }
@@ -210,13 +194,13 @@ fun ConversationsScreen(
                     },
                     actions = {
                         PocketIconButton(
-                            icon = if (searchActive) Icons.Filled.Close else Icons.Filled.Search,
+                            icon = if (searchActive) PocketIcons.Close else PocketIcons.Search,
                             contentDescription = stringResource(if (searchActive) de.smartzone.pocketclaude.R.string.action_close else de.smartzone.pocketclaude.R.string.action_search),
                             onClick = { searchActive = !searchActive; if (!searchActive) vm.clearSearch() },
                         )
                         Spacer(Modifier.width(6.dp))
                         PocketIconButton(
-                            icon = Icons.Filled.Settings,
+                            icon = PocketIcons.Settings,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_settings),
                             onClick = onOpenSettings,
                             modifier = Modifier.padding(end = 8.dp),
@@ -234,7 +218,7 @@ fun ConversationsScreen(
                     onClick = { vm.create(onCreated = onOpenChat) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    icon = { Icon(PocketIcons.Add, contentDescription = null) },
                     text = { Text(stringResource(de.smartzone.pocketclaude.R.string.new_chat)) },
                     shape = RoundedCornerShape(20.dp),
                 )
@@ -253,11 +237,11 @@ fun ConversationsScreen(
                 OutlinedTextField(
                     value = search.query,
                     onValueChange = vm::setSearchQuery,
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    leadingIcon = { Icon(PocketIcons.Search, contentDescription = null) },
                     trailingIcon = {
                         if (search.query.isNotEmpty()) {
                             IconButton(onClick = { vm.setSearchQuery("") }) {
-                                Icon(Icons.Filled.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_close))
+                                Icon(PocketIcons.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_close))
                             }
                         }
                     },
@@ -504,7 +488,7 @@ private fun ConversationRow(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.AutoMirrored.Filled.Chat,
+                    PocketIcons.ChatBubble,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(22.dp),
@@ -517,7 +501,7 @@ private fun ConversationRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (conv.pinned) {
                         Icon(
-                            Icons.Filled.PushPin,
+                            PocketIcons.PushPin,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_pinned),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(14.dp),
@@ -526,7 +510,7 @@ private fun ConversationRow(
                     }
                     if (conv.locked) {
                         Icon(
-                            Icons.Filled.Lock,
+                            PocketIcons.Lock,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_locked),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(14.dp),
@@ -556,7 +540,7 @@ private fun ConversationRow(
                     if (conv.hasMidSummary || conv.hasLongSummary) {
                         Spacer(Modifier.width(6.dp))
                         Icon(
-                            Icons.Filled.Compress,
+                            PocketIcons.Compress,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_condensed),
                             tint = PocketTheme.colors.accent,
                             modifier = Modifier.size(14.dp),
@@ -568,7 +552,7 @@ private fun ConversationRow(
             if (selectionMode) {
                 // Selection-Indikator statt 3-Dots-Menü
                 Icon(
-                    imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                    imageVector = if (selected) PocketIcons.CheckCircle else PocketIcons.RadioUnchecked,
                     contentDescription = stringResource(if (selected) de.smartzone.pocketclaude.R.string.convo_selected else de.smartzone.pocketclaude.R.string.convo_not_selected),
                     tint = if (selected) MaterialTheme.colorScheme.primary
                            else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -579,7 +563,7 @@ private fun ConversationRow(
             } else {
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = null)
+                        Icon(PocketIcons.MoreVert, contentDescription = null)
                     }
                     DropdownMenu(
                         expanded = menuOpen,
@@ -589,7 +573,7 @@ private fun ConversationRow(
                             text = { Text(stringResource(if (conv.pinned) de.smartzone.pocketclaude.R.string.conversation_unpin else de.smartzone.pocketclaude.R.string.conversation_pin)) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Filled.PushPin,
+                                    PocketIcons.PushPin,
                                     contentDescription = null,
                                     tint = if (conv.pinned) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -601,7 +585,7 @@ private fun ConversationRow(
                             text = { Text(stringResource(if (conv.locked) de.smartzone.pocketclaude.R.string.conversation_unlock else de.smartzone.pocketclaude.R.string.conversation_lock)) },
                             leadingIcon = {
                                 Icon(
-                                    if (conv.locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                                    if (conv.locked) PocketIcons.LockOpen else PocketIcons.Lock,
                                     contentDescription = null,
                                     tint = if (conv.locked) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -611,14 +595,14 @@ private fun ConversationRow(
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_rename)) },
-                            leadingIcon = { Icon(Icons.Filled.DriveFileRenameOutline, contentDescription = null) },
+                            leadingIcon = { Icon(PocketIcons.Edit, contentDescription = null) },
                             onClick = { menuOpen = false; onRename() },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_delete), color = MaterialTheme.colorScheme.error) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Filled.Delete,
+                                    PocketIcons.Delete,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
                                 )
@@ -784,7 +768,7 @@ private fun NeedsSetupView(onOpenSettings: () -> Unit) {
             onClick = onOpenSettings,
             shape = RoundedCornerShape(14.dp),
         ) {
-            Icon(Icons.Filled.Settings, contentDescription = null)
+            Icon(PocketIcons.Settings, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(stringResource(de.smartzone.pocketclaude.R.string.convo_open_settings))
         }

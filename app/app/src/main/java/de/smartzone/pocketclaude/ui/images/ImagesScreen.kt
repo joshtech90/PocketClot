@@ -5,8 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material3.FilledTonalIconButton
 import android.content.ContentValues
 import android.content.Context
@@ -37,14 +35,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -97,6 +87,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -140,7 +131,7 @@ fun ImagesScreen(
                 },
                 navigationIcon = {
                     PocketIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        icon = PocketIcons.ArrowBack,
                         contentDescription = stringResource(R.string.action_back),
                         onClick = onBack,
                         modifier = Modifier.padding(start = 8.dp),
@@ -149,14 +140,14 @@ fun ImagesScreen(
                 actions = {
                     if (state.history.isNotEmpty()) {
                         PocketIconButton(
-                            icon = Icons.Filled.Delete,
+                            icon = PocketIcons.Delete,
                             contentDescription = stringResource(R.string.image_clear_history),
                             onClick = { clearAllOpen = true },
                         )
                         Spacer(Modifier.width(4.dp))
                     }
                     PocketIconButton(
-                        icon = Icons.Filled.Settings,
+                        icon = PocketIcons.Settings,
                         contentDescription = stringResource(R.string.image_open_settings),
                         onClick = onOpenSettings,
                         modifier = Modifier.padding(end = 8.dp),
@@ -208,7 +199,7 @@ fun ImagesScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(
-                        Icons.Filled.AutoAwesome,
+                        PocketIcons.Sparkle,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -526,7 +517,7 @@ private fun GeneratorCard(
                     )
                 } else {
                     Icon(
-                        if (state.isEditing) Icons.Filled.Brush else Icons.Filled.AutoAwesome,
+                        if (state.isEditing) PocketIcons.Brush else PocketIcons.Sparkle,
                         contentDescription = null, modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(8.dp))
@@ -615,7 +606,7 @@ private fun ReferenceStrip(
                             .align(Alignment.TopEnd)
                             .size(22.dp),
                     ) {
-                        Icon(Icons.Filled.Close,
+                        Icon(PocketIcons.Close,
                              contentDescription = stringResource(R.string.image_reference_remove),
                              modifier = Modifier.size(12.dp))
                     }
@@ -638,7 +629,7 @@ private fun ReferenceStrip(
                         CircularProgressIndicator(strokeWidth = 2.dp,
                                                   modifier = Modifier.size(18.dp))
                     } else {
-                        Icon(Icons.Filled.AddPhotoAlternate,
+                        Icon(PocketIcons.AddPhoto,
                              contentDescription = stringResource(R.string.image_reference_add),
                              tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -696,7 +687,7 @@ private fun HistoryRow(
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
                     Icon(
-                        Icons.Filled.Close,
+                        PocketIcons.Close,
                         contentDescription = stringResource(R.string.image_remove_entry),
                         modifier = Modifier.size(18.dp),
                     )
@@ -731,7 +722,7 @@ private fun HistoryRow(
                                 .size(30.dp),
                         ) {
                             Icon(
-                                Icons.Filled.Brush,
+                                PocketIcons.Brush,
                                 contentDescription = stringResource(R.string.image_use_as_reference),
                                 modifier = Modifier.size(15.dp),
                             )
@@ -781,14 +772,14 @@ private fun ImageFullscreenDialog(
                 FilledTonalButton(onClick = {
                     scope.launch { shareImage(context, serverBaseUrl, serverToken, attachment) }
                 }) {
-                    Icon(Icons.Filled.IosShare, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(PocketIcons.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.image_share_btn))
                 }
                 FilledTonalButton(onClick = {
                     scope.launch { saveImageToGallery(context, serverBaseUrl, serverToken, attachment) }
                 }) {
-                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(PocketIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.image_save_btn))
                 }

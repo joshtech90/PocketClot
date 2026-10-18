@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -34,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.smartzone.pocketclaude.R
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 /**
  * Bildschirmfüllende Voice-Bar für den Auto-Modus. Ersetzt im Auto-Mode die
@@ -197,7 +196,7 @@ fun AutoModeBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    Icons.Filled.Close,
+                    PocketIcons.Close,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )

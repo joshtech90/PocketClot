@@ -21,11 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,6 +52,7 @@ import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 const val CHAT_LOCK_PIN_LENGTH = 5
 
@@ -243,7 +239,7 @@ fun ChatLockGate(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Filled.Lock,
+                    PocketIcons.Lock,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(36.dp),
@@ -284,7 +280,7 @@ fun ChatLockGate(
             if (biometricUsable) {
                 Spacer(Modifier.height(20.dp))
                 TextButton(onClick = { triggerBiometric() }) {
-                    Icon(Icons.Filled.Fingerprint, contentDescription = null)
+                    Icon(PocketIcons.Fingerprint, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.chat_lock_use_fingerprint))
                 }
@@ -297,7 +293,7 @@ fun ChatLockGate(
         // geschlossener App komplett fest.
         if (onOpenMenu != null) {
             PocketIconButton(
-                icon = Icons.Filled.Menu,
+                icon = PocketIcons.Menu,
                 contentDescription = menuContentDescription,
                 onClick = onOpenMenu,
                 modifier = Modifier
@@ -450,7 +446,7 @@ fun PinPad(
                         "" -> Spacer(Modifier.size(64.dp))
                         "⌫" -> PinKey(enabled = enabled, onClick = onBackspace) {
                             Icon(
-                                Icons.AutoMirrored.Filled.Backspace,
+                                PocketIcons.Backspace,
                                 contentDescription = stringResource(R.string.action_delete),
                                 tint = MaterialTheme.colorScheme.onSurface,
                             )

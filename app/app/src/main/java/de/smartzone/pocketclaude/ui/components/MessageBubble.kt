@@ -27,15 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +54,7 @@ import de.smartzone.pocketclaude.R
 import de.smartzone.pocketclaude.data.AttachmentRefDto
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @Composable
 fun UserBubble(
@@ -137,7 +129,7 @@ fun UserBubble(
                     modifier = Modifier.padding(top = 2.dp, end = 2.dp).size(48.dp),
                 ) {
                     Icon(
-                        Icons.Filled.ContentCopy,
+                        PocketIcons.Copy,
                         contentDescription = stringResource(R.string.bubble_copy),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(15.dp),
@@ -311,7 +303,7 @@ fun AssistantBubble(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.VolumeUp,
+                                PocketIcons.VolumeUp,
                                 contentDescription = stringResource(R.string.bubble_read_aloud),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp),
@@ -333,7 +325,7 @@ fun AssistantBubble(
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    Icons.Filled.Pause,
+                                    PocketIcons.Pause,
                                     contentDescription = stringResource(R.string.bubble_pause),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp),
@@ -344,7 +336,7 @@ fun AssistantBubble(
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    Icons.Filled.Stop,
+                                    PocketIcons.Stop,
                                     contentDescription = stringResource(R.string.bubble_cancel),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(18.dp),
@@ -358,7 +350,7 @@ fun AssistantBubble(
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    Icons.Filled.PlayArrow,
+                                    PocketIcons.Play,
                                     contentDescription = stringResource(R.string.bubble_resume),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp),
@@ -369,7 +361,7 @@ fun AssistantBubble(
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    Icons.Filled.Stop,
+                                    PocketIcons.Stop,
                                     contentDescription = stringResource(R.string.bubble_cancel),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(18.dp),
@@ -386,7 +378,7 @@ fun AssistantBubble(
                         modifier = Modifier.size(48.dp),
                     ) {
                         Icon(
-                            Icons.Filled.ContentCopy,
+                            PocketIcons.Copy,
                             contentDescription = stringResource(R.string.bubble_copy),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp),
@@ -401,7 +393,7 @@ fun AssistantBubble(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                Icons.Filled.Restore,
+                                PocketIcons.History,
                                 contentDescription = stringResource(R.string.bubble_rewind),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(17.dp),
@@ -511,7 +503,7 @@ private fun AttachmentChip(att: AttachmentRefDto) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.material3.Icon(
-            Icons.AutoMirrored.Filled.InsertDriveFile,
+            PocketIcons.Document,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),

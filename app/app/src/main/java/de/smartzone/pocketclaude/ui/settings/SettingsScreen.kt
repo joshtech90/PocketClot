@@ -27,27 +27,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.animation.animateContentSize
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DriveFileRenameOutline
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.text.font.FontWeight as FW
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -131,6 +110,7 @@ import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -170,7 +150,7 @@ fun SettingsScreen(
                 },
                 navigationIcon = {
                     PocketIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        icon = PocketIcons.ArrowBack,
                         contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_back),
                         onClick = onBack,
                         modifier = Modifier.padding(start = 8.dp),
@@ -915,14 +895,14 @@ private fun GemsSection(
                 }
                 IconButton(onClick = { onDuplicate(gem.id) }) {
                     Icon(
-                        Icons.Filled.ContentCopy,
+                        PocketIcons.Copy,
                         contentDescription = stringResource(de.smartzone.pocketclaude.R.string.gem_duplicate),
                     )
                 }
                 if (!gem.isBuiltin) {
                     IconButton(onClick = { onDelete(gem.id) }) {
                         Icon(
-                            Icons.Filled.Delete,
+                            PocketIcons.Delete,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_remove),
                         )
                     }
@@ -931,7 +911,7 @@ private fun GemsSection(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
         FilledTonalButton(onClick = { onEdit(null) }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text(stringResource(de.smartzone.pocketclaude.R.string.gem_new))
         }
@@ -1581,7 +1561,7 @@ private fun QuickSetupBanner(
 private fun QuickSetupRow(done: Boolean, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            imageVector = if (done) Icons.Filled.CheckCircle else Icons.Filled.Error,
+            imageVector = if (done) PocketIcons.CheckCircle else PocketIcons.Error,
             contentDescription = null,
             tint = if (done) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
                 else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1657,7 +1637,7 @@ private fun ExpandableSection(
                 InfoButton(title = infoTitle, body = infoBody)
             }
             Icon(
-                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                imageVector = if (expanded) PocketIcons.ExpandLess else PocketIcons.ExpandMore,
                 contentDescription = if (expanded) stringResource(de.smartzone.pocketclaude.R.string.settings_collapse) else stringResource(de.smartzone.pocketclaude.R.string.settings_expand),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1967,7 +1947,7 @@ private fun TtsSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val configured = ttsStatus?.configured == true
                     Icon(
-                        imageVector = if (configured) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                        imageVector = if (configured) PocketIcons.CheckCircle else PocketIcons.Error,
                         contentDescription = null,
                         tint = if (configured) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
                                else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1994,7 +1974,7 @@ private fun TtsSection(
                     // Lösch-Button für Cloud-TTS-Credentials nur bei Cloud-Provider.
                     if (ttsStatus?.cloudTtsConfigured == true && isCloud) {
                         IconButton(onClick = { vm.deleteTtsCredentials() }, enabled = !ttsBusy) {
-                            Icon(Icons.Filled.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_remove_credentials))
+                            Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_remove_credentials))
                         }
                     }
                 }
@@ -2015,7 +1995,7 @@ private fun TtsSection(
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
                     }
-                    Icon(Icons.Filled.Upload, contentDescription = null)
+                    Icon(PocketIcons.Upload, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(if (ttsStatus?.cloudTtsConfigured == true) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_replace_cloud_credentials) else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_paste_cloud_credentials))
                 }
@@ -2217,7 +2197,7 @@ private fun TtsSection(
                     enabled = ttsStatus?.configured == true && ttsTest !is TtsTestResult.Testing,
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
+                    Icon(PocketIcons.VolumeUp, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_test_btn))
                 }
@@ -2226,7 +2206,7 @@ private fun TtsSection(
                     onClick = vm::stopAudio,
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(Icons.Filled.Stop, contentDescription = null)
+                    Icon(PocketIcons.Stop, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_stop_btn))
                 }
@@ -2401,7 +2381,7 @@ private fun TestResultIndicator(state: ConnectionTestResult) {
         }
         is ConnectionTestResult.Success -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Filled.CheckCircle,
+                PocketIcons.CheckCircle,
                 contentDescription = null,
                 tint = PocketTheme.colors.success,
                 modifier = Modifier.size(18.dp),
@@ -2415,7 +2395,7 @@ private fun TestResultIndicator(state: ConnectionTestResult) {
         }
         is ConnectionTestResult.Failure -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Filled.Error,
+                PocketIcons.Error,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(18.dp),
@@ -2490,7 +2470,7 @@ private fun BackupSection(vm: SettingsViewModel) {
                     enabled = !busy,
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(Icons.Filled.Upload, contentDescription = null)
+                    Icon(PocketIcons.Upload, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_export))
                 }
@@ -2509,7 +2489,7 @@ private fun BackupSection(vm: SettingsViewModel) {
                     enabled = !busy,
                     shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Icon(PocketIcons.Play, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_backup_btn_import))
                 }
@@ -2647,8 +2627,8 @@ private fun BackupSection(vm: SettingsViewModel) {
                         trailingIcon = {
                             IconButton(onClick = { showPw = !showPw }) {
                                 Icon(
-                                    if (showPw) Icons.Filled.VisibilityOff
-                                    else Icons.Filled.Visibility,
+                                    if (showPw) PocketIcons.VisibilityOff
+                                    else PocketIcons.Visibility,
                                     contentDescription = if (showPw) stringResource(de.smartzone.pocketclaude.R.string.settings_backup_password_hide)
                                                          else stringResource(de.smartzone.pocketclaude.R.string.settings_backup_password_show),
                                 )
@@ -2700,8 +2680,8 @@ private fun BackupSection(vm: SettingsViewModel) {
                         trailingIcon = {
                             IconButton(onClick = { showPw = !showPw }) {
                                 Icon(
-                                    if (showPw) Icons.Filled.VisibilityOff
-                                    else Icons.Filled.Visibility,
+                                    if (showPw) PocketIcons.VisibilityOff
+                                    else PocketIcons.Visibility,
                                     contentDescription = null,
                                 )
                             }
@@ -2858,7 +2838,7 @@ private fun FirstRunSignInCard(vm: SettingsViewModel) {
                 trailingIcon = {
                     IconButton(onClick = { showPw = !showPw }) {
                         Icon(
-                            if (showPw) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            if (showPw) PocketIcons.VisibilityOff else PocketIcons.Visibility,
                             contentDescription = stringResource(
                                 if (showPw) de.smartzone.pocketclaude.R.string.settings_label_hide
                                 else de.smartzone.pocketclaude.R.string.settings_label_show
@@ -2949,7 +2929,7 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            if (isActive) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                            if (isActive) PocketIcons.CheckCircle else PocketIcons.RadioUnchecked,
                             contentDescription = null,
                             tint = if (isActive) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2970,12 +2950,12 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                             )
                         }
                         IconButton(onClick = { renameId = p.id; renameLabel = p.label }) {
-                            Icon(Icons.Filled.DriveFileRenameOutline, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_profile_rename),
+                            Icon(PocketIcons.Edit, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_profile_rename),
                                 modifier = Modifier.size(18.dp))
                         }
                         if (settings.profiles.size > 1) {
                             IconButton(onClick = { confirmDeleteId = p.id }) {
-                                Icon(Icons.Filled.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_delete_profile_cd),
+                                Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_delete_profile_cd),
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(18.dp))
                             }
@@ -2987,7 +2967,7 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                 onClick = { addDialogOpen = true },
                 modifier = Modifier.padding(start = 4.dp),
             ) {
-                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_add_profile))
             }
@@ -3120,7 +3100,7 @@ private fun AddProfileLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) 
                     trailingIcon = {
                         IconButton(onClick = { showPw = !showPw }) {
                             Icon(
-                                if (showPw) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                if (showPw) PocketIcons.VisibilityOff else PocketIcons.Visibility,
                                 contentDescription = if (showPw) stringResource(de.smartzone.pocketclaude.R.string.settings_label_hide) else stringResource(de.smartzone.pocketclaude.R.string.settings_label_show),
                             )
                         }
@@ -3202,7 +3182,7 @@ private fun ReLoginDialog(vm: SettingsViewModel, onDismiss: () -> Unit) {
                     trailingIcon = {
                         IconButton(onClick = { showPw = !showPw }) {
                             Icon(
-                                if (showPw) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                if (showPw) PocketIcons.VisibilityOff else PocketIcons.Visibility,
                                 contentDescription = null,
                             )
                         }
@@ -3308,7 +3288,7 @@ fun ChangePasswordDialog(vm: SettingsViewModel, forced: Boolean, onDone: () -> U
                     trailingIcon = {
                         IconButton(onClick = { showPw = !showPw }) {
                             Icon(
-                                if (showPw) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                if (showPw) PocketIcons.VisibilityOff else PocketIcons.Visibility,
                                 contentDescription = null,
                             )
                         }
@@ -3408,7 +3388,7 @@ private fun SettingsTransferSection(vm: SettingsViewModel) {
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.Filled.Upload, contentDescription = null)
+                    Icon(PocketIcons.Upload, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_export))
                 }
@@ -3423,7 +3403,7 @@ private fun SettingsTransferSection(vm: SettingsViewModel) {
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null)
+                    Icon(PocketIcons.Document, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(de.smartzone.pocketclaude.R.string.settings_transfer_import))
                 }
@@ -3698,7 +3678,7 @@ private fun TtsGeminiApiKeyField(
                         onClick = { vm.removeTtsKey(entry.id) },
                         enabled = !ttsBusy,
                     ) {
-                        Icon(Icons.Filled.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_pool_remove_key))
+                        Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_pool_remove_key))
                     }
                 }
             }
@@ -3718,8 +3698,8 @@ private fun TtsGeminiApiKeyField(
             trailingIcon = {
                 IconButton(onClick = { showKey = !showKey }) {
                     Icon(
-                        imageVector = if (showKey) Icons.Filled.VisibilityOff
-                                      else Icons.Filled.Visibility,
+                        imageVector = if (showKey) PocketIcons.VisibilityOff
+                                      else PocketIcons.Visibility,
                         contentDescription = if (showKey) stringResource(de.smartzone.pocketclaude.R.string.settings_label_hide) else stringResource(de.smartzone.pocketclaude.R.string.settings_label_show),
                     )
                 }
@@ -3751,7 +3731,7 @@ private fun TtsGeminiApiKeyField(
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
             }
-            Icon(Icons.Filled.Add, contentDescription = null)
+            Icon(PocketIcons.Add, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pool_add_btn))
         }
@@ -3840,7 +3820,7 @@ private fun VoiceSection(vm: SettingsViewModel) {
                 if (c.configured) {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Filled.CheckCircle, contentDescription = null,
+                        Icon(PocketIcons.CheckCircle, contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         Text(
                             stringResource(
@@ -3869,7 +3849,7 @@ private fun VoiceSection(vm: SettingsViewModel) {
                 visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
                     IconButton(onClick = { showKey = !showKey }) {
-                        Icon(if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        Icon(if (showKey) PocketIcons.VisibilityOff else PocketIcons.Visibility,
                              contentDescription = null)
                     }
                 },
@@ -4168,7 +4148,7 @@ private fun CloudBillingWidget(vm: SettingsViewModel) {
                     )
                 } else {
                     IconButton(onClick = { vm.refreshBillingStatus() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_refresh_cd))
+                        Icon(PocketIcons.Refresh, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_refresh_cd))
                     }
                 }
             }
@@ -4324,7 +4304,7 @@ private fun DefaultModelPicker(
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
-                        Icons.Filled.Refresh,
+                        PocketIcons.Refresh,
                         contentDescription = stringResource(R.string.model_refresh),
                         modifier = Modifier.size(16.dp),
                     )
@@ -4587,7 +4567,7 @@ private fun PalettePicker(
                 )
                 if (isSelected) {
                     Icon(
-                        Icons.Filled.Check,
+                        PocketIcons.Check,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,

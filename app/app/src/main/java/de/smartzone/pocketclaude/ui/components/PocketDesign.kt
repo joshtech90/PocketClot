@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,6 +39,7 @@ import de.smartzone.pocketclaude.ui.theme.AtelierCoral
 import de.smartzone.pocketclaude.ui.theme.AtelierGold
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @Composable
 fun PocketBackdrop(
@@ -160,7 +159,7 @@ fun PocketStatusPill(
     text: String,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.secondary,
-    icon: ImageVector? = Icons.Filled.AutoAwesome,
+    icon: ImageVector? = PocketIcons.Sparkle,
 ) {
     Row(
         modifier = modifier
