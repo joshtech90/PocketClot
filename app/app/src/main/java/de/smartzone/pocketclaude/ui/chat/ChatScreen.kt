@@ -1270,15 +1270,18 @@ private fun GemWelcome(
         }
         if (starters.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
+            // Mittig wie Emoji, Name und Beschreibung darueber.
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 starters.forEach { s ->
+                    // Radius 24 statt Kreisform: lange Starter brechen um und
+                    // wuerden als Kreisform zu einer Linse.
                     AssistChip(
                         onClick = { onStarter(s) },
-                        label = { Text(s) },
-                        shape = CircleShape,
+                        label = { Text(s, modifier = Modifier.padding(vertical = 6.dp)) },
+                        shape = RoundedCornerShape(PocketRadius.Large),
                     )
                 }
             }

@@ -1709,7 +1709,8 @@ function openLightbox(url) {
   lb.className = 'lightbox';
   lb.innerHTML = `<button class="lb-close" aria-label="${escapeHtml(t('lightbox_close'))}"><svg class="icon"><use href="#icon-close"/></svg></button><img src="${url}">`;
   lb.addEventListener('click', (e) => {
-    if (e.target === lb || e.target.classList.contains('lb-close')) lb.remove();
+    // closest(): seit dem Symbol im Knopf trifft der Klick oft das <svg>, nicht den Knopf.
+    if (e.target === lb || e.target.closest('.lb-close')) lb.remove();
   });
   document.addEventListener('keydown', function esc(e) {
     if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', esc); }

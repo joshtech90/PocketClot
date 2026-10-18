@@ -1195,8 +1195,8 @@ svg use { fill: currentColor; }
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  height: 32px;
-  padding: 0 12px;
+  min-height: 32px;
+  padding: 4px 12px;
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-soft);
@@ -1389,8 +1389,8 @@ svg use { fill: currentColor; }
 }
 .segments label {
   display: inline-flex; align-items: center; gap: 8px;
-  height: 32px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 4px 14px;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
@@ -1528,9 +1528,11 @@ svg use { fill: currentColor; }
 .gem-welcome h3 { margin: 0; font-size: var(--fs-2xl); font-weight: 600; }
 .gem-welcome p { margin: 0; color: var(--text-soft); }
 .gem-starter-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
+/* Mindesthoehe statt fester Hoehe: lange Starter duerfen umbrechen. */
 .gem-starter-chip {
-  height: 32px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-pill);
+  min-height: 32px; padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-xl);
   background: transparent; color: inherit; cursor: pointer; font-size: var(--fs-sm);
+  line-height: 1.4; text-align: center;
 }
 .gem-starter-chip:hover { border-color: var(--accent); }
 
