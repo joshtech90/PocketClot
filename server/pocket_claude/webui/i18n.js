@@ -179,7 +179,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Enter to send · PocketClot can make mistakes.',
       image_mode_placeholder: 'Describe the image — e.g. "Cyberpunk cat in neon rain, 35mm photo"…',
-      image_mode_hint: '✨ Image mode · prompt goes to Gemini',
+      image_mode_hint: 'Image mode · prompt goes to Gemini',
       image_mode_hint_no_key: ' · no API key set (Settings → Images)',
       // Settings sections — hints
       system_prompt_hint: 'Which prompt Claude starts the response with.',
@@ -545,7 +545,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Enter zum Senden · PocketClot kann Fehler machen.',
       image_mode_placeholder: 'Beschreibe das Bild — z.B. „Cyberpunk-Katze im Neon-Regen, 35mm Foto"…',
-      image_mode_hint: '✨ Bild-Modus · Prompt geht an Gemini',
+      image_mode_hint: 'Bild-Modus · Prompt geht an Gemini',
       image_mode_hint_no_key: ' · kein API-Key gesetzt (Einstellungen → Bilder)',
       // Settings sections — hints
       system_prompt_hint: 'Mit welchem Prompt Claude die Antwort beginnt.',
@@ -911,7 +911,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Enter para enviar · PocketClot puede cometer errores.',
       image_mode_placeholder: 'Describe la imagen — p. ej. "Gato cyberpunk bajo lluvia de neón, foto 35mm"…',
-      image_mode_hint: '✨ Modo imagen · el prompt va a Gemini',
+      image_mode_hint: 'Modo imagen · el prompt va a Gemini',
       image_mode_hint_no_key: ' · sin API key (Ajustes → Imágenes)',
       // Settings sections — hints
       system_prompt_hint: 'Con qué prompt Claude inicia la respuesta.',
@@ -1275,7 +1275,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Entrée pour envoyer · PocketClot peut se tromper.',
       image_mode_placeholder: "Décrivez l'image — p. ex. « Chat cyberpunk sous la pluie néon, photo 35mm »…",
-      image_mode_hint: '✨ Mode image · prompt envoyé à Gemini',
+      image_mode_hint: 'Mode image · prompt envoyé à Gemini',
       image_mode_hint_no_key: ' · pas de clé API (Paramètres → Images)',
       // Settings sections — hints
       system_prompt_hint: 'Avec quel prompt Claude commence sa réponse.',
@@ -1639,7 +1639,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Enter para enviar · PocketClot pode cometer erros.',
       image_mode_placeholder: 'Descreva a imagem — ex.: "Gato cyberpunk na chuva de neon, foto 35mm"…',
-      image_mode_hint: '✨ Modo imagem · prompt vai para Gemini',
+      image_mode_hint: 'Modo imagem · prompt vai para Gemini',
       image_mode_hint_no_key: ' · sem API key (Configurações → Imagens)',
       // Settings sections — hints
       system_prompt_hint: 'Com qual prompt o Claude começa a resposta.',
@@ -2003,7 +2003,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Enter 发送 · PocketClot 可能出错。',
       image_mode_placeholder: '描述图像 — 例如「霓虹雨中的赛博朋克猫,35mm 照片」…',
-      image_mode_hint: '✨ 图像模式 · 提示发送到 Gemini',
+      image_mode_hint: '图像模式 · 提示发送到 Gemini',
       image_mode_hint_no_key: ' · 未设置 API key(设置 → 图像)',
       // Settings sections — hints
       system_prompt_hint: 'Claude 用哪个 prompt 开始回复。',
@@ -2367,7 +2367,7 @@
       // Composer
       composer_hint: '⌘/Ctrl + Enter で送信 · PocketClot は誤りを犯すことがあります。',
       image_mode_placeholder: '画像を説明 — 例:「ネオン雨の中のサイバーパンク猫、35mm 写真」…',
-      image_mode_hint: '✨ 画像モード · プロンプトは Gemini に送られます',
+      image_mode_hint: '画像モード · プロンプトは Gemini に送られます',
       image_mode_hint_no_key: ' · API キー未設定(設定 → 画像)',
       // Settings sections — hints
       system_prompt_hint: 'Claude が回答を始めるプロンプト。',

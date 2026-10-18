@@ -392,8 +392,8 @@
 
     <!-- ─── Message bubble ────────────────────────────────────────────── -->
     <string name="bubble_copied">Copiado</string>
-    <string name="bubble_thinking_live">💭 Pensando…</string>
-    <string name="bubble_thinking_label">💭 Processo de raciocínio</string>
+    <string name="bubble_thinking_live">Pensando…</string>
+    <string name="bubble_thinking_label">Processo de raciocínio</string>
     <string name="bubble_read_aloud">Ler em voz alta</string>
     <string name="bubble_pause">Pausar</string>
     <string name="bubble_cancel">Cancelar</string>
@@ -475,7 +475,7 @@
     <string name="settings_info_images_free_body">Se um modelo pode gerar imagens é definido em Modelos &amp; comportamento e por chat no menu ⋮.</string>
     <string name="settings_info_images_paid_label">Custo:</string>
     <string name="settings_info_images_paid_body">Nenhum. Versões anteriores cobravam por imagem por meio de uma chave de API do Google; esse método foi descontinuado.</string>
-    <string name="settings_images_shared_key_hint">💡 A mesma chave também funciona para a saída de voz TTS Gemini (seção &quot;Leitura em voz alta&quot;). Se nenhuma chave separada estiver configurada lá, o servidor usa esta automaticamente.</string>
+    <string name="settings_images_shared_key_hint">A mesma chave também funciona para a saída de voz TTS Gemini (seção &quot;Leitura em voz alta&quot;). Se nenhuma chave separada estiver configurada lá, o servidor usa esta automaticamente.</string>
     <string name="settings_data_info_title">Dois tipos diferentes de backup</string>
     <string name="settings_data_chat_backup_label">Backup de conversas:</string>
     <string name="settings_data_chat_backup_body">Todas as conversas + anexos como um ZIP criptografado (AES-256). Na importação: &quot;Substituir&quot; sobrescreve, &quot;Mesclar&quot; combina.</string>
@@ -798,7 +798,7 @@
     <string name="settings_skill_websearch_desc">Pesquise na web por informações atuais. Funciona com todos os modelos.</string>
     <string name="settings_skill_webfetch_desc">Abre um endereço específico e lê o conteúdo. Funciona com todos os modelos.</string>
     <string name="settings_save_btn_label">Salvar</string>
-    <string name="settings_tts_image_shared_key_tip">💡 Dica: a chave TTS pode ser a mesma chave do AI Studio usada para imagens. Se você não inserir uma aqui, o servidor usa automaticamente a chave de imagem (veja a seção &quot;Imagens&quot; abaixo).</string>
+    <string name="settings_tts_image_shared_key_tip">Dica: a chave TTS pode ser a mesma chave do AI Studio usada para imagens. Se você não inserir uma aqui, o servidor usa automaticamente a chave de imagem (veja a seção &quot;Imagens&quot; abaixo).</string>
     <string name="settings_pool_err_duplicate">Esta chave já está no pool.</string>
     <string name="settings_pool_err_invalid">Chave inválida. Deve começar com &quot;AIza&quot;.</string>
     <string name="settings_pool_err_add_failed">Falha ao adicionar chave: %1$s</string>

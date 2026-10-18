@@ -395,8 +395,8 @@
 
     <!-- ─── Message bubble ────────────────────────────────────────────── -->
     <string name="bubble_copied">Kopiert</string>
-    <string name="bubble_thinking_live">💭 Denkt nach…</string>
-    <string name="bubble_thinking_label">💭 Gedankengang</string>
+    <string name="bubble_thinking_live">Denkt nach…</string>
+    <string name="bubble_thinking_label">Gedankengang</string>
     <string name="bubble_read_aloud">Vorlesen</string>
     <string name="bubble_pause">Pause</string>
     <string name="bubble_cancel">Abbrechen</string>
@@ -478,7 +478,7 @@
     <string name="settings_info_images_free_body">Ob ein Modell überhaupt Bilder erzeugen darf, steht unter Modelle &amp; Verhalten und pro Chat im ⋮-Menü.</string>
     <string name="settings_info_images_paid_label">Kosten:</string>
     <string name="settings_info_images_paid_body">Keine. Ältere Versionen rechneten pro Bild über einen Google-Schlüssel ab, dieser Weg ist entfallen.</string>
-    <string name="settings_images_shared_key_hint">💡 Derselbe Key funktioniert auch für die Gemini-TTS-Sprachausgabe (Bereich &quot;Vorlesen&quot;). Wenn dort kein separater Key konfiguriert ist, nutzt der Server diesen automatisch.</string>
+    <string name="settings_images_shared_key_hint">Derselbe Key funktioniert auch für die Gemini-TTS-Sprachausgabe (Bereich &quot;Vorlesen&quot;). Wenn dort kein separater Key konfiguriert ist, nutzt der Server diesen automatisch.</string>
     <string name="settings_data_info_title">Zwei verschiedene Backup-Typen</string>
     <string name="settings_data_chat_backup_label">Chat-Backup:</string>
     <string name="settings_data_chat_backup_body">Alle Gespräche + Anhänge als verschlüsseltes ZIP (AES-256). Beim Import: &quot;Ersetzen&quot; überschreibt, &quot;Zusammenführen&quot; kombiniert.</string>
@@ -801,7 +801,7 @@
     <string name="settings_skill_websearch_desc">Im Web nach aktuellen Infos suchen. Gilt für jedes Modell.</string>
     <string name="settings_skill_webfetch_desc">Eine bestimmte Adresse öffnen und lesen. Gilt für jedes Modell.</string>
     <string name="settings_save_btn_label">Speichern</string>
-    <string name="settings_tts_image_shared_key_tip">💡 Tipp: Der TTS-Key kann derselbe AI-Studio-Key wie der für Bilder sein. Wenn du hier keinen einträgst, nutzt der Server automatisch den Bild-Key (siehe Bereich &quot;Bilder&quot; unten).</string>
+    <string name="settings_tts_image_shared_key_tip">Tipp: Der TTS-Key kann derselbe AI-Studio-Key wie der für Bilder sein. Wenn du hier keinen einträgst, nutzt der Server automatisch den Bild-Key (siehe Bereich &quot;Bilder&quot; unten).</string>
     <string name="settings_pool_err_duplicate">Dieser Key ist bereits im Pool.</string>
     <string name="settings_pool_err_invalid">Ungültiger Key. Sollte mit &quot;AIza&quot; beginnen.</string>
     <string name="settings_pool_err_add_failed">Hinzufügen des Keys fehlgeschlagen: %1$s</string>

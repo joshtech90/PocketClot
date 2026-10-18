@@ -1870,9 +1870,11 @@ private fun TtsSection(
                 shape = RoundedCornerShape(PocketRadius.Small),
                 color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
             ) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_image_shared_key_tip),
-                    style = MaterialTheme.typography.bodySmall,
+                // Hinweis-Symbol statt des frueheren 💡 im Text.
+                PocketStatusLine(
+                    text = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_image_shared_key_tip),
+                    kind = StatusKind.Info,
+                    textColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(12.dp),
                 )
             }

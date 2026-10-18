@@ -392,8 +392,8 @@
 
     <!-- ─── Message bubble ────────────────────────────────────────────── -->
     <string name="bubble_copied">已复制</string>
-    <string name="bubble_thinking_live">💭 思考中…</string>
-    <string name="bubble_thinking_label">💭 思考过程</string>
+    <string name="bubble_thinking_live">思考中…</string>
+    <string name="bubble_thinking_label">思考过程</string>
     <string name="bubble_read_aloud">朗读</string>
     <string name="bubble_pause">暂停</string>
     <string name="bubble_cancel">取消</string>
@@ -475,7 +475,7 @@
     <string name="settings_info_images_free_body">模型是否可以生成图像可在“模型 &amp; 行为”中设置，也可在每个对话中通过 ⋮ 菜单进行设置。</string>
     <string name="settings_info_images_paid_label">费用:</string>
     <string name="settings_info_images_paid_body">无。旧版本通过 Google API 密钥按图像计费；该方式已被移除。</string>
-    <string name="settings_images_shared_key_hint">💡 同一密钥也适用于 Gemini TTS 语音输出(&quot;朗读&quot;部分)。如果那里未单独配置密钥,服务器会自动使用此密钥。</string>
+    <string name="settings_images_shared_key_hint">同一密钥也适用于 Gemini TTS 语音输出(&quot;朗读&quot;部分)。如果那里未单独配置密钥,服务器会自动使用此密钥。</string>
     <string name="settings_data_info_title">两种不同的备份类型</string>
     <string name="settings_data_chat_backup_label">聊天备份:</string>
     <string name="settings_data_chat_backup_body">所有会话 + 附件,以加密 ZIP 形式(AES-256)。导入时:&quot;替换&quot;覆盖,&quot;合并&quot;合并。</string>
@@ -798,7 +798,7 @@
     <string name="settings_skill_websearch_desc">在网络上搜索最新信息。适用于所有模型。</string>
     <string name="settings_skill_webfetch_desc">打开指定网址并读取内容。适用于所有模型。</string>
     <string name="settings_save_btn_label">保存</string>
-    <string name="settings_tts_image_shared_key_tip">💡 提示:TTS 密钥可与图片所用的 AI Studio 密钥相同。如果此处不填写,服务器会自动使用图片密钥(参见下方&quot;图片&quot;部分)。</string>
+    <string name="settings_tts_image_shared_key_tip">提示:TTS 密钥可与图片所用的 AI Studio 密钥相同。如果此处不填写,服务器会自动使用图片密钥(参见下方&quot;图片&quot;部分)。</string>
     <string name="settings_pool_err_duplicate">此密钥已在密钥池中。</string>
     <string name="settings_pool_err_invalid">无效密钥。应以 &quot;AIza&quot; 开头。</string>
     <string name="settings_pool_err_add_failed">添加密钥失败:%1$s</string>

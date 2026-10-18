@@ -395,8 +395,8 @@
 
     <!-- ─── Message bubble ────────────────────────────────────────────── -->
     <string name="bubble_copied">Copied</string>
-    <string name="bubble_thinking_live">💭 Thinking…</string>
-    <string name="bubble_thinking_label">💭 Thought process</string>
+    <string name="bubble_thinking_live">Thinking…</string>
+    <string name="bubble_thinking_label">Thought process</string>
     <string name="bubble_read_aloud">Read aloud</string>
     <string name="bubble_pause">Pause</string>
     <string name="bubble_cancel">Cancel</string>
@@ -478,7 +478,7 @@
     <string name="settings_info_images_free_body">Whether a model may create images at all is set under Models &amp; behaviour, and per chat via the ⋮ menu.</string>
     <string name="settings_info_images_paid_label">Cost:</string>
     <string name="settings_info_images_paid_body">None. Older versions billed per image through a Google API key; that path is gone.</string>
-    <string name="settings_images_shared_key_hint">💡 The same key also works for Gemini TTS speech output (section &quot;Read aloud&quot;). If no separate key is configured there, the server uses this one automatically.</string>
+    <string name="settings_images_shared_key_hint">The same key also works for Gemini TTS speech output (section &quot;Read aloud&quot;). If no separate key is configured there, the server uses this one automatically.</string>
     <string name="settings_data_info_title">Two different backup types</string>
     <string name="settings_data_chat_backup_label">Chat backup:</string>
     <string name="settings_data_chat_backup_body">All conversations + attachments as an encrypted ZIP (AES-256). On import: &quot;Replace&quot; overwrites, &quot;Merge&quot; combines.</string>
@@ -801,7 +801,7 @@
     <string name="settings_skill_websearch_desc">Search the web for current information. Works with every model.</string>
     <string name="settings_skill_webfetch_desc">Open a specific address and read it. Works with every model.</string>
     <string name="settings_save_btn_label">Save</string>
-    <string name="settings_tts_image_shared_key_tip">💡 Tip: The TTS key can be the same AI Studio key as the one for images. If you don\'t enter one here, the server automatically uses the image key (see &quot;Images&quot; section below).</string>
+    <string name="settings_tts_image_shared_key_tip">Tip: The TTS key can be the same AI Studio key as the one for images. If you don\'t enter one here, the server automatically uses the image key (see &quot;Images&quot; section below).</string>
     <string name="settings_pool_err_duplicate">This key is already in the pool.</string>
     <string name="settings_pool_err_invalid">Invalid key. Should start with &quot;AIza&quot;.</string>
     <string name="settings_pool_err_add_failed">Adding key failed: %1$s</string>
