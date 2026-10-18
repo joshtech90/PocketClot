@@ -1190,7 +1190,7 @@ private fun ChatAutoSpeakDialog(
                             contentDescription = null,
                             tint = if (selected) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(PocketIconSize.Regular),
                         )
                         Spacer(Modifier.width(12.dp))
                         Text(
@@ -1439,13 +1439,13 @@ private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
                 PocketIcons.Close,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(PocketIconSize.Marker),
             )
             else -> Icon(
                 PocketIcons.Image,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(PocketIconSize.Small),
             )
         }
         Spacer(Modifier.width(6.dp))
@@ -1462,7 +1462,7 @@ private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
             Icon(
                 PocketIcons.Close,
                 contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_remove),
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(PocketIconSize.Marker),
             )
         }
     }
@@ -1960,7 +1960,7 @@ private fun ModelSheet(
                                     PocketIcons.Check,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(PocketIconSize.Regular),
                                 )
                             } else {
                                 Spacer(Modifier.size(20.dp))
@@ -1990,7 +1990,7 @@ private fun ModelSheet(
                                     PocketIcons.Check,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(PocketIconSize.Regular),
                                 )
                             } else {
                                 Spacer(Modifier.size(20.dp))

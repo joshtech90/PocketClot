@@ -86,7 +86,7 @@ private val MidnightAtelierLightColors = lightColorScheme(
     onPrimaryContainer = Color(0xFF3B0B00),
     secondary = AtelierIceDeep,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFC3E9F0),
+    secondaryContainer = Color(0xFFCFE7EC),
     onSecondaryContainer = Color(0xFF092A31),
     tertiary = Color(0xFF7A5730),
     onTertiary = Color.White,
@@ -196,7 +196,9 @@ private val NordicLightPrimaryCont = Color(0xFFCEE5FF)
 private val NordicLightOnPrimaryCont = Color(0xFF001D36)
 private val NordicLightSecondary = Color(0xFF1B6870)
 private val NordicLightOnSecondary = Color.White
-private val NordicLightSecondaryCont = Color(0xFFA6EEF6)
+// Gedaempft: das fruehere 0xFFA6EEF6 war als Auswahlflaeche (Drawer, Chips)
+// ein greller Tuerkis-Block neben dem ruhigen Blau.
+private val NordicLightSecondaryCont = Color(0xFFCBE6EC)
 private val NordicLightOnSecondaryCont = Color(0xFF002024)
 private val NordicLightTertiary = Color(0xFF2F636E)
 private val NordicLightOnTertiary = Color.White

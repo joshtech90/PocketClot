@@ -43,6 +43,13 @@ import com.halilibo.richtext.ui.material3.RichText
 import com.halilibo.richtext.ui.string.RichTextStringStyle
 import de.smartzone.pocketclaude.ui.theme.AtelierIce
 import de.smartzone.pocketclaude.ui.theme.AtelierIceDeep
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.em
+import com.halilibo.richtext.ui.BlockQuoteGutter
+import com.halilibo.richtext.ui.TableStyle
+import de.smartzone.pocketclaude.ui.theme.PocketCodeStyle
+import de.smartzone.pocketclaude.ui.theme.PocketRadius
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 /**
@@ -65,9 +72,42 @@ fun MarkdownText(
     // - Light: tiefes Eisblau mit gutem Kontrast auf hellem Hintergrund.
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val linkColor = if (isDarkTheme) AtelierIce else AtelierIceDeep
-    val richTextStyle = remember(linkColor) {
+    // Ueberschriften, Inline-Code, Tabellen und Zitate waren bisher die
+    // Bibliotheks-Vorgaben: graue, zu grosse Ueberschriften, Inline-Code als
+    // greller Kasten, Tabellen mit harten weissen Linien. Jetzt folgen sie der
+    // App-Typografie und den Theme-Farben.
+    val typography = MaterialTheme.typography
+    val scheme = MaterialTheme.colorScheme
+    val hairline = with(LocalDensity.current) { 1.dp.toPx() }
+    val richTextStyle = remember(linkColor, color, typography, scheme, hairline) {
         RichTextStyle(
+            headingStyle = { level, base ->
+                val target = when (level) {
+                    1 -> typography.titleLarge
+                    2 -> typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 26.sp)
+                    3 -> typography.titleMedium
+                    else -> typography.titleSmall
+                }
+                base.merge(target).copy(color = color)
+            },
+            blockQuoteGutter = BlockQuoteGutter.BarGutter(
+                startMargin = 2.sp,
+                barWidth = 3.sp,
+                endMargin = 12.sp,
+                color = { scheme.primary.copy(alpha = 0.5f) },
+            ),
+            tableStyle = TableStyle(
+                headerTextStyle = typography.titleSmall.copy(color = color),
+                cellPadding = 8.sp,
+                borderColor = scheme.outlineVariant,
+                borderStrokeWidth = hairline,
+            ),
             stringStyle = RichTextStringStyle(
+                codeStyle = SpanStyle(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 0.9.em,
+                    background = scheme.onSurface.copy(alpha = 0.08f),
+                ),
                 linkStyle = TextLinkStyles(
                     style = SpanStyle(
                         color = linkColor,
@@ -134,7 +174,7 @@ private fun CodeBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(PocketRadius.Medium))
             .background(bg),
     ) {
         // Header: Sprach-Label + Copy-Button
@@ -142,15 +182,12 @@ private fun CodeBlock(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(border.copy(alpha = 0.15f))
-                .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                .padding(start = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = language?.lowercase() ?: "code",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium,
-                ),
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
@@ -160,13 +197,13 @@ private fun CodeBlock(
                     clipboard.setText(AnnotatedString(code))
                     Toast.makeText(context, codeCopiedMsg, Toast.LENGTH_SHORT).show()
                 },
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     PocketIcons.Copy,
                     contentDescription = stringResource(R.string.markdown_copy_code),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(PocketIconSize.Small),
                 )
             }
         }
@@ -175,15 +212,11 @@ private fun CodeBlock(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
         ) {
             Text(
                 text = code,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                ),
+                style = PocketCodeStyle,
                 color = MaterialTheme.colorScheme.onSurface,
                 softWrap = false,
             )

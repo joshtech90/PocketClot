@@ -64,6 +64,7 @@ import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -216,7 +217,7 @@ fun GemEditorScreen(
                 }
                 if (!st.isBuiltin) {
                     OutlinedButton(onClick = { vm.addStarter() }) {
-                        Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.gem_add_starter))
                     }
@@ -266,7 +267,7 @@ fun GemEditorScreen(
                 }
                 if (!st.isBuiltin) {
                     OutlinedButton(onClick = { filePicker.launch(arrayOf("*/*")) }) {
-                        Icon(PocketIcons.Document, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(PocketIcons.Document, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.gem_add_file))
                     }
@@ -321,14 +322,14 @@ private fun FileRow(name: String, enabled: Boolean, onRemove: () -> Unit) {
         Icon(
             PocketIcons.Document,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(PocketIconSize.Small),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.width(8.dp))
         Text(name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         if (enabled) {
             IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                Icon(PocketIcons.Close, contentDescription = stringResource(R.string.chat_remove), modifier = Modifier.size(16.dp))
+                Icon(PocketIcons.Close, contentDescription = stringResource(R.string.chat_remove), modifier = Modifier.size(PocketIconSize.Regular))
             }
         }
     }

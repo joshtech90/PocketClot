@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.smartzone.pocketclaude.R
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 /**
@@ -198,7 +199,7 @@ fun AutoModeBar(
                 Icon(
                     PocketIcons.Close,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(PocketIconSize.Small),
                 )
                 Text(stringResource(R.string.auto_mode_exit))
             }

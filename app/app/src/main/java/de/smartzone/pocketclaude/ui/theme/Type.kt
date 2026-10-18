@@ -81,3 +81,12 @@ val PocketTypography = Typography(
         lineHeight = 16.sp, letterSpacing = 0.4.sp,
     ),
 )
+
+/** Code in Codebloecken: Monospace, eine Stufe ueber bodySmall, damit lange
+ *  Zeilen lesbar bleiben. Einzige Ausnahme von der Skala oben. */
+val PocketCodeStyle = TextStyle(
+    fontFamily = FontFamily.Monospace,
+    fontWeight = FontWeight.Normal,
+    fontSize = 13.sp,
+    lineHeight = 20.sp,
+)

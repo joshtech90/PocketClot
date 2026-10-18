@@ -54,6 +54,7 @@ import de.smartzone.pocketclaude.R
 import de.smartzone.pocketclaude.data.AttachmentRefDto
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @Composable
@@ -132,7 +133,7 @@ fun UserBubble(
                         PocketIcons.Copy,
                         contentDescription = stringResource(R.string.bubble_copy),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(15.dp),
+                        modifier = Modifier.size(PocketIconSize.Small),
                     )
                 }
             }
@@ -306,7 +307,7 @@ fun AssistantBubble(
                                 PocketIcons.VolumeUp,
                                 contentDescription = stringResource(R.string.bubble_read_aloud),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(PocketIconSize.Small),
                             )
                         }
                         TtsState.Loading -> Box(
@@ -328,7 +329,7 @@ fun AssistantBubble(
                                     PocketIcons.Pause,
                                     contentDescription = stringResource(R.string.bubble_pause),
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(PocketIconSize.Small),
                                 )
                             }
                             IconButton(
@@ -339,7 +340,7 @@ fun AssistantBubble(
                                     PocketIcons.Stop,
                                     contentDescription = stringResource(R.string.bubble_cancel),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(PocketIconSize.Small),
                                 )
                             }
                         }
@@ -353,7 +354,7 @@ fun AssistantBubble(
                                     PocketIcons.Play,
                                     contentDescription = stringResource(R.string.bubble_resume),
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(PocketIconSize.Small),
                                 )
                             }
                             IconButton(
@@ -364,7 +365,7 @@ fun AssistantBubble(
                                     PocketIcons.Stop,
                                     contentDescription = stringResource(R.string.bubble_cancel),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(PocketIconSize.Small),
                                 )
                             }
                         }
@@ -381,7 +382,7 @@ fun AssistantBubble(
                             PocketIcons.Copy,
                             contentDescription = stringResource(R.string.bubble_copy),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(PocketIconSize.Small),
                         )
                     }
                     // Ab hier weitermachen. Bewusst in derselben Reihe wie
@@ -396,7 +397,7 @@ fun AssistantBubble(
                                 PocketIcons.History,
                                 contentDescription = stringResource(R.string.bubble_rewind),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(17.dp),
+                                modifier = Modifier.size(PocketIconSize.Small),
                             )
                         }
                     }

@@ -80,6 +80,7 @@ import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import de.smartzone.pocketclaude.util.formatRelative
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -139,7 +140,6 @@ fun ConversationsScreen(
                         Text(
                             stringResource(de.smartzone.pocketclaude.R.string.convo_selection_count, selectedIds.size),
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
                         )
                     },
                     navigationIcon = {
@@ -173,23 +173,19 @@ fun ConversationsScreen(
             } else {
                 TopAppBar(
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            PocketBrandMark(size = 38.dp)
-                            Spacer(Modifier.width(12.dp))
-                            PocketScreenTitle(
-                                eyebrow = stringResource(de.smartzone.pocketclaude.R.string.app_name),
-                                title = stringResource(de.smartzone.pocketclaude.R.string.all_conversations),
-                            )
-                        }
+                        PocketScreenTitle(
+                            eyebrow = stringResource(de.smartzone.pocketclaude.R.string.app_name),
+                            title = stringResource(de.smartzone.pocketclaude.R.string.all_conversations),
+                        )
                     },
                     navigationIcon = {
                         if (onBack != null) {
-                            IconButton(onClick = onBack) {
-                                Icon(
-                                    PocketIcons.ArrowBack,
-                                    contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_back),
-                                )
-                            }
+                            PocketIconButton(
+                                icon = PocketIcons.ArrowBack,
+                                contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_back),
+                                onClick = onBack,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
                         }
                     },
                     actions = {
@@ -198,7 +194,7 @@ fun ConversationsScreen(
                             contentDescription = stringResource(if (searchActive) de.smartzone.pocketclaude.R.string.action_close else de.smartzone.pocketclaude.R.string.action_search),
                             onClick = { searchActive = !searchActive; if (!searchActive) vm.clearSearch() },
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(8.dp))
                         PocketIconButton(
                             icon = PocketIcons.Settings,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_settings),
@@ -218,9 +214,8 @@ fun ConversationsScreen(
                     onClick = { vm.create(onCreated = onOpenChat) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    icon = { Icon(PocketIcons.Add, contentDescription = null) },
+                    icon = { Icon(PocketIcons.NewChat, contentDescription = null) },
                     text = { Text(stringResource(de.smartzone.pocketclaude.R.string.new_chat)) },
-                    shape = RoundedCornerShape(20.dp),
                 )
             }
         },
@@ -250,7 +245,8 @@ fun ConversationsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(22.dp),
+                    // Suchfelder sind Pillen, wie die Suchleiste der Web-UI.
+                    shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -491,7 +487,7 @@ private fun ConversationRow(
                     PocketIcons.ChatBubble,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(PocketIconSize.Regular),
                 )
             }
 
@@ -504,7 +500,7 @@ private fun ConversationRow(
                             PocketIcons.PushPin,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_pinned),
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(PocketIconSize.Marker),
                         )
                         Spacer(Modifier.width(6.dp))
                     }
@@ -513,7 +509,7 @@ private fun ConversationRow(
                             PocketIcons.Lock,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_locked),
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(PocketIconSize.Marker),
                         )
                         Spacer(Modifier.width(6.dp))
                     }
@@ -543,7 +539,7 @@ private fun ConversationRow(
                             PocketIcons.Compress,
                             contentDescription = stringResource(de.smartzone.pocketclaude.R.string.convo_condensed),
                             tint = PocketTheme.colors.accent,
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(PocketIconSize.Marker),
                         )
                     }
                 }
@@ -558,7 +554,7 @@ private fun ConversationRow(
                            else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .padding(end = 8.dp)
-                        .size(26.dp),
+                        .size(PocketIconSize.Regular),
                 )
             } else {
                 Box {

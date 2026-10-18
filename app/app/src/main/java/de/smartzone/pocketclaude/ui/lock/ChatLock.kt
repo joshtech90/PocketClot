@@ -52,6 +52,7 @@ import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 const val CHAT_LOCK_PIN_LENGTH = 5
@@ -242,7 +243,7 @@ fun ChatLockGate(
                     PocketIcons.Lock,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(PocketIconSize.Hero),
                 )
             }
             Spacer(Modifier.height(20.dp))

@@ -876,7 +876,7 @@ private fun GemsSection(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
         FilledTonalButton(onClick = { onEdit(null) }, modifier = Modifier.fillMaxWidth()) {
-            Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
             Spacer(Modifier.width(6.dp))
             Text(stringResource(de.smartzone.pocketclaude.R.string.gem_new))
         }
@@ -1510,7 +1510,7 @@ private fun QuickSetupRow(done: Boolean, text: String) {
             contentDescription = null,
             tint = if (done) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
                 else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(PocketIconSize.Small),
         )
         Spacer(Modifier.width(8.dp))
         Text(
@@ -1893,7 +1893,7 @@ private fun TtsSection(
                     contentDescription = null,
                     tint = if (configured) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(PocketIconSize.Small),
                 )
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
@@ -2310,7 +2310,7 @@ private fun TestResultIndicator(state: ConnectionTestResult) {
                 PocketIcons.CheckCircle,
                 contentDescription = null,
                 tint = PocketTheme.colors.success,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(PocketIconSize.Small),
             )
             Spacer(Modifier.width(8.dp))
             Text(
@@ -2324,7 +2324,7 @@ private fun TestResultIndicator(state: ConnectionTestResult) {
                 PocketIcons.Error,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(PocketIconSize.Small),
             )
             Spacer(Modifier.width(8.dp))
             Text(
@@ -2838,7 +2838,7 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                             contentDescription = null,
                             tint = if (isActive) MaterialTheme.colorScheme.primary
                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(PocketIconSize.Regular),
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -2856,13 +2856,13 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                         }
                         IconButton(onClick = { renameId = p.id; renameLabel = p.label }) {
                             Icon(PocketIcons.Edit, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_profile_rename),
-                                modifier = Modifier.size(18.dp))
+                                modifier = Modifier.size(PocketIconSize.Regular))
                         }
                         if (settings.profiles.size > 1) {
                             IconButton(onClick = { confirmDeleteId = p.id }) {
                                 Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_delete_profile_cd),
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp))
+                                    modifier = Modifier.size(PocketIconSize.Regular))
                             }
                         }
                     }
@@ -2872,7 +2872,7 @@ private fun ProfilesCard(vm: SettingsViewModel, settings: de.smartzone.pocketcla
                 onClick = { addDialogOpen = true },
                 modifier = Modifier.padding(start = 4.dp),
             ) {
-                Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(de.smartzone.pocketclaude.R.string.settings_add_profile))
             }
@@ -3706,7 +3706,7 @@ private fun VoiceSection(vm: SettingsViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(PocketIcons.CheckCircle, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(PocketIconSize.Marker))
                     Text(
                         stringResource(
                             de.smartzone.pocketclaude.R.string.settings_voice_configured,
@@ -4187,7 +4187,7 @@ private fun DefaultModelPicker(
                     Icon(
                         PocketIcons.Refresh,
                         contentDescription = stringResource(R.string.model_refresh),
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(PocketIconSize.Small),
                     )
                 }
             }

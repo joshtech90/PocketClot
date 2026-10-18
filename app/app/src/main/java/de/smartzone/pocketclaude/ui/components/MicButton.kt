@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.smartzone.pocketclaude.R
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 enum class MicState { Idle, Recording, Transcribing }
@@ -75,7 +76,9 @@ fun MicButton(
     // damit der Button bei größeren Outer-Werten (Auto-Mode: 140dp+)
     // weiterhin stimmige Proportionen hat.
     val innerSize = outerSize * (40f / 48f)
-    val iconSize = outerSize * (20f / 48f)
+    // Halbe Aussenkante: bei 48 dp sind das 24 dp, genau wie das Anhang-Symbol
+    // daneben. Vorher war das Mikrofon mit 20 dp sichtbar kleiner.
+    val iconSize = outerSize / 2
 
     // Animation: progressFraction snap-resets auf 0 wenn der User weiter
     // spricht — wir wollen aber nicht zurückspringen, sondern sanft
@@ -253,7 +256,7 @@ fun MicCancelHint(modifier: Modifier = Modifier) {
             PocketIcons.Close,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(12.dp),
+            modifier = Modifier.size(PocketIconSize.Marker),
         )
     }
 }

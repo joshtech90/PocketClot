@@ -88,6 +88,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import de.smartzone.pocketclaude.ui.components.PocketChoiceChip
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -202,7 +203,7 @@ fun ImagesScreen(
                     Icon(
                         PocketIcons.Sparkle,
                         contentDescription = null,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(PocketIconSize.Hero),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -518,7 +519,7 @@ private fun GeneratorCard(
                 } else {
                     Icon(
                         if (state.isEditing) PocketIcons.Brush else PocketIcons.Sparkle,
-                        contentDescription = null, modifier = Modifier.size(16.dp),
+                        contentDescription = null, modifier = Modifier.size(PocketIconSize.Small),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(
@@ -608,7 +609,7 @@ private fun ReferenceStrip(
                     ) {
                         Icon(PocketIcons.Close,
                              contentDescription = stringResource(R.string.image_reference_remove),
-                             modifier = Modifier.size(12.dp))
+                             modifier = Modifier.size(PocketIconSize.Marker))
                     }
                 }
             }
@@ -689,7 +690,7 @@ private fun HistoryRow(
                     Icon(
                         PocketIcons.Close,
                         contentDescription = stringResource(R.string.image_remove_entry),
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(PocketIconSize.Regular),
                     )
                 }
             }
@@ -724,7 +725,7 @@ private fun HistoryRow(
                             Icon(
                                 PocketIcons.Brush,
                                 contentDescription = stringResource(R.string.image_use_as_reference),
-                                modifier = Modifier.size(15.dp),
+                                modifier = Modifier.size(PocketIconSize.Small),
                             )
                         }
                     }
@@ -772,14 +773,14 @@ private fun ImageFullscreenDialog(
                 FilledTonalButton(onClick = {
                     scope.launch { shareImage(context, serverBaseUrl, serverToken, attachment) }
                 }) {
-                    Icon(PocketIcons.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(PocketIcons.Share, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.image_share_btn))
                 }
                 FilledTonalButton(onClick = {
                     scope.launch { saveImageToGallery(context, serverBaseUrl, serverToken, attachment) }
                 }) {
-                    Icon(PocketIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(PocketIcons.Download, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.image_save_btn))
                 }
