@@ -713,6 +713,9 @@ svg use { fill: currentColor; }
   color: var(--text-soft); cursor: pointer;
 }
 .icon-btn-sm .icon { width: var(--ic-sm); height: var(--ic-sm); }
+/* `.dropdown button` gibt jedem Knopf volle Breite; der Neu-laden-Knopf im
+   Kopf des Modell-Menues hat den Titel sonst auf zwei Zeilen gedrueckt. */
+.dropdown .icon-btn-sm { width: 28px; padding: 0; justify-content: center; flex: 0 0 auto; }
 .icon-btn-sm:hover { background: var(--bg-elev-2); }
 #effort-btn #model-label:not(:empty) { margin-right: 6px; opacity: 0.85; }
 #effort-btn #model-label:not(:empty)::after { content: "\00b7"; margin-left: 6px; opacity: 0.5; }
@@ -753,13 +756,22 @@ svg use { fill: currentColor; }
   display: flex;
   justify-content: flex-end;
 }
+/* Der Wrapper (Anhaenge + Bubble) ist hoechstens 75 % breit und richtet
+   alles rechts aus. Vorher galt die 75 % fuer die Bubble innerhalb eines
+   unterschiedlich breiten Wrappers: die rechte Kante der Bubble sprang je
+   nach Chat hin und her und schloss nicht mit der Spalte ab. */
+.msg.user > div {
+  display: flex; flex-direction: column; align-items: flex-end;
+  max-width: 75%;
+  min-width: 0;
+}
 /* Gleiche Form wie in der App: runde Ecken, kleine Ecke unten rechts. */
 .msg.user .bubble {
   background: var(--bubble-user);
   color: var(--bubble-user-fg);
   border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
   padding: 10px 16px;
-  max-width: 75%;
+  max-width: 100%;
   word-wrap: break-word;
 }
 

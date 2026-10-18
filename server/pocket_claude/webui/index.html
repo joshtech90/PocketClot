@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#100E14">
 <title>PocketClot</title>
 <link rel="icon" type="image/png" href="brand-mark.png">
-<link rel="stylesheet" href="style.css?v=20261018a">
+<link rel="stylesheet" href="style.css?v=20261018d">
 <!-- Feste Versionen mit Pruefsumme: DOMPurify schuetzt auch den Gedaechtnis-Schluessel im Browser -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL" crossorigin="anonymous"></script>
-<script src="i18n.js?v=20261018a"></script>
+<script src="i18n.js?v=20261018d"></script>
 </head>
 <body>
 
@@ -199,7 +199,7 @@
             <span id="effort-label">High</span>
             <svg class="icon icon-sm"><use href="#icon-chevron-down"/></svg>
           </button>
-          <div id="effort-menu" class="dropdown hidden"></div>
+          <div id="effort-menu" class="dropdown right hidden"></div>
         </div>
         <button id="more-btn" class="icon-btn" data-i18n-title="more_title" title="More">
           <svg class="icon"><use href="#icon-more"/></svg>
@@ -412,7 +412,7 @@
             <option value="cloud_tts" data-i18n="tts_provider_option_cloud">Cloud TTS (Service Account, kein Hard-Cap)</option>
           </select>
         </label>
-        <p class="hint" id="tts-provider-hint" style="margin-top:-2px"></p>
+        <p class="hint" id="tts-provider-hint" style="margin-top:8px"></p>
         <label class="field">
           <span data-i18n="voice">Stimme</span>
           <select id="tts-voice"></select>
@@ -438,16 +438,16 @@
         <p class="hint" data-i18n="chat_lock_hint">Einzelne Chats mit einer 5-stelligen PIN schützen.</p>
 
         <!-- Shown when NO PIN is set yet -->
-        <div id="chat-lock-set-form" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:10px">
+        <div id="chat-lock-set-form" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:12px">
           <label class="field">
             <span data-i18n="chat_lock_pin">PIN (5 Ziffern)</span>
             <input id="chat-lock-pin" type="password" inputmode="numeric" maxlength="5" autocomplete="off"
-                   style="font-family:SF Mono,Menlo,monospace;letter-spacing:4px">
+                   class="pin-input">
           </label>
           <label class="field">
             <span data-i18n="chat_lock_pin_confirm">PIN bestätigen</span>
             <input id="chat-lock-pin-confirm" type="password" inputmode="numeric" maxlength="5" autocomplete="off"
-                   style="font-family:SF Mono,Menlo,monospace;letter-spacing:4px">
+                   class="pin-input">
           </label>
           <div class="row-gap">
             <button id="chat-lock-save" class="btn-secondary" type="button" data-i18n="chat_lock_set_pin">PIN festlegen</button>
@@ -455,21 +455,21 @@
         </div>
 
         <!-- Shown when a PIN IS set -->
-        <div id="chat-lock-change-form" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:10px">
+        <div id="chat-lock-change-form" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:12px">
           <label class="field">
             <span data-i18n="chat_lock_current_pin">Aktuelle PIN</span>
             <input id="chat-lock-current" type="password" inputmode="numeric" maxlength="5" autocomplete="off"
-                   style="font-family:SF Mono,Menlo,monospace;letter-spacing:4px">
+                   class="pin-input">
           </label>
           <label class="field">
             <span data-i18n="chat_lock_new_pin">Neue PIN</span>
             <input id="chat-lock-new" type="password" inputmode="numeric" maxlength="5" autocomplete="off"
-                   style="font-family:SF Mono,Menlo,monospace;letter-spacing:4px">
+                   class="pin-input">
           </label>
           <label class="field">
             <span data-i18n="chat_lock_pin_confirm">PIN bestätigen</span>
             <input id="chat-lock-new-confirm" type="password" inputmode="numeric" maxlength="5" autocomplete="off"
-                   style="font-family:SF Mono,Menlo,monospace;letter-spacing:4px">
+                   class="pin-input">
           </label>
           <div class="row-gap" style="flex-wrap:wrap">
             <button id="chat-lock-change" class="btn-secondary" type="button" data-i18n="chat_lock_change_pin">PIN ändern</button>
@@ -487,7 +487,7 @@
         <label class="field" style="margin-top:8px">
           <span data-i18n="memory_key_label">Gedächtnis-Schlüssel</span>
           <input id="memory-key-input" type="password" autocomplete="off" spellcheck="false"
-                 style="font-family:SF Mono,Menlo,monospace">
+                 class="mono">
         </label>
         <div class="row-gap" style="margin-top:8px;flex-wrap:wrap">
           <button id="memory-key-save" class="btn-secondary" type="button" data-i18n="memory_key_save">Speichern</button>
@@ -500,10 +500,10 @@
         <h3 data-i18n="user_management">Benutzer-Verwaltung</h3>
         <p class="hint" data-i18n="admin_users_hint">Nur als Admin sichtbar. Login per Benutzername + Passwort. Beim Anlegen kannst Du ein Initial-Passwort vergeben oder vom Server generieren lassen — der neue User muss es beim ersten Login ändern.</p>
         <div id="users-list" class="users-list"></div>
-        <div class="row-gap" style="margin-top:10px;flex-wrap:wrap">
-          <input id="new-user-name" type="text" placeholder="Benutzername" data-i18n-placeholder="username" style="flex:1;min-width:140px;padding:9px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;outline:none">
-          <input id="new-user-password" type="text" placeholder="Initial-Passwort (leer = generieren)" data-i18n-placeholder="user_initial_password" autocomplete="off" style="flex:1.5;min-width:200px;padding:9px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;outline:none">
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-soft);white-space:nowrap">
+        <div class="row-gap" style="margin-top:12px;flex-wrap:wrap">
+          <input id="new-user-name" type="text" placeholder="Benutzername" data-i18n-placeholder="username" class="text-input" style="flex:1;min-width:140px">
+          <input id="new-user-password" type="text" placeholder="Initial-Passwort (leer = generieren)" data-i18n-placeholder="user_initial_password" autocomplete="off" class="text-input mono" style="flex:1.5;min-width:200px">
+          <label class="inline-check">
             <input id="new-user-admin" type="checkbox"> <span data-i18n="admin_label">Admin</span>
           </label>
           <button id="new-user-btn" class="btn-secondary" type="button" data-i18n="add_user">Anlegen</button>
@@ -534,14 +534,14 @@
           <p class="hint" id="claude-auth-apikey-current"></p>
           <div class="row-gap" style="margin-top:8px;flex-wrap:wrap">
             <input id="claude-anthropic-key" type="password" placeholder="sk-ant-…" autocomplete="off"
-                   style="flex:1;min-width:240px;padding:9px 12px;background:var(--bg-elev);border:1px solid var(--border);border-radius:10px;outline:none;font-family:SF Mono,Menlo,monospace;font-size:13px">
+                   class="text-input mono" style="flex:1;min-width:240px">
             <button id="claude-anthropic-save" class="btn-secondary" type="button" data-i18n="save">Save</button>
             <button id="claude-anthropic-clear" class="btn-ghost" type="button" data-i18n="clear">Clear</button>
           </div>
         </div>
 
         <!-- AWS Bedrock form -->
-        <div id="claude-auth-bedrock-form" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:10px">
+        <div id="claude-auth-bedrock-form" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:12px">
           <label class="field">
             <span data-i18n="aws_region">AWS region</span>
             <input id="bedrock-region" type="text" placeholder="us-east-1" autocomplete="off">
@@ -595,7 +595,7 @@
       <section class="settings-section" id="usage-section">
         <h3 data-i18n="token_usage">Token usage</h3>
         <p class="hint" data-i18n="usage_this_month">This month</p>
-        <div id="usage-grid" style="display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin-top:6px;font-size:13.5px"></div>
+        <div id="usage-grid" style="display:grid;grid-template-columns:1fr auto;gap:8px 16px;margin-top:8px;font-size:var(--fs-sm)"></div>
         <p class="hint" id="usage-pro-max-note" data-i18n="usage_pro_max_note" style="margin-top:8px">Pro/Max plans bill flat-rate — counts here are informational only.</p>
         <button id="usage-refresh" class="btn-ghost" type="button" style="margin-top:8px" data-i18n="usage_refresh">Refresh</button>
       </section>
@@ -709,6 +709,6 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden"></div>
-<script src="app.js?v=20261018a"></script>
+<script src="app.js?v=20261018d"></script>
 </body>
 </html>

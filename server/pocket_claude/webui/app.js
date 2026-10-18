@@ -564,7 +564,7 @@ function renderChatList(items) {
       li.className = 'chat-item' + (c.id === state.cid ? ' active' : '');
       li.dataset.cid = c.id;
       const lockMark = c.locked
-        ? `<span class="lock-mark" title="${escapeHtml(t('chat_locked_badge'))}" aria-label="${escapeHtml(t('chat_locked_badge'))}"><svg><use href="#icon-lock"/></svg></span>`
+        ? `<span class="lock-mark" title="${escapeHtml(t('chat_locked_badge'))}" aria-label="${escapeHtml(t('chat_locked_badge'))}"><svg><use href="#icon-lock-filled"/></svg></span>`
         : '';
       li.innerHTML = `
         <span class="title">${escapeHtml(c.title || t('no_title'))}</span>
@@ -611,7 +611,7 @@ function openChatRowMenu(rowEl, chat) {
       <svg><use href="#icon-edit"/></svg> ${escapeHtml(t('rename'))}
     </button>
     <button data-act="pin" type="button">
-      <svg><use href="#icon-pin"/></svg> ${escapeHtml(chat.pinned ? t('unpin') : t('pin'))}
+      <svg><use href="#icon-${chat.pinned ? 'pin-filled' : 'pin'}"/></svg> ${escapeHtml(chat.pinned ? t('unpin') : t('pin'))}
     </button>
     <button data-act="lock" type="button">
       <svg><use href="#icon-${chat.locked ? 'unlock' : 'lock'}"/></svg> ${escapeHtml(chat.locked ? t('unlock_chat') : t('lock_chat'))}
@@ -946,11 +946,13 @@ async function loadChatModels(force = false) {
 }
 
 // Formatiert die Bezeichnung einer Denktiefe
+// Uebersetzt wie in der App ("Hoch" statt "High"). Unbekannte Stufen behalten
+// ihre Kennung, damit eine neue Stufe vom Server trotzdem sichtbar bleibt.
 function formatEffortLabel(eff) {
   if (!eff) return '';
-  if (eff === 'minimal') return t('effort_minimal');
-  if (eff === 'ultra')   return t('effort_ultra');
-  if (eff === 'xhigh')   return 'xHigh';
+  const key = 'effort_' + eff;
+  const label = t(key);
+  if (label && label !== key) return label;
   return eff.charAt(0).toUpperCase() + eff.slice(1);
 }
 
@@ -965,7 +967,7 @@ function renderModelMenu() {
   html += '<div class="dropdown-header flex-between">';
   html += '  <span class="dropdown-title">' + t('model_menu_title') + '</span>';
   html += '  <button type="button" id="model-refresh-btn" class="icon-btn-sm" title="' + t('model_refresh') + '">';
-  html += '    <svg class="icon icon-sm"><use href="#icon-loop"/></svg>';
+  html += '    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg>';
   html += '  </button>';
   html += '</div>';
 
@@ -1233,9 +1235,7 @@ function renderMessages() {
     if (state.gem) { inner.appendChild(gemWelcomeEl(state.gem)); return; }
     inner.innerHTML = `
       <div class="empty-hint">
-        <div class="e-logo">
-          <svg width="32" height="32" viewBox="0 0 24 24"><path d="M12 8v6m-3-3 3 3 3-3" stroke="white" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
-        </div>
+        <div class="e-logo"><img class="brand-mark" src="brand-mark.png" alt=""></div>
         <h3>${escapeHtml(t('empty_hint_title'))}</h3>
         <p>${escapeHtml(t('empty_hint_body'))}</p>
       </div>`;
@@ -1653,7 +1653,7 @@ function attachmentsToHtml(atts) {
         <figure data-att-id="${escapeHtml(a.id)}">
           <img src="${url}" alt="${escapeHtml(a.filename)}" data-lightbox="${url}">
           <div class="img-actions">
-            <button title="${escapeHtml(t('img_action_zoom'))}" data-action="zoom" data-url="${url}"><svg class="icon"><use href="#icon-search"/></svg></button>
+            <button title="${escapeHtml(t('img_action_zoom'))}" data-action="zoom" data-url="${url}"><svg class="icon"><use href="#icon-zoom"/></svg></button>
             <button title="${escapeHtml(t('img_action_edit'))}" data-action="edit" data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}"><svg class="icon"><use href="#icon-wand"/></svg></button>
             <a href="${url}" download="${escapeHtml(a.filename)}" title="${escapeHtml(t('img_action_download'))}"><button data-action="download"><svg class="icon"><use href="#icon-download"/></svg></button></a>
           </div>
@@ -1707,7 +1707,7 @@ function openLightbox(url) {
   const lb = document.createElement('div');
   lb.id = 'lightbox';
   lb.className = 'lightbox';
-  lb.innerHTML = `<button class="lb-close" aria-label="${escapeHtml(t('lightbox_close'))}">×</button><img src="${url}">`;
+  lb.innerHTML = `<button class="lb-close" aria-label="${escapeHtml(t('lightbox_close'))}"><svg class="icon"><use href="#icon-close"/></svg></button><img src="${url}">`;
   lb.addEventListener('click', (e) => {
     if (e.target === lb || e.target.classList.contains('lb-close')) lb.remove();
   });
@@ -1892,7 +1892,7 @@ async function generateImage(prompt) {
       resp.attachments.length === 1
         ? t('image_mode_status_done_singular', resp.attachments.length)
         : t('image_mode_status_done_plural', resp.attachments.length),
-      '',
+      'ok',
     );
     // Chat neu laden, damit die neuen Messages erscheinen
     await reloadChatMessages(state.cid);
@@ -2237,18 +2237,23 @@ function _renderTtsProviderHint(status) {
   if (!els.ttsProviderHint) return;
   const p = status.provider || 'gemini_web';
   const lines = [];
+  let hintOk;
   if (p === 'gemini_web') {
     // `configured` heisst hier: Dienst laeuft UND Google-Sitzung traegt noch.
+    hintOk = !!status.configured;
     lines.push(status.configured ? t('tts_hint_web_ok') : t('tts_hint_web_down'));
   } else if (p === 'edge_tts') {
+    hintOk = true;
     lines.push(t('tts_hint_edge_ok'));
   } else if (p === 'gemini_api') {
+    hintOk = !!status.gemini_api_configured;
     if (status.gemini_api_configured) {
       lines.push(t('tts_hint_gemini_ok'));
     } else {
       lines.push(t('tts_hint_gemini_missing'));
     }
   } else {
+    hintOk = !!status.cloud_tts_configured;
     if (status.cloud_tts_configured) {
       lines.push(t('tts_hint_cloud_ok', status.client_email || '?'));
     } else {
@@ -2256,6 +2261,8 @@ function _renderTtsProviderHint(status) {
     }
   }
   els.ttsProviderHint.textContent = lines.join(' ');
+  els.ttsProviderHint.classList.toggle('status-ok', hintOk === true);
+  els.ttsProviderHint.classList.toggle('status-warn', hintOk === false);
 }
 
 async function openSettings() {
@@ -3423,8 +3430,10 @@ window.PocketVoice = (() => {
     lastCfg = cfg;
     if (voiceKeyStatus) {
       if (cfg.configured) {
-        voiceKeyStatus.textContent = `✓ ${cfg.api_key_masked || ''} · ${cfg.model || ''}`;
+        voiceKeyStatus.className = 'backup-status ok';
+        voiceKeyStatus.textContent = `${cfg.api_key_masked || ''} · ${cfg.model || ''}`;
       } else {
+        voiceKeyStatus.className = 'backup-status';
         voiceKeyStatus.textContent = t('voice_key_not_set');
       }
     }
@@ -3510,8 +3519,8 @@ window.PocketVoice = (() => {
       }
     } catch (e) {
       if (translateStatus) {
+        translateStatus.className = 'backup-status error';
         translateStatus.textContent = t('voice_translate_error', e.message);
-        translateStatus.style.color = 'var(--danger, #d33)';
       }
     }
   }
@@ -3519,19 +3528,19 @@ window.PocketVoice = (() => {
   async function translatePrompt(locale, force) {
     if (!locale) return;
     if (translateStatus) {
-      translateStatus.style.color = '';
+      translateStatus.className = 'backup-status';
       translateStatus.textContent = t('voice_translate_running');
     }
     try {
       await api('POST', '/voice/prompt/translate', { locale, force: !!force });
       if (translateStatus) {
-        translateStatus.style.color = 'var(--accent)';
+        translateStatus.className = 'backup-status ok';
         translateStatus.textContent = t('voice_translate_success');
       }
       await loadVoiceConfig();
     } catch (e) {
       if (translateStatus) {
-        translateStatus.style.color = 'var(--danger, #d33)';
+        translateStatus.className = 'backup-status error';
         translateStatus.textContent = t('voice_translate_error', e.message);
       }
     }
