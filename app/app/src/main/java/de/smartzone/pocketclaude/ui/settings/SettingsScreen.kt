@@ -833,8 +833,7 @@ private fun GemsSection(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             gem.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FW.SemiBold,
+                            style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -1094,7 +1093,7 @@ private fun UsageStatsSection(vm: SettingsViewModel) {
 
     SettingsGroup(spacing = 8.dp) {
         if (usage == null) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            CircularProgressIndicator(modifier = Modifier.size(PocketIconSize.Regular))
         } else {
             val u = usage!!
             UsageRow(stringResource(de.smartzone.pocketclaude.R.string.usage_input), u.inputTokens)
@@ -1128,7 +1127,7 @@ private fun UsageRow(label: String, value: Long) {
 private fun UsageRowText(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FW.Medium)
+        Text(value, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -1169,7 +1168,7 @@ private fun ChatLockSection(
 
     SettingsGroup {
         when (isSet) {
-            null -> CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            null -> CircularProgressIndicator(modifier = Modifier.size(PocketIconSize.Regular))
             false -> {
                 Text(
                     stringResource(de.smartzone.pocketclaude.R.string.chat_lock_no_pin),
@@ -1276,7 +1275,7 @@ private fun ChatLockSection(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(de.smartzone.pocketclaude.R.string.chat_lock_biometric_toggle),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
                         stringResource(de.smartzone.pocketclaude.R.string.chat_lock_biometric_toggle_sub),
@@ -1652,14 +1651,11 @@ private fun TtsSection(
     ) {
 
     // ============================================================
-    // Card A — Provider & Setup
+    // Gruppe A — Provider & Setup. Frueher eine eigene Karte mit Titel;
+    // jetzt eine Gruppe im aufklappbaren Abschnitt. Der Gruppentitel
+    // entfaellt, weil direkt darunter „Provider" steht.
     // ============================================================
     SettingsGroup {
-
-        Text(
-            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_setup_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
 
         // Provider-Auswahl: Edge (free, no-setup) / Gemini API (paid key) / Cloud TTS (service account).
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1961,15 +1957,14 @@ private fun TtsSection(
         }
     }
 
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
     // ============================================================
-    // Card B — Stimme & Wiedergabe
+    // Gruppe B — Stimme & Wiedergabe
     // ============================================================
     SettingsGroup {
 
-        Text(
-            stringResource(de.smartzone.pocketclaude.R.string.settings_voice_playback_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
+        SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_playback_title))
 
         // Voice-Auswahl — nach Engine-Tier gruppiert, damit Gemini-Voices
         // klar von den klassischen Cloud-TTS-Voices getrennt sind.
@@ -2165,11 +2160,9 @@ private fun TtsSection(
         voicesForModel.firstOrNull { it.id == settings.ttsVoice }?.tier == "gemini"
     val availableModels = ttsStatus?.availableModels.orEmpty()
     if (isGeminiVoice && availableModels.isNotEmpty()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         SettingsGroup {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_gemini_tts_model_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
+            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_gemini_tts_model_title))
             run {
             val currentModelId = ttsStatus?.ttsModel
                 ?: availableModels.firstOrNull { it.default }?.id
@@ -2410,7 +2403,7 @@ private fun BackupSection(vm: SettingsViewModel) {
         if (busy) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(PocketIconSize.Marker),
                     strokeWidth = 2.dp,
                 )
                 Spacer(Modifier.width(8.dp))
@@ -2702,7 +2695,6 @@ private fun FirstRunSignInCard(vm: SettingsViewModel) {
         Text(
             stringResource(de.smartzone.pocketclaude.R.string.login_title),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FW.SemiBold,
         )
         Text(
             stringResource(de.smartzone.pocketclaude.R.string.settings_profile_first_run),
@@ -2783,7 +2775,7 @@ private fun FirstRunSignInCard(vm: SettingsViewModel) {
         ) {
             if (working) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(PocketIconSize.Small),
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
@@ -4008,7 +4000,7 @@ private fun CloudBillingWidget(vm: SettingsViewModel) {
                 if (busy) {
                     CircularProgressIndicator(
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(PocketIconSize.Small),
                     )
                 } else {
                     IconButton(onClick = { vm.refreshBillingStatus() }) {
@@ -4157,7 +4149,7 @@ private fun DefaultModelPicker(
                 Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(PocketIconSize.Small),
                     )
                 }
             } else {

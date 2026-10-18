@@ -41,6 +41,7 @@ import de.smartzone.pocketclaude.ui.settings.SettingsScreen
 import de.smartzone.pocketclaude.ui.settings.SettingsViewModel
 import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketBrandMark
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 
 object Routes {
     /** Startroute: erzeugt einen frischen Chat (oder zeigt Setup-Hinweis) und leitet weiter. */
@@ -325,7 +326,7 @@ private fun LaunchScreen(
                 )
                 Spacer(Modifier.height(16.dp))
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(PocketIconSize.Regular),
                     strokeWidth = 2.dp,
                 )
             }

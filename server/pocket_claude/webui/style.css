@@ -392,6 +392,9 @@ svg use { fill: currentColor; }
 .chat-item .chat-row-more {
   flex: 0 0 auto;
   width: 24px; height: 24px;
+  /* Negativer Rand: der Knopf erscheint beim Hovern, ohne die Zeile um
+     3 px hoeher zu machen. */
+  margin: -4px -4px -4px 0;
   display: none;
   align-items: center; justify-content: center;
   border-radius: 50%;
@@ -1344,6 +1347,11 @@ svg use { fill: currentColor; }
   font-size: var(--fs-sm);
   color: var(--text-soft);
 }
+.settings-section a,
+.modal a {
+  color: var(--link);
+  text-underline-offset: 2px;
+}
 .settings-section textarea {
   width: 100%;
   margin-top: 12px;
@@ -1367,6 +1375,12 @@ svg use { fill: currentColor; }
   font-style: normal;
   font-weight: 500;
   color: var(--accent);
+}
+/* Hinweistexte in Feldern bleiben Hinweistexte, nicht Akzentfarbe. */
+.settings-section .field em.hint {
+  margin: 0;
+  font-weight: 400;
+  color: var(--text-soft);
 }
 
 .segments {

@@ -1461,7 +1461,7 @@ private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
         when {
             p.uploading -> CircularProgressIndicator(
                 strokeWidth = 2.dp,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(PocketIconSize.Marker),
             )
             p.error != null -> Icon(
                 PocketIcons.Close,
@@ -1903,7 +1903,7 @@ private fun ModelSheet(
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(PocketIconSize.Small),
                             strokeWidth = 2.dp,
                         )
                     }

@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#100E14">
 <title>PocketClot</title>
 <link rel="icon" type="image/png" href="brand-mark.png">
-<link rel="stylesheet" href="style.css?v=20261018d">
+<link rel="stylesheet" href="style.css?v=20261018g">
 <!-- Feste Versionen mit Pruefsumme: DOMPurify schuetzt auch den Gedaechtnis-Schluessel im Browser -->
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL" crossorigin="anonymous"></script>
-<script src="i18n.js?v=20261018d"></script>
+<script src="i18n.js?v=20261018g"></script>
 </head>
 <body>
 
@@ -319,10 +319,10 @@
         <h3 data-i18n="appearance">Darstellung</h3>
         <p class="hint" data-i18n="appearance_hint">Visuelle Optionen für den Chat-Bereich.</p>
         <label class="field" style="display:flex;flex-direction:row;align-items:flex-start;gap:12px">
-          <input id="setting-collapse-user-msgs" type="checkbox" style="margin-top:4px">
+          <input id="setting-collapse-user-msgs" type="checkbox" style="width:auto;flex:0 0 auto;margin-top:4px">
           <span style="display:flex;flex-direction:column;gap:2px">
-            <strong style="font-weight:500" data-i18n="collapse_user_msgs_label">Lange eigene Nachrichten einklappen</strong>
-            <em class="hint" style="font-style:normal" data-i18n="collapse_user_msgs_hint">
+            <strong style="font-weight:600;font-size:var(--fs-md);color:var(--text)" data-i18n="collapse_user_msgs_label">Lange eigene Nachrichten einklappen</strong>
+            <em class="hint" data-i18n="collapse_user_msgs_hint">
               Ab ~6 Zeilen wird Dein Input abgeschnitten mit „Mehr anzeigen". Spart Scrollen
               bei langen Antworten. Tap auf die Bubble klappt sie auf.
             </em>
@@ -709,6 +709,6 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden"></div>
-<script src="app.js?v=20261018d"></script>
+<script src="app.js?v=20261018g"></script>
 </body>
 </html>
