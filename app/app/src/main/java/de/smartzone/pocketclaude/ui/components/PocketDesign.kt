@@ -39,6 +39,7 @@ import de.smartzone.pocketclaude.ui.theme.AtelierCoral
 import de.smartzone.pocketclaude.ui.theme.AtelierGold
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale
+import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketIcons
 
 @Composable
@@ -55,16 +56,30 @@ fun PocketBackdrop(
             )
         ),
     ) {
+        // Weiche Lichtflecken statt Kreisen mit harter Kante: die Kanten der
+        // alten Kreise zeichneten sich hinter Text und Karten als Boegen ab.
         Canvas(Modifier.fillMaxSize()) {
+            val warm = Offset(size.width * 1.0f, size.height * 0.02f)
+            val warmRadius = size.minDimension * 0.85f
             drawCircle(
-                color = colors.ambientPrimary.copy(alpha = 0.075f),
-                radius = size.minDimension * 0.52f,
-                center = Offset(size.width * 1.04f, size.height * 0.03f),
+                brush = Brush.radialGradient(
+                    colors = listOf(colors.ambientPrimary.copy(alpha = 0.10f), Color.Transparent),
+                    center = warm,
+                    radius = warmRadius,
+                ),
+                radius = warmRadius,
+                center = warm,
             )
+            val cool = Offset(size.width * 0.0f, size.height * 0.55f)
+            val coolRadius = size.minDimension * 0.75f
             drawCircle(
-                color = colors.ambientSecondary.copy(alpha = 0.055f),
-                radius = size.minDimension * 0.42f,
-                center = Offset(size.width * -0.08f, size.height * 0.48f),
+                brush = Brush.radialGradient(
+                    colors = listOf(colors.ambientSecondary.copy(alpha = 0.07f), Color.Transparent),
+                    center = cool,
+                    radius = coolRadius,
+                ),
+                radius = coolRadius,
+                center = cool,
             )
         }
         content()
@@ -115,7 +130,7 @@ fun PocketIconButton(
             1.dp,
             if (emphasized) Color.Transparent else PocketTheme.colors.outlineSoft,
         ),
-        shadowElevation = if (emphasized) 7.dp else 0.dp,
+        shadowElevation = if (emphasized) 6.dp else 0.dp,
     ) {
         Box(
             modifier = Modifier
@@ -123,7 +138,7 @@ fun PocketIconButton(
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(21.dp))
+            Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(PocketIconSize.Regular))
         }
     }
 }
@@ -165,12 +180,12 @@ fun PocketStatusPill(
         modifier = modifier
             .background(tint.copy(alpha = 0.12f), RoundedCornerShape(50))
             .border(1.dp, tint.copy(alpha = 0.2f), RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(13.dp))
-            Spacer(Modifier.width(5.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(PocketIconSize.Marker))
+            Spacer(Modifier.width(6.dp))
         }
         Text(
             text = text,

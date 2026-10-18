@@ -37,13 +37,26 @@ val LocalPocketColors = staticCompositionLocalOf {
     specFor(PocketPalette.MIDNIGHT_ATELIER).darkPocket
 }
 
+// Radien-Skala der App: 8 · 12 · 16 · 24 · 32. Lokale RoundedCornerShape-Werte
+// sollen auf diese Stufen zeigen (PocketRadius), nicht dazwischen liegen.
 private val PocketShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(13.dp),
-    medium = RoundedCornerShape(19.dp),
-    large = RoundedCornerShape(27.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    extraSmall = RoundedCornerShape(PocketRadius.XSmall),
+    small = RoundedCornerShape(PocketRadius.Small),
+    medium = RoundedCornerShape(PocketRadius.Medium),
+    large = RoundedCornerShape(PocketRadius.Large),
+    extraLarge = RoundedCornerShape(PocketRadius.XLarge),
 )
+
+/** Eckenradien. Inline-Code und kleine Vorschauen XSmall, Eingabe-nahe
+ *  Elemente Small, Karten/Bubbles/Codebloecke Medium, grosse Container und
+ *  Sheets Large, Dialoge XLarge. Pillen nehmen CircleShape bzw. 50 %. */
+object PocketRadius {
+    val XSmall = 8.dp
+    val Small = 12.dp
+    val Medium = 16.dp
+    val Large = 24.dp
+    val XLarge = 32.dp
+}
 
 @Composable
 fun PocketClaudeTheme(
