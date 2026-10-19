@@ -826,7 +826,8 @@ fun ChatScreen(
                             containerColor = MaterialTheme.colorScheme.surface,
                         ),
                         shape = CircleShape,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+                        // Unter der schwebenden Kopfzeile, nicht dahinter.
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = headerPad + 8.dp),
                     )
                 }
 

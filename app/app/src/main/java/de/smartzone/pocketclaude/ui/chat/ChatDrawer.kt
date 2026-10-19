@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -93,7 +97,9 @@ internal fun ChatDrawerContent(
     }
 
     var query by remember { mutableStateOf("") }
-    var hits by remember { mutableStateOf<List<SearchHitDto>>(emptyList()) }
+    // Treffer merken sich ihren Suchbegriff: alte Volltexttreffer duerfen nicht
+    // neben den Titeltreffern eines neuen Begriffs stehen bleiben.
+    var hits by remember { mutableStateOf<Pair<String, List<SearchHitDto>>>("" to emptyList()) }
     var searching by remember { mutableStateOf(false) }
     // Beim Schliessen leeren, sonst oeffnet die Leiste beim naechsten Mal
     // mitten in einer alten Suche.
@@ -106,15 +112,21 @@ internal fun ChatDrawerContent(
     LaunchedEffect(query) {
         val q = query.trim()
         if (q.isEmpty()) {
-            hits = emptyList()
+            hits = "" to emptyList()
             searching = false
             return@LaunchedEffect
         }
         searching = true
         delay(250)
-        hits = runCatching { container.chatRepository.search(q).hits }
-            .onFailure { android.util.Log.w("PC_NET", "drawer search failed: ${it.message}") }
-            .getOrDefault(emptyList())
+        val found = try {
+            container.chatRepository.search(q).hits
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("PC_NET", "drawer search failed: ${e.message}")
+            emptyList()
+        }
+        hits = q to found
         searching = false
     }
 
@@ -126,7 +138,14 @@ internal fun ChatDrawerContent(
         drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         drawerContentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Box(Modifier.fillMaxSize()) {
+        // Tastatur der Suche schiebt Liste und untere Knoepfe hoch, statt sie
+        // zu verdecken. Die Navigationsleiste rechnet der Sheet schon ein.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .consumeWindowInsets(WindowInsets.navigationBars)
+                .imePadding(),
+        ) {
             Column(Modifier.fillMaxSize()) {
                 Text(
                     stringResource(R.string.app_name),
@@ -173,7 +192,7 @@ internal fun ChatDrawerContent(
                         val titleIds = titleMatches.map { it.id }.toSet()
                         // Pro Chat nur der beste Treffer; Chats, die schon ueber
                         // den Titel gefunden wurden, nicht doppelt.
-                        val messageHits = hits
+                        val messageHits = (if (hits.first == q) hits.second else emptyList())
                             .distinctBy { it.conversationId }
                             .filterNot { it.conversationId in titleIds }
                         items(titleMatches, key = { "t-" + it.id }) { conv ->
