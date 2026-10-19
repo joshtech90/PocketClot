@@ -1275,7 +1275,8 @@ private fun shareMarkdownIntent(context: android.content.Context, title: String,
             type = "text/markdown"
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             putExtra(android.content.Intent.EXTRA_SUBJECT, title)
-            putExtra(android.content.Intent.EXTRA_TEXT, markdown.take(4000))
+            // Bewusst kein EXTRA_TEXT: Telegram & Co. setzen den sonst als
+            // Nachricht neben die Datei (Joscha 19.10.2026: nur die Datei).
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(android.content.Intent.createChooser(intent, context.getString(de.smartzone.pocketclaude.R.string.chat_share_chooser_title)))
