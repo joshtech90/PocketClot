@@ -329,8 +329,10 @@
     <string name="chat_close">Schließen</string>
     <string name="chat_untitled">(ohne Titel)</string>
     <string name="chat_attach">Anhängen</string>
-    <string name="chat_attach_image_menu">Bild aus Galerie</string>
-    <string name="chat_attach_file_menu">Datei (PDF, JSON, Code …)</string>
+    <string name="chat_attach_image_menu">Fotos</string>
+    <string name="chat_attach_file_menu">Dateien</string>
+    <string name="chat_attach_camera_menu">Kamera</string>
+    <string name="chat_voice_conversation">Sprachgespräch starten</string>
     <string name="chat_remove">Entfernen</string>
     <string name="chat_share_chooser_title">Chat teilen</string>
     <string name="chat_share_failed">Teilen fehlgeschlagen: %1$s</string>

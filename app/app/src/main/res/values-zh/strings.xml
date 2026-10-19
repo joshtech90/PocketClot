@@ -326,8 +326,10 @@
     <string name="chat_close">关闭</string>
     <string name="chat_untitled">(未命名)</string>
     <string name="chat_attach">附件</string>
-    <string name="chat_attach_image_menu">从相册选择图片</string>
-    <string name="chat_attach_file_menu">文件(PDF、JSON、代码 …)</string>
+    <string name="chat_attach_image_menu">照片</string>
+    <string name="chat_attach_file_menu">文件</string>
+    <string name="chat_attach_camera_menu">相机</string>
+    <string name="chat_voice_conversation">开始语音对话</string>
     <string name="chat_remove">移除</string>
     <string name="chat_share_chooser_title">分享聊天</string>
     <string name="chat_share_failed">分享失败:%1$s</string>
