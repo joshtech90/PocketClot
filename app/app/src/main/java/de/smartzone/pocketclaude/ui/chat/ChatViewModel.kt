@@ -55,6 +55,8 @@ data class PendingAttachment(
     val uploading: Boolean,
     val uploaded: AttachmentDto? = null,
     val error: String? = null,
+    /** Steuert nur die Vorschau im Eingabefeld (Bild statt Dateikachel). */
+    val isImage: Boolean = false,
 )
 
 data class ChatUiState(
@@ -517,8 +519,12 @@ class ChatViewModel(
     }
 
     fun addPending(uri: Uri, filename: String) {
+        // Mehrfachauswahl: dieselbe Datei nicht zweimal hochladen.
+        if (_state.value.pending.any { it.uri == uri }) return
+        val isImage = runCatching { appContext.contentResolver.getType(uri) }
+            .getOrNull()?.startsWith("image/") == true
         _state.update { st ->
-            st.copy(pending = st.pending + PendingAttachment(uri, filename, uploading = true))
+            st.copy(pending = st.pending + PendingAttachment(uri, filename, uploading = true, isImage = isImage))
         }
         viewModelScope.launch {
             runCatching { repo.uploadFromUri(uri) }

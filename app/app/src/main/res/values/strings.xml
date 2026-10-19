@@ -333,6 +333,7 @@
     <string name="chat_attach_file_menu">Files</string>
     <string name="chat_attach_camera_menu">Camera</string>
     <string name="chat_voice_conversation">Start voice conversation</string>
+    <string name="chat_camera_unavailable">No camera app found</string>
     <string name="chat_remove">Remove</string>
     <string name="chat_share_chooser_title">Share chat</string>
     <string name="chat_share_failed">Share failed: %1$s</string>

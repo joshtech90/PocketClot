@@ -330,6 +330,7 @@
     <string name="chat_attach_file_menu">ファイル</string>
     <string name="chat_attach_camera_menu">カメラ</string>
     <string name="chat_voice_conversation">音声会話を開始</string>
+    <string name="chat_camera_unavailable">カメラアプリが見つかりません</string>
     <string name="chat_remove">削除</string>
     <string name="chat_share_chooser_title">チャットを共有</string>
     <string name="chat_share_failed">共有に失敗しました: %1$s</string>

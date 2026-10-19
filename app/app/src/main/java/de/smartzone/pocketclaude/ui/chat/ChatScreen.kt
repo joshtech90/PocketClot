@@ -76,6 +76,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -172,20 +173,55 @@ fun ChatScreen(
 
     val defaultImageName = stringResource(de.smartzone.pocketclaude.R.string.chat_default_filename_image)
     val defaultDocName = stringResource(de.smartzone.pocketclaude.R.string.chat_default_filename_doc)
+    // Mehrfachauswahl: bis zu MAX_PICK Bilder bzw. beliebig viele Dateien auf
+    // einmal; jede wird einzeln hochgeladen und als Anhang vorgemerkt.
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val name = queryName(context, uri) ?: defaultImageName
-            vm.addPending(uri, name)
-        }
+        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_PICK),
+    ) { uris: List<Uri> ->
+        for (uri in uris) vm.addPending(uri, queryName(context, uri) ?: defaultImageName)
     }
     val documentPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val name = queryName(context, uri) ?: defaultDocName
-            vm.addPending(uri, name)
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris: List<Uri> ->
+        for (uri in uris) vm.addPending(uri, queryName(context, uri) ?: defaultDocName)
+    }
+    // Kamera: Foto landet in einer eigenen Datei im Cache (FileProvider deckt
+    // den ganzen Cache ab). Pfad ueberlebt per rememberSaveable auch, dass
+    // Android die App waehrend der Kamera beendet.
+    var cameraFile by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+    ) { ok: Boolean ->
+        val file = cameraFile?.let { java.io.File(it) }
+        cameraFile = null
+        if (file == null) return@rememberLauncherForActivityResult
+        if (ok && file.length() > 0) {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", file,
+            )
+            vm.addPending(uri, file.name)
+        } else {
+            file.delete()
+        }
+    }
+    val launchCamera: () -> Unit = {
+        val dir = java.io.File(context.cacheDir, "camera").apply { mkdirs() }
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.ROOT)
+            .format(java.util.Date())
+        val file = java.io.File(dir, "IMG_$stamp.jpg")
+        cameraFile = file.absolutePath
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.fileprovider", file,
+        )
+        try {
+            cameraLauncher.launch(uri)
+        } catch (e: android.content.ActivityNotFoundException) {
+            cameraFile = null
+            android.widget.Toast.makeText(
+                context,
+                context.getString(de.smartzone.pocketclaude.R.string.chat_camera_unavailable),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
         }
     }
     // Chat als .md lokal speichern (Storage Access Framework). Inhalt wird beim
@@ -328,6 +364,19 @@ fun ChatScreen(
             }
         }
         pendingMicAction = false
+    }
+    // Auto-Modus (Sprachgespraech) starten: aus dem Drei-Punkte-Menue und vom
+    // runden Knopf im leeren Eingabefeld.
+    val startAutoMode: () -> Unit = {
+        // Permission vorher klären — sonst landet der Loop im Error-Branch.
+        if (!container.voiceRecorder.hasPermission()) {
+            pendingMicAction = true
+            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+            // Permission-Result-Handler ruft toggleRecording() — einfacher
+            // Trick: Auto-Mode-Flag gleich setzen, der Loop wartet dann auf
+            // den Mic-Start.
+        }
+        vm.setAutoMode(true)
     }
     // Transkript aus dem VM ins Input-Feld einfügen (nur im manuellen Modus —
     // im Auto-Modus geht der Text direkt zu send(), nicht über input).
@@ -630,29 +679,7 @@ fun ChatScreen(
                                 },
                                 onClick = {
                                     moreMenuOpen = false
-                                    val turnOn = !state.autoMode
-                                    if (turnOn) {
-                                        // Permission vorher klären — sonst landet
-                                        // der Loop im Error-Branch.
-                                        if (container.voiceRecorder.hasPermission()) {
-                                            vm.setAutoMode(true)
-                                        } else {
-                                            pendingMicAction = true
-                                            micPermissionLauncher.launch(
-                                                android.Manifest.permission.RECORD_AUDIO
-                                            )
-                                            // Permission-Result-Handler ruft
-                                            // toggleRecording() — wir starten
-                                            // den Auto-Mode hier separat, wenn
-                                            // sich der Grant einstellt:
-                                            // einfacher Trick: Auto-Mode flag
-                                            // gleich setzen, der Loop wartet
-                                            // dann auf den Mic-Start.
-                                            vm.setAutoMode(true)
-                                        }
-                                    } else {
-                                        vm.setAutoMode(false)
-                                    }
+                                    if (!state.autoMode) startAutoMode() else vm.setAutoMode(false)
                                 },
                             )
                             DropdownMenuItem(
@@ -876,20 +903,6 @@ fun ChatScreen(
                 }
             }
 
-            // Pending attachments strip
-            AnimatedVisibility(visible = state.pending.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.pending.forEach { p ->
-                        PendingChip(p, onRemove = { vm.removePending(p.uri) })
-                    }
-                }
-            }
-
             // Input: Im Auto-Mode komplett ersetzt durch AutoModeBar (grosser
             // Mic + Status-Text + Exit-Button). Tastatur ist dort nutzlos,
             // wird beim Auto-Mode-Start aktiv ausgeblendet (siehe oben).
@@ -924,21 +937,24 @@ fun ChatScreen(
                     },
                 )
             } else {
-                InputBar(
+                ChatComposer(
                     value = input,
                     onChange = { input = it },
+                    pending = state.pending,
+                    onRemovePending = { vm.removePending(it.uri) },
                     onSend = {
                         val text = input
                         input = ""
                         vm.send(text)
                     },
                     onStop = { vm.stop() },
-                    onAttachImage = {
+                    onCamera = launchCamera,
+                    onPhotos = {
                         photoPicker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
-                    onAttachDocument = {
+                    onFiles = {
                         // Liberal-Liste: Claude kann mit allem umgehen, was Text ist
                         // (Code, Configs, Logs, Markdown, JSON, YAML, …) oder als
                         // Bild/PDF erkannt werden kann. Wir lassen den OS-Picker
@@ -948,8 +964,8 @@ fun ChatScreen(
                         // im Server (.env: MAX_UPLOAD_MB).
                         documentPicker.launch(arrayOf("*/*"))
                     },
+                    onVoiceConversation = startAutoMode,
                     sending = state.isStreaming,
-                    hasContent = input.isNotBlank() || state.pending.any { it.uploaded != null },
                     voiceState = state.voiceState,
                     // Mic deaktivieren wenn LLM busy ist (Stream läuft oder TTS
                     // spielt) — sonst nimmt das Mic die TTS-Wiedergabe vom
@@ -1452,197 +1468,8 @@ private fun DrawerSectionLabel(text: String) {
     )
 }
 
-@Composable
-private fun PendingChip(p: PendingAttachment, onRemove: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        when {
-            p.uploading -> CircularProgressIndicator(
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(PocketIconSize.Marker),
-            )
-            p.error != null -> Icon(
-                PocketIcons.Close,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(PocketIconSize.Marker),
-            )
-            else -> Icon(
-                PocketIcons.Image,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(PocketIconSize.Small),
-            )
-        }
-        Spacer(Modifier.width(6.dp))
-        Text(
-            p.filename,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 140.dp),
-        )
-        Spacer(Modifier.width(4.dp))
-        IconButton(onClick = onRemove, modifier = Modifier.size(20.dp)) {
-            Icon(
-                PocketIcons.Close,
-                contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_remove),
-                modifier = Modifier.size(PocketIconSize.Marker),
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun InputBar(
-    value: String,
-    onChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onStop: () -> Unit,
-    onAttachImage: () -> Unit,
-    onAttachDocument: () -> Unit,
-    sending: Boolean,
-    hasContent: Boolean,
-    voiceState: VoiceState,
-    voiceEnabled: Boolean,
-    onMicTap: () -> Unit,
-    onMicCancel: () -> Unit,
-) {
-    var attachMenu by remember { mutableStateOf(false) }
-    val inputInteractionSource = remember { MutableInteractionSource() }
-    val inputFocused by inputInteractionSource.collectIsFocusedAsState()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Max von IME und Navigation-Bar, damit beide Insets nicht addiert werden.
-            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(PocketRadius.XLarge),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (inputFocused) MaterialTheme.colorScheme.primary
-            else PocketTheme.colors.outlineSoft,
-        ),
-        shadowElevation = 8.dp,
-    ) {
-    Row(
-        modifier = Modifier.padding(4.dp),
-        // Mittig statt unten: das Textfeld ist hoeher als die 48dp-Knoepfe,
-        // deshalb sassen Heftklammer, Mikrofon und Senden bei einzeiliger
-        // Eingabe sichtbar zu tief.
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box {
-            IconButton(onClick = { attachMenu = true }) {
-                Icon(PocketIcons.AttachFile, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.chat_attach))
-            }
-            DropdownMenu(
-                expanded = attachMenu,
-                onDismissRequest = { attachMenu = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_attach_image_menu)) },
-                    leadingIcon = { Icon(PocketIcons.AddPhoto, contentDescription = null) },
-                    onClick = { attachMenu = false; onAttachImage() },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.chat_attach_file_menu)) },
-                    leadingIcon = { Icon(PocketIcons.Document, contentDescription = null) },
-                    onClick = { attachMenu = false; onAttachDocument() },
-                )
-            }
-        }
-
-        // Mic-Button: idle / recording (pulsierend grün) / transcribing (Spinner).
-        // Long-Press während Recording bricht ab statt zu transkribieren.
-        de.smartzone.pocketclaude.ui.components.MicButton(
-            state = when (voiceState) {
-                VoiceState.Idle -> de.smartzone.pocketclaude.ui.components.MicState.Idle
-                VoiceState.Recording -> de.smartzone.pocketclaude.ui.components.MicState.Recording
-                VoiceState.Transcribing -> de.smartzone.pocketclaude.ui.components.MicState.Transcribing
-            },
-            onTap = onMicTap,
-            onCancel = onMicCancel,
-            // Erlaubt wenn der User wirklich was tun darf: nicht senden,
-            // nicht transkribieren, LLM nicht busy (Stream/TTS). Während
-            // einer aktiven Recording-Phase bleibt der Button enabled, damit
-            // der User stoppen kann.
-            enabled = voiceState == VoiceState.Recording ||
-                (voiceEnabled && voiceState != VoiceState.Transcribing),
-        )
-
-        Box(modifier = Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onChange,
-                modifier = Modifier.fillMaxWidth(),
-                interactionSource = inputInteractionSource,
-                placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.hint_message)) },
-                maxLines = 6,
-                shape = RoundedCornerShape(24.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                ),
-            )
-        }
-
-        Spacer(Modifier.width(6.dp))
-
-        SendButton(
-            sending = sending,
-            enabled = hasContent || sending,
-            onSend = onSend,
-            onStop = onStop,
-        )
-    }
-    }
-    }
-}
-
-
-@Composable
-private fun SendButton(
-    sending: Boolean,
-    enabled: Boolean,
-    onSend: () -> Unit,
-    onStop: () -> Unit,
-) {
-    val containerColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val contentColor = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(containerColor),
-        contentAlignment = Alignment.Center,
-    ) {
-        IconButton(
-            onClick = { if (sending) onStop() else onSend() },
-            enabled = enabled,
-        ) {
-            Icon(
-                imageVector = if (sending) PocketIcons.Stop else PocketIcons.Send,
-                contentDescription = stringResource(if (sending) de.smartzone.pocketclaude.R.string.stop else de.smartzone.pocketclaude.R.string.send),
-                tint = contentColor,
-            )
-        }
-    }
-}
+/** Hoechstzahl Bilder pro Auswahl im Foto-Picker. */
+private const val MAX_PICK = 10
 
 private fun shareMarkdownIntent(context: android.content.Context, title: String, markdown: String) {
     // Markdown in temp-Datei, Share via FileProvider als .md

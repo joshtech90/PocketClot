@@ -330,6 +330,7 @@
     <string name="chat_attach_file_menu">Fichiers</string>
     <string name="chat_attach_camera_menu">Appareil photo</string>
     <string name="chat_voice_conversation">Démarrer une conversation vocale</string>
+    <string name="chat_camera_unavailable">Aucune application appareil photo trouvée</string>
     <string name="chat_remove">Supprimer</string>
     <string name="chat_share_chooser_title">Partager la discussion</string>
     <string name="chat_share_failed">Échec du partage : %1$s</string>

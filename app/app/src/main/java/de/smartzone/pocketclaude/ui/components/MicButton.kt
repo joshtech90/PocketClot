@@ -69,6 +69,8 @@ fun MicButton(
      *  bevor er voll ist sendet die App automatisch. Ersetzt den vorher
      *  springenden „Senden in Ns"-Text. */
     progressFraction: Float = 0f,
+    /** Symbolfarbe im Ruhezustand; das Eingabefeld zeichnet es so dunkel wie Plus. */
+    idleTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
@@ -160,7 +162,7 @@ fun MicButton(
                     PocketIcons.Mic,
                     contentDescription = stringResource(R.string.voice_mic_idle_cd),
                     tint = if (enabled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        idleTint
                     } else {
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                     },
