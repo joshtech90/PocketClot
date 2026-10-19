@@ -678,7 +678,7 @@ private fun SearchHitCard(
 }
 
 /** Wandelt `[[hit]]`-Marker aus dem FTS5-snippet in fett-formatierte Spans. */
-private fun highlightSnippet(raw: String): AnnotatedString {
+internal fun highlightSnippet(raw: String): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
         while (i < raw.length) {

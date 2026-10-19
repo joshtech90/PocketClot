@@ -164,7 +164,7 @@ fun ChatScreen(
     LaunchedEffect(drawerState.currentValue, state.title) {
         if (drawerState.currentValue == DrawerValue.Open) {
             runCatching { container.chatRepository.list() }
-                .onSuccess { drawerChats = it.take(40) }
+                .onSuccess { drawerChats = it }
             runCatching { container.chatRepository.listGems() }
                 .onSuccess { drawerGems = it }
         }
@@ -408,8 +408,12 @@ fun ChatScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // Abdunklung wie bei ChatGPT; die Leiste ist nur 80 % breit, ein Tipp
+        // auf den sichtbaren Chat rechts daneben schliesst sie.
+        scrimColor = Color.Black.copy(alpha = 0.5f),
         drawerContent = {
             ChatDrawerContent(
+                open = drawerState.targetValue == DrawerValue.Open,
                 currentCid = state.conversationId,
                 chats = drawerChats,
                 gems = drawerGems,
@@ -1251,169 +1255,6 @@ private fun GemWelcome(
             }
         }
     }
-}
-
-@Composable
-private fun ChatDrawerContent(
-    currentCid: String,
-    chats: List<ConversationDto>,
-    gems: List<de.smartzone.pocketclaude.data.GemDto>,
-    onNewChat: () -> Unit,
-    onStartGem: (String) -> Unit,
-    onGenerateImages: () -> Unit,
-    onSwitch: (String) -> Unit,
-    onAllChats: () -> Unit,
-    onSettings: () -> Unit,
-) {
-    // Image-Gen-Config asynchron prüfen — wir zeigen den Drawer-Eintrag nur,
-    // wenn ein API-Key gesetzt ist (User-Wunsch: "soll überall aus sein wenn
-    // kein API-Key"). Bei API-Errors / nicht eingerichtet: Eintrag bleibt aus.
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val container = remember {
-        (context.applicationContext as de.smartzone.pocketclaude.PocketClaudeApp).container
-    }
-    var imageGenAvailable by remember { mutableStateOf(false) }
-    val allConversationsLabel = stringResource(de.smartzone.pocketclaude.R.string.all_conversations)
-    LaunchedEffect(Unit) {
-        runCatching { container.chatRepository.imagesConfig() }
-            .onSuccess { cfg -> imageGenAvailable = cfg.configured }
-    }
-    ModalDrawerSheet(
-        drawerContainerColor = PocketTheme.colors.surfaceLow,
-        drawerContentColor = MaterialTheme.colorScheme.onBackground,
-    ) {
-        // Kopf: Markenzeichen + Name + Einstellungen. Das Markenzeichen fuehrt
-        // wie bisher zur Liste aller Gespraeche.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .semantics { contentDescription = allConversationsLabel }
-                    .clickable(role = Role.Button, onClick = onAllChats),
-                contentAlignment = Alignment.Center,
-            ) {
-                PocketBrandMark(size = 40.dp)
-            }
-            Spacer(Modifier.width(12.dp))
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.app_name),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onSettings) {
-                Icon(PocketIcons.Settings, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_settings))
-            }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        Spacer(Modifier.height(8.dp))
-        DrawerEntry(
-            icon = PocketIcons.NewChat,
-            label = stringResource(de.smartzone.pocketclaude.R.string.new_chat),
-            onClick = onNewChat,
-        )
-        // Image generation — only visible if an API key is configured
-        // (otherwise the entry would do nothing useful). Setup flow runs via Settings.
-        if (imageGenAvailable) {
-            DrawerEntry(
-                icon = PocketIcons.Image,
-                label = stringResource(de.smartzone.pocketclaude.R.string.title_images),
-                onClick = onGenerateImages,
-            )
-        }
-        DrawerEntry(
-            icon = PocketIcons.Forum,
-            label = allConversationsLabel,
-            onClick = onAllChats,
-        )
-
-        // Gems (Custom Agents) — Tippen startet einen frischen Chat mit dem Gem.
-        if (gems.isNotEmpty()) {
-            DrawerSectionLabel(stringResource(de.smartzone.pocketclaude.R.string.section_gems))
-            gems.forEach { gem ->
-                NavigationDrawerItem(
-                    icon = {
-                        // Das Emoji sitzt in derselben 24-dp-Flaeche wie die
-                        // Symbole, damit alle Beschriftungen buendig beginnen.
-                        Box(Modifier.size(PocketIconSize.Regular), contentAlignment = Alignment.Center) {
-                            Text(
-                                gem.emoji.ifBlank { "🤖" },
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                    },
-                    label = {
-                        Text(gem.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    },
-                    selected = false,
-                    onClick = { onStartGem(gem.id) },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-            }
-        }
-
-        DrawerSectionLabel(stringResource(de.smartzone.pocketclaude.R.string.recent_chats))
-
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 12.dp),
-        ) {
-            items(chats, key = { it.id }) { conv ->
-                NavigationDrawerItem(
-                    icon = {
-                        if (conv.pinned) {
-                            Icon(
-                                PocketIcons.PushPinFilled,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        } else {
-                            Icon(PocketIcons.ChatBubble, contentDescription = null)
-                        }
-                    },
-                    label = {
-                        Text(
-                            conv.title.ifBlank { stringResource(de.smartzone.pocketclaude.R.string.chat_untitled) },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    selected = conv.id == currentCid,
-                    onClick = { onSwitch(conv.id) },
-                )
-            }
-        }
-    }
-}
-
-/** Fester Drawer-Eintrag (Neuer Chat, Bilder, Alle Gespraeche). */
-@Composable
-private fun DrawerEntry(icon: ImageVector, label: String, onClick: () -> Unit) {
-    NavigationDrawerItem(
-        icon = { Icon(icon, contentDescription = null) },
-        label = { Text(label) },
-        selected = false,
-        onClick = onClick,
-        modifier = Modifier.padding(horizontal = 12.dp),
-    )
-}
-
-/** Abschnittsbeschriftung im Drawer, buendig mit den Symbolen der Eintraege. */
-@Composable
-private fun DrawerSectionLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 8.dp),
-    )
 }
 
 /** Hoechstzahl Bilder pro Auswahl im Foto-Picker. */

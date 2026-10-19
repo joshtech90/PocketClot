@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -111,7 +112,9 @@ internal fun ChatDrawerContent(
         }
         searching = true
         delay(250)
-        hits = runCatching { container.chatRepository.search(q).hits }.getOrDefault(emptyList())
+        hits = runCatching { container.chatRepository.search(q).hits }
+            .onFailure { android.util.Log.w("PC_NET", "drawer search failed: ${it.message}") }
+            .getOrDefault(emptyList())
         searching = false
     }
 
@@ -214,7 +217,7 @@ private fun DrawerSearchField(query: String, onQueryChange: (String) -> Unit) {
             .padding(horizontal = 16.dp)
             .height(44.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(start = 12.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -369,10 +372,12 @@ private fun DrawerBottomBar(onNewChat: () -> Unit, onSettings: () -> Unit, modif
                 Text(stringResource(R.string.new_chat), style = MaterialTheme.typography.titleMedium)
             }
         }
+        val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
         Surface(
             onClick = onSettings,
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            color = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh
+                else MaterialTheme.colorScheme.surfaceContainerLowest,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shadowElevation = 3.dp,
             modifier = Modifier.size(48.dp),

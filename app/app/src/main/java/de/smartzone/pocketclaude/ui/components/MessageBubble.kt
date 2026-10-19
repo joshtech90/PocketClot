@@ -76,19 +76,17 @@ fun UserBubble(
     val showCollapsed = collapseLongMessages && !expanded
     val maxLines = if (showCollapsed) COLLAPSE_MAX_LINES else Int.MAX_VALUE
     val copy = rememberCopyHandler(text)
-    val bubbleShape = RoundedCornerShape(
-        topStart = PocketRadius.Large,
-        topEnd = PocketRadius.Large,
-        bottomStart = PocketRadius.Large,
-        bottomEnd = PocketRadius.XSmall,
-    )
+    // Rundum gleich rund wie die eigene Nachricht in der ChatGPT-App.
+    val bubbleShape = RoundedCornerShape(PocketRadius.Large)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             // Rechts 16 dp wie links bei den Antworten: vorher klebte die
             // eigene Nachricht mit 10 dp naeher am Rand als die Antwort.
-            .padding(start = 48.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            // Links 88 dp frei wie bei ChatGPT: die Blase nimmt hoechstens
+            // gut 70 % der Breite ein.
+            .padding(start = 88.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.End,
     ) {
         Column(horizontalAlignment = Alignment.End) {
@@ -102,7 +100,6 @@ fun UserBubble(
                         .widthIn(max = 320.dp)
                         .clip(bubbleShape)
                         .background(pocket.bubbleUser)
-                        .border(1.dp, Color.White.copy(alpha = 0.14f), bubbleShape)
                         // Normaler clickable (NICHT combinedClickable) — Long-
                         // Click bleibt dann beim eingebetteten SelectionContainer
                         // (wird vom ChatScreen umgewickelt), damit native Text-
