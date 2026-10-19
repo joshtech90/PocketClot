@@ -878,7 +878,9 @@ private val ChatGptDarkColors = darkColorScheme(
     onError = Color(0xFF450A0A),
 )
 
-// Keine Lichtflecken im Hintergrund: ChatGPT ist flach.
+// Keine Lichtflecken im Hintergrund: ChatGPT ist flach. Die Flecken bekommen
+// deshalb die Hintergrundfarbe; Color.Transparent ginge nicht, das ist Schwarz
+// mit Alpha 0 und wird durch copy(alpha = 0.1f) zu einem grauen Fleck.
 private val ChatGptLightPocket = PocketColors(
     bubbleUser = GptLightBubbleUser,
     bubbleAssistant = Color(0xFFF4F4F4),
@@ -886,8 +888,8 @@ private val ChatGptLightPocket = PocketColors(
     onBubbleAssistant = GptLightText,
     accent = GptLightAccent,
     success = Color(0xFF10A37F),
-    ambientPrimary = Color.Transparent,
-    ambientSecondary = Color.Transparent,
+    ambientPrimary = GptLightBg,
+    ambientSecondary = GptLightBg,
     surfaceLow = GptLightBg,
     outlineSoft = GptLightOutlineSoft,
 )
@@ -899,8 +901,8 @@ private val ChatGptDarkPocket = PocketColors(
     onBubbleAssistant = GptDarkText,
     accent = GptDarkAccent,
     success = Color(0xFF19C37D),
-    ambientPrimary = Color.Transparent,
-    ambientSecondary = Color.Transparent,
+    ambientPrimary = GptDarkBg,
+    ambientSecondary = GptDarkBg,
     surfaceLow = GptDarkBg,
     outlineSoft = GptDarkOutlineSoft,
 )

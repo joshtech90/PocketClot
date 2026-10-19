@@ -53,9 +53,9 @@ internal fun ChatFloatingHeader(
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    0f to background.copy(alpha = 0.92f),
-                    0.7f to background.copy(alpha = 0.75f),
-                    1f to Color.Transparent,
+                    0f to background.copy(alpha = 0.96f),
+                    0.75f to background.copy(alpha = 0.9f),
+                    1f to background.copy(alpha = 0f),
                 )
             ),
     ) {
