@@ -782,6 +782,7 @@
     <string name="auto_mode_hint_listening_auto">Pausa = enviar · toque para enviar já</string>
     <string name="auto_mode_hint_idle">Toque para falar</string>
     <string name="auto_mode_exit">Sair do Auto-Modo</string>
+    <string name="auto_mode_stop_speaking">Parar a leitura</string>
     <string name="auto_mode_status_sending_in">Enviando em %1$ds</string>
     <string name="auto_mode_auto_send_label">Auto-envio na pausa</string>
     <string name="settings_billing_widget_title">Uso da Cloud este mês</string>

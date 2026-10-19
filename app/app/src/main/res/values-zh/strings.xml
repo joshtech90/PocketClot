@@ -782,6 +782,7 @@
     <string name="auto_mode_hint_listening_auto">停顿即发送 · 点击立即发送</string>
     <string name="auto_mode_hint_idle">点击说话</string>
     <string name="auto_mode_exit">退出自动模式</string>
+    <string name="auto_mode_stop_speaking">停止朗读</string>
     <string name="auto_mode_status_sending_in">%1$d 秒后发送</string>
     <string name="auto_mode_auto_send_label">停顿时自动发送</string>
     <string name="settings_billing_widget_title">本月 Cloud 使用</string>

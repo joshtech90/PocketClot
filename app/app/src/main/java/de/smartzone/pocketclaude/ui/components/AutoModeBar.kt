@@ -1,5 +1,6 @@
 package de.smartzone.pocketclaude.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -70,6 +72,8 @@ fun AutoModeBar(
     onMicTap: () -> Unit,
     onMicCancel: () -> Unit,
     onExitAutoMode: () -> Unit,
+    /** Bricht das laufende Vorlesen ab; der Loop nimmt danach sofort wieder auf. */
+    onStopSpeaking: () -> Unit,
     onAutoSendChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -160,6 +164,21 @@ fun AutoModeBar(
             outerSize = 140.dp,
             progressFraction = ringFraction,
         )
+
+        // Vorlesen abbrechen (Joscha 19.10.2026): nur waehrend die Antwort
+        // geladen oder vorgelesen wird. Der Loop wartet in Phase 6 genau auf
+        // das Ende der Wiedergabe und startet danach selbst die Aufnahme.
+        AnimatedVisibility(visible = phase == AutoPhase.LoadingAudio || phase == AutoPhase.Speaking) {
+            FilledTonalButton(onClick = onStopSpeaking) {
+                Icon(
+                    PocketIcons.Stop,
+                    contentDescription = null,
+                    modifier = Modifier.size(PocketIconSize.Small),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(R.string.auto_mode_stop_speaking))
+            }
+        }
 
         Spacer(Modifier.size(4.dp))
 

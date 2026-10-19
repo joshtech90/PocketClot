@@ -3,6 +3,7 @@ package de.smartzone.pocketclaude.ui.chat
 import androidx.compose.ui.res.pluralStringResource
 import de.smartzone.pocketclaude.data.MessageDto
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -365,6 +366,9 @@ fun ChatScreen(
         }
         pendingMicAction = false
     }
+    // Zurueck beendet im Auto-Modus nur den Modus, nicht die ganze App
+    // (Joscha 19.10.2026). Ein offener Drawer faengt Zurueck vorher ab.
+    BackHandler(enabled = state.autoMode) { vm.setAutoMode(false) }
     // Auto-Modus (Sprachgespraech) starten: aus dem Drei-Punkte-Menue und vom
     // runden Knopf im leeren Eingabefeld.
     val startAutoMode: () -> Unit = {
@@ -932,6 +936,7 @@ fun ChatScreen(
                     onMicTap = handleMicTap,
                     onMicCancel = { vm.cancelRecording() },
                     onExitAutoMode = { vm.setAutoMode(false) },
+                    onStopSpeaking = { vm.stopSpeaking() },
                     onAutoSendChange = { enabled ->
                         scope.launch { container.settingsRepository.setAutoSendEnabled(enabled) }
                     },
