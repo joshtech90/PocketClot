@@ -23,6 +23,12 @@ object PocketIcons {
 
     /** add */
     val Add: ImageVector by lazy { symbol("Add", false, "M440-440H240q-17 0-28.5-11.5T200-480q0-17 11.5-28.5T240-520h200v-200q0-17 11.5-28.5T480-760q17 0 28.5 11.5T520-720v200h200q17 0 28.5 11.5T760-480q0 17-11.5 28.5T720-440H520v200q0 17-11.5 28.5T480-200q-17 0-28.5-11.5T440-240v-200Z") }
+    /**
+     * Grosses, duennes Plus fuer das Eingabefeld, nachgezeichnet nach der
+     * ChatGPT-App (17,5 dp Kantenlaenge, 2 dp Strich, runde Enden). Das
+     * Material-"add" ist dort sichtbar kleiner.
+     */
+    val AddLarge: ImageVector by lazy { symbol("AddLarge", false, "M440-790A40 40 0 0 1 520-790V-520H790A40 40 0 0 1 790-440H520V-170A40 40 0 0 1 440-170V-440H170A40 40 0 0 1 170-520H440Z") }
     /** add_photo_alternate */
     val AddPhoto: ImageVector by lazy { symbol("AddPhoto", false, "M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280q17 0 28.5 11.5T520-800q0 17-11.5 28.5T480-760H200v560h560v-280q0-17 11.5-28.5T800-520q17 0 28.5 11.5T840-480v280q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-400h-40q-17 0-28.5-11.5T600-720q0-17 11.5-28.5T640-760h40v-40q0-17 11.5-28.5T720-840q17 0 28.5 11.5T760-800v40h40q17 0 28.5 11.5T840-720q0 17-11.5 28.5T800-680h-40v40q0 17-11.5 28.5T720-600q-17 0-28.5-11.5T680-640v-40Z") }
     /** arrow_back */

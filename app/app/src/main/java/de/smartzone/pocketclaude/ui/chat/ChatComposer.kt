@@ -41,7 +41,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +58,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
@@ -108,6 +113,12 @@ internal fun ChatComposer(
     val keyboard = LocalSoftwareKeyboardController.current
     val menuState = remember { MutableTransitionState(false) }
 
+    // Eigener Cursor-Zustand: Kommt Text von aussen (Diktat, geteilter Text),
+    // steht der Cursor danach am Ende statt am Anfang (Joscha 19.10.2026).
+    var fieldState by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    val fieldValue = if (fieldState.text == value) fieldState
+        else TextFieldValue(value, TextRange(value.length))
+
     val expanded = focused || value.isNotEmpty() || pending.isNotEmpty()
     val anim = tween<androidx.compose.ui.unit.Dp>(durationMillis = 180)
     // Eingeklappt: Zeile mittig in 48 dp, links Platz fuer Plus, rechts fuer
@@ -119,6 +130,12 @@ internal fun ChatComposer(
     )
     val padBottom by animateDpAsState(if (expanded) BUTTON + 4.dp else 12.dp, anim, label = "padBottom")
 
+    // Volle 24-dp-Zeile auch bei einer einzigen Zeile. Der Standard schneidet
+    // den Zeilenabstand oben und unten weg; dann sass der Text 3 dp zu hoch
+    // und die Karte war niedriger als bei ChatGPT.
+    val fieldStyle = MaterialTheme.typography.bodyLarge.copy(
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+    )
     val anyUploading = pending.any { it.uploading }
     val hasContent = value.isNotBlank() || pending.any { it.uploaded != null }
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -137,7 +154,7 @@ internal fun ChatComposer(
             shape = RoundedCornerShape(PocketRadius.XLarge),
             color = cardColor,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shadowElevation = 6.dp,
+            shadowElevation = 3.dp,
         ) {
             Column(
                 // Antippen irgendwo auf der Karte setzt den Cursor ins Feld,
@@ -165,16 +182,17 @@ internal fun ChatComposer(
                 }
                 Box(modifier = Modifier.fillMaxWidth()) {
                     BasicTextField(
-                        value = value,
-                        onValueChange = onChange,
+                        value = fieldValue,
+                        onValueChange = {
+                            fieldState = it
+                            if (it.text != value) onChange(it.text)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = padStart, end = padEnd, top = padTop, bottom = padBottom)
                             .focusRequester(focusRequester),
                         interactionSource = interaction,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
+                        textStyle = fieldStyle.copy(color = MaterialTheme.colorScheme.onSurface),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         maxLines = 8,
                         decorationBox = { inner ->
@@ -182,8 +200,8 @@ internal fun ChatComposer(
                                 if (value.isEmpty()) {
                                     Text(
                                         stringResource(R.string.hint_message),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = fieldStyle,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -202,7 +220,7 @@ internal fun ChatComposer(
                         modifier = Modifier.align(Alignment.BottomStart).size(BUTTON),
                     ) {
                         Icon(
-                            PocketIcons.Add,
+                            PocketIcons.AddLarge,
                             contentDescription = stringResource(R.string.chat_attach),
                             tint = MaterialTheme.colorScheme.onSurface,
                         )
