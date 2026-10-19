@@ -334,6 +334,8 @@
     <string name="chat_attach_camera_menu">Kamera</string>
     <string name="chat_voice_conversation">Sprachgespräch starten</string>
     <string name="chat_camera_unavailable">Keine Kamera-App gefunden</string>
+    <string name="chat_wait_for_uploads">Warte, bis die Anhänge hochgeladen sind</string>
+    <string name="error_upload_too_large">Datei zu groß (max. %1$d MB)</string>
     <string name="chat_remove">Entfernen</string>
     <string name="chat_share_chooser_title">Chat teilen</string>
     <string name="chat_share_failed">Teilen fehlgeschlagen: %1$s</string>

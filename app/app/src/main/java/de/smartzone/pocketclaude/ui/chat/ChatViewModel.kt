@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import java.time.OffsetDateTime
@@ -523,11 +525,29 @@ class ChatViewModel(
         if (_state.value.pending.any { it.uri == uri }) return
         val isImage = runCatching { appContext.contentResolver.getType(uri) }
             .getOrNull()?.startsWith("image/") == true
+        // readUpload() liest die ganze Datei in den Speicher. Riesige Dateien
+        // gar nicht erst anfassen, sonst kann eine Mehrfachauswahl die App
+        // sprengen, bevor das Serverlimit ueberhaupt greift.
+        val size = runCatching {
+            appContext.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)
+                ?.use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null }
+        }.getOrNull()
+        if (size != null && size > MAX_ATTACHMENT_BYTES) {
+            _state.update { st ->
+                st.copy(pending = st.pending + PendingAttachment(
+                    uri, filename, uploading = false, isImage = isImage,
+                    error = appContext.getString(R.string.error_upload_too_large, MAX_ATTACHMENT_BYTES / (1024 * 1024)),
+                ))
+            }
+            return
+        }
         _state.update { st ->
             st.copy(pending = st.pending + PendingAttachment(uri, filename, uploading = true, isImage = isImage))
         }
         viewModelScope.launch {
-            runCatching { repo.uploadFromUri(uri) }
+            // Hoechstens zwei Anhaenge gleichzeitig lesen, komprimieren und
+            // hochladen; der Rest wartet (Mehrfachauswahl bis 10 Fotos).
+            runCatching { uploadSlots.withPermit { repo.uploadFromUri(uri) } }
                 .onSuccess { dto ->
                     _state.update { st ->
                         st.copy(pending = st.pending.map { p ->
@@ -553,6 +573,12 @@ class ChatViewModel(
         val text = content.trim()
         val pending = _state.value.pending
         if (text.isEmpty() && pending.none { it.uploaded != null }) return
+        // Nur fertig hochgeladene Anhaenge gehen mit, danach wird die Liste
+        // geleert. Ein laufender Upload ginge also stumm verloren.
+        if (pending.any { it.uploading }) {
+            _state.update { it.copy(errorMessage = appContext.getString(R.string.chat_wait_for_uploads)) }
+            return
+        }
         if (_state.value.isStreaming) return
 
         val attachmentIds = pending.mapNotNull { it.uploaded?.id }
@@ -1208,7 +1234,11 @@ class ChatViewModel(
         }
     }
 
+    private val uploadSlots = Semaphore(2)
+
     companion object {
+        private const val MAX_ATTACHMENT_BYTES = 50L * 1024 * 1024
+
         fun factory(container: AppContainer, cid: String): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")

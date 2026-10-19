@@ -331,6 +331,8 @@
     <string name="chat_attach_camera_menu">Appareil photo</string>
     <string name="chat_voice_conversation">Démarrer une conversation vocale</string>
     <string name="chat_camera_unavailable">Aucune application appareil photo trouvée</string>
+    <string name="chat_wait_for_uploads">Attends la fin de l’envoi des pièces jointes</string>
+    <string name="error_upload_too_large">Fichier trop volumineux (max. %1$d Mo)</string>
     <string name="chat_remove">Supprimer</string>
     <string name="chat_share_chooser_title">Partager la discussion</string>
     <string name="chat_share_failed">Échec du partage : %1$s</string>

@@ -331,6 +331,8 @@
     <string name="chat_attach_camera_menu">相机</string>
     <string name="chat_voice_conversation">开始语音对话</string>
     <string name="chat_camera_unavailable">未找到相机应用</string>
+    <string name="chat_wait_for_uploads">请等待附件上传完成</string>
+    <string name="error_upload_too_large">文件过大（最大 %1$d MB）</string>
     <string name="chat_remove">移除</string>
     <string name="chat_share_chooser_title">分享聊天</string>
     <string name="chat_share_failed">分享失败:%1$s</string>
