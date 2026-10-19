@@ -115,7 +115,6 @@ import de.smartzone.pocketclaude.data.EFFORT_LEVELS
 import de.smartzone.pocketclaude.data.EFFORT_LEVELS_ALL
 import de.smartzone.pocketclaude.data.GatewayStatusDto
 import de.smartzone.pocketclaude.data.familyForKey
-import de.smartzone.pocketclaude.data.shortModelLabel
 import androidx.compose.ui.graphics.vector.ImageVector
 import de.smartzone.pocketclaude.ui.theme.PocketIconSize
 import de.smartzone.pocketclaude.ui.theme.PocketRadius
@@ -136,7 +135,6 @@ fun ChatScreen(
     val state by vm.state.collectAsState()
     val audioState by vm.audioState.collectAsState()
     val context = LocalContext.current
-    val showTopBarDetails = LocalDensity.current.fontScale <= 1.3f
     val container = remember {
         (context.applicationContext as de.smartzone.pocketclaude.PocketClaudeApp).container
     }
@@ -458,9 +456,9 @@ fun ChatScreen(
             )
         },
         topBar = {
-            TopAppBar(
-                title = {
-                    if (state.searchActive) {
+            if (state.searchActive) {
+                TopAppBar(
+                    title = {
                         // Such-Modus: TextField statt Titel + Match-Counter
                         SearchBarTitle(
                             query = state.searchQuery,
@@ -468,289 +466,234 @@ fun ChatScreen(
                             matchCount = state.searchMatches.size,
                             currentIndex = state.searchIndex,
                         )
-                    } else {
-                        Column {
-                            val appName = stringResource(de.smartzone.pocketclaude.R.string.app_name)
-                            val baseTitle = state.title.ifBlank { appName }
-                            Text(
-                                if (state.gemEmoji.isNotBlank()) "${state.gemEmoji}  $baseTitle" else baseTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (showTopBarDetails) {
-                                val pct = (state.totalTokens.toFloat() / 200_000f * 100f)
-                                    .toInt().coerceIn(0, 999)
-                                val warn = pct >= 85
-                                val cachedLast = state.lastTurnCachedRead
-                                val cacheInfo = if (cachedLast > 0) {
-                                    stringResource(
-                                        de.smartzone.pocketclaude.R.string.chat_cache_suffix,
-                                        cachedLast / 1000,
-                                    )
-                                } else {
-                                    ""
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (state.modelKey.startsWith("gw:")) {
-                                        val label = state.models
-                                            .firstOrNull { it.key == state.modelKey }
-                                            ?.label
-                                        Text(
-                                            shortModelLabel(
-                                                label ?: state.modelKey.substringAfterLast(':'),
-                                            ),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            maxLines = 1,
-                                        )
-                                        Text(
-                                            " · ",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.outline,
-                                        )
-                                    }
-                                    Text(
-                                        stringResource(
-                                            de.smartzone.pocketclaude.R.string.chat_context_status,
-                                            pct,
-                                            formatTokens(context, state.totalTokens),
-                                            cacheInfo,
-                                        ),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (warn) MaterialTheme.colorScheme.error
-                                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    if (state.searchActive) {
+                    },
+                    navigationIcon = {
                         IconButton(onClick = { vm.closeSearch() }) {
                             Icon(PocketIcons.Close, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_close))
                         }
-                    } else {
-                        PocketIconButton(
-                            icon = PocketIcons.Menu,
-                            contentDescription = stringResource(de.smartzone.pocketclaude.R.string.title_conversations),
-                            onClick = { scope.launch { drawerState.open() } },
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-                },
-                actions = {
-                  if (state.searchActive) {
-                    val hasMatches = state.searchMatches.isNotEmpty()
-                    IconButton(onClick = { vm.previousMatch() }, enabled = hasMatches) {
-                        Icon(PocketIcons.ExpandLess, contentDescription = null)
-                    }
-                    IconButton(
-                        onClick = { vm.nextMatch() },
-                        enabled = hasMatches,
-                        modifier = Modifier.padding(end = 8.dp),
-                    ) {
-                        Icon(PocketIcons.ExpandMore, contentDescription = null)
-                    }
-                  } else {
-                    // Modell und Denktiefe. Das Sheet zeigt Claude zuerst,
+                    },
+                    actions = {
+                        val hasMatches = state.searchMatches.isNotEmpty()
+                        IconButton(onClick = { vm.previousMatch() }, enabled = hasMatches) {
+                            Icon(PocketIcons.ExpandLess, contentDescription = null)
+                        }
+                        IconButton(
+                            onClick = { vm.nextMatch() },
+                            enabled = hasMatches,
+                            modifier = Modifier.padding(end = 8.dp),
+                        ) {
+                            Icon(PocketIcons.ExpandMore, contentDescription = null)
+                        }
+                    },
+                    // Deckend: der Verlauf laeuft unter der Kopfzeile durch.
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
+                )
+            } else {
+                val appName = stringResource(de.smartzone.pocketclaude.R.string.app_name)
+                val baseTitle = state.title.ifBlank { appName }
+                ChatFloatingHeader(
+                    title = if (state.gemEmoji.isNotBlank()) "${state.gemEmoji}  $baseTitle" else baseTitle,
+                    onMenu = { scope.launch { drawerState.open() } },
+                    menuDescription = stringResource(de.smartzone.pocketclaude.R.string.title_conversations),
+                ) {
+                    // Denkstufe (und Modell): Tacho wie bei ChatGPT, eingefaerbt
+                    // nach der aktuellen Stufe. Das Sheet zeigt Claude zuerst,
                     // darunter die Zusatz-Modelle der erreichbaren Gateways.
-                    PocketIconButton(
-                        icon = PocketIcons.Tune,
-                        contentDescription = stringResource(de.smartzone.pocketclaude.R.string.model_sheet_title),
+                    HeaderIcon(
+                        icon = PocketIcons.Speed,
+                        description = stringResource(de.smartzone.pocketclaude.R.string.model_sheet_title),
                         onClick = { modelSheetOpen = true },
-                        contentColor = effortTint(appSettings.effortFor(familyForKey(state.modelKey))),
+                        tint = effortTint(appSettings.effortFor(familyForKey(state.modelKey))),
                     )
-                    Spacer(Modifier.width(8.dp))
+                    HeaderIcon(
+                        icon = PocketIcons.NewChat,
+                        description = stringResource(de.smartzone.pocketclaude.R.string.new_chat),
+                        onClick = onNewChat,
+                    )
                     // Three-dot overflow — rename / pin / share / delete
-                    Box(modifier = Modifier.padding(end = 8.dp)) {
-                        PocketIconButton(
+                    Box {
+                        HeaderIcon(
                             icon = PocketIcons.MoreVert,
-                            contentDescription = stringResource(de.smartzone.pocketclaude.R.string.action_more),
+                            description = stringResource(de.smartzone.pocketclaude.R.string.action_more),
                             onClick = { moreMenuOpen = true },
                         )
-                        DropdownMenu(
-                            expanded = moreMenuOpen,
-                            onDismissRequest = { moreMenuOpen = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_rename)) },
-                                leadingIcon = {
-                                    Icon(PocketIcons.Edit, contentDescription = null)
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    renameInput = state.title
-                                    renameOpen = true
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(stringResource(if (state.pinned) de.smartzone.pocketclaude.R.string.conversation_unpin else de.smartzone.pocketclaude.R.string.conversation_pin))
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        if (state.pinned) PocketIcons.PushPinFilled else PocketIcons.PushPin,
-                                        contentDescription = null,
-                                        tint = if (state.pinned) MaterialTheme.colorScheme.primary
-                                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    vm.togglePin()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (state.skillsIsOverride) stringResource(de.smartzone.pocketclaude.R.string.skills_for_this_chat_done)
-                                        else stringResource(de.smartzone.pocketclaude.R.string.skills_for_this_chat)
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(PocketIcons.Extension, contentDescription = null)
-                                },
-                                // Eigene Skills fuer diesen Chat: Haken am rechten Rand
-                                // statt eines ✓-Zeichens im Text.
-                                trailingIcon = if (state.skillsIsOverride) {
-                                    {
+                            DropdownMenu(
+                                expanded = moreMenuOpen,
+                                onDismissRequest = { moreMenuOpen = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_rename)) },
+                                    leadingIcon = {
+                                        Icon(PocketIcons.Edit, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        renameInput = state.title
+                                        renameOpen = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(stringResource(if (state.pinned) de.smartzone.pocketclaude.R.string.conversation_unpin else de.smartzone.pocketclaude.R.string.conversation_pin))
+                                    },
+                                    leadingIcon = {
                                         Icon(
-                                            PocketIcons.Check,
+                                            if (state.pinned) PocketIcons.PushPinFilled else PocketIcons.PushPin,
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(PocketIconSize.Small),
+                                            tint = if (state.pinned) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                    }
-                                } else null,
-                                onClick = {
-                                    moreMenuOpen = false
-                                    skillsDialogOpen = true
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(stringResource(de.smartzone.pocketclaude.R.string.auto_speak_for_this_chat, ""))
-                                },
-                                // Ein fester Wert fuer diesen Chat steht als kurzer
-                                // Zustand am rechten Rand (an/aus), wie in den
-                                // Systemeinstellungen.
-                                trailingIcon = state.autoSpeakOverride?.let { on ->
-                                    {
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        vm.togglePin()
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = {
                                         Text(
-                                            stringResource(
-                                                if (on) de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_on
-                                                else de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_off
-                                            ),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = if (on) MaterialTheme.colorScheme.primary
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            if (state.skillsIsOverride) stringResource(de.smartzone.pocketclaude.R.string.skills_for_this_chat_done)
+                                            else stringResource(de.smartzone.pocketclaude.R.string.skills_for_this_chat)
                                         )
-                                    }
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        PocketIcons.VolumeUp,
-                                        contentDescription = null,
-                                    )
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    autoSpeakDialogOpen = true
-                                },
-                            )
-                            // Auto-Mode: Voice-Loop (Recording → Senden →
-                            // TTS-Vorlesen → wieder Recording).
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (state.autoMode)
-                                            stringResource(de.smartzone.pocketclaude.R.string.chat_auto_mode_stop)
-                                        else
-                                            stringResource(de.smartzone.pocketclaude.R.string.chat_auto_mode_start)
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        PocketIcons.VoiceMode,
-                                        contentDescription = null,
-                                        tint = if (state.autoMode) MaterialTheme.colorScheme.primary
-                                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    if (!state.autoMode) startAutoMode() else vm.setAutoMode(false)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(de.smartzone.pocketclaude.R.string.search_in_chat)) },
-                                leadingIcon = {
-                                    Icon(PocketIcons.Search, contentDescription = null)
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    vm.openSearch()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(de.smartzone.pocketclaude.R.string.share_as_markdown)) },
-                                leadingIcon = {
-                                    Icon(PocketIcons.Share, contentDescription = null)
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    vm.exportMarkdown { title, md ->
-                                        shareMarkdownIntent(context, title, md)
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(de.smartzone.pocketclaude.R.string.save_as_markdown)) },
-                                leadingIcon = {
-                                    Icon(PocketIcons.Download, contentDescription = null)
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    vm.exportMarkdown { title, md ->
-                                        pendingExportMd = md
-                                        val safe = title.replace(Regex("""[^\p{L}\p{N}\-_ ]"""), "_")
-                                            .take(60).trim().ifBlank { "chat" }
-                                        saveMarkdownLauncher.launch("$safe.md")
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_delete), color = MaterialTheme.colorScheme.error) },
-                                leadingIcon = {
-                                    Icon(
-                                        PocketIcons.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                },
-                                onClick = {
-                                    moreMenuOpen = false
-                                    confirmDeleteOpen = true
-                                },
-                            )
-                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(PocketIcons.Extension, contentDescription = null)
+                                    },
+                                    // Eigene Skills fuer diesen Chat: Haken am rechten Rand
+                                    // statt eines ✓-Zeichens im Text.
+                                    trailingIcon = if (state.skillsIsOverride) {
+                                        {
+                                            Icon(
+                                                PocketIcons.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(PocketIconSize.Small),
+                                            )
+                                        }
+                                    } else null,
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        skillsDialogOpen = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(stringResource(de.smartzone.pocketclaude.R.string.auto_speak_for_this_chat, ""))
+                                    },
+                                    // Ein fester Wert fuer diesen Chat steht als kurzer
+                                    // Zustand am rechten Rand (an/aus), wie in den
+                                    // Systemeinstellungen.
+                                    trailingIcon = state.autoSpeakOverride?.let { on ->
+                                        {
+                                            Text(
+                                                stringResource(
+                                                    if (on) de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_on
+                                                    else de.smartzone.pocketclaude.R.string.chat_auto_speak_marker_off
+                                                ),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = if (on) MaterialTheme.colorScheme.primary
+                                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            PocketIcons.VolumeUp,
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        autoSpeakDialogOpen = true
+                                    },
+                                )
+                                // Auto-Mode: Voice-Loop (Recording → Senden →
+                                // TTS-Vorlesen → wieder Recording).
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (state.autoMode)
+                                                stringResource(de.smartzone.pocketclaude.R.string.chat_auto_mode_stop)
+                                            else
+                                                stringResource(de.smartzone.pocketclaude.R.string.chat_auto_mode_start)
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            PocketIcons.VoiceMode,
+                                            contentDescription = null,
+                                            tint = if (state.autoMode) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        if (!state.autoMode) startAutoMode() else vm.setAutoMode(false)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.search_in_chat)) },
+                                    leadingIcon = {
+                                        Icon(PocketIcons.Search, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        vm.openSearch()
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.share_as_markdown)) },
+                                    leadingIcon = {
+                                        Icon(PocketIcons.Share, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        vm.exportMarkdown { title, md ->
+                                            shareMarkdownIntent(context, title, md)
+                                        }
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.save_as_markdown)) },
+                                    leadingIcon = {
+                                        Icon(PocketIcons.Download, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        vm.exportMarkdown { title, md ->
+                                            pendingExportMd = md
+                                            val safe = title.replace(Regex("""[^\p{L}\p{N}\-_ ]"""), "_")
+                                                .take(60).trim().ifBlank { "chat" }
+                                            saveMarkdownLauncher.launch("$safe.md")
+                                        }
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.smartzone.pocketclaude.R.string.action_delete), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(
+                                            PocketIcons.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    onClick = {
+                                        moreMenuOpen = false
+                                        confirmDeleteOpen = true
+                                    },
+                                )
+                            }
                     }
-                  } // else (not searchActive)
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                ),
-            )
+                }
+            }
         },
     ) { pad ->
-        Column(modifier = Modifier.fillMaxSize().padding(pad)) {
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
+        // Kein Top-Padding: der Verlauf scrollt unter die schwebende Kopfzeile
+        // (wie bei ChatGPT), die Liste bekommt den Abstand als contentPadding.
+        val headerPad = pad.calculateTopPadding()
+        Column(modifier = Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) {
 
             // Message list
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -768,7 +711,7 @@ fun ChatScreen(
                   androidx.compose.foundation.text.selection.SelectionContainer {
                     LazyColumn(
                         state = listState,
-                        contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp),
+                        contentPadding = PaddingValues(top = headerPad + 4.dp, bottom = 8.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         if (state.hasMidSummary || state.hasLongSummary) {
@@ -1497,13 +1440,6 @@ private fun shareMarkdownIntent(context: android.content.Context, title: String,
     } catch (e: Exception) {
         android.widget.Toast.makeText(context, context.getString(de.smartzone.pocketclaude.R.string.chat_share_failed, e.message ?: ""), android.widget.Toast.LENGTH_LONG).show()
     }
-}
-
-private fun formatTokens(context: android.content.Context, n: Int): String = when {
-    n >= 1_000_000 -> context.getString(de.smartzone.pocketclaude.R.string.tokens_label_millions, n / 1_000_000f)
-    n >= 10_000 -> context.getString(de.smartzone.pocketclaude.R.string.tokens_label_thousands_k, n / 1000)
-    n >= 1000 -> context.getString(de.smartzone.pocketclaude.R.string.tokens_label_thousands_dot, n / 1000f)
-    else -> context.getString(de.smartzone.pocketclaude.R.string.tokens_label_raw, n)
 }
 
 @Composable

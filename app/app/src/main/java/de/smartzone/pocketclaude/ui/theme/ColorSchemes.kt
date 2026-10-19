@@ -13,7 +13,8 @@ enum class PocketPalette(val id: String, val displayName: String) {
     NORDIC_BLUE("nordic_blue", "Nordic Blue"),
     FOREST_SAGE("forest_sage", "Forest Sage"),
     PLUM_DUSK("plum_dusk", "Plum Dusk"),
-    GRAPHITE_MONO("graphite_mono", "Graphite Mono");
+    GRAPHITE_MONO("graphite_mono", "Graphite Mono"),
+    CHATGPT("chatgpt", "ChatGPT");
 
     companion object {
         /** Unbekannte oder fehlende IDs fallen auf die Standardpalette zurueck.
@@ -43,6 +44,7 @@ fun specFor(palette: PocketPalette): PaletteSpec = when (palette) {
     PocketPalette.FOREST_SAGE -> ForestSageSpec
     PocketPalette.PLUM_DUSK -> PlumDuskSpec
     PocketPalette.GRAPHITE_MONO -> GraphiteMonoSpec
+    PocketPalette.CHATGPT -> ChatGptSpec
 }
 
 // ---------------------------------------------------------------------------
@@ -786,4 +788,126 @@ private val GraphiteMonoSpec = PaletteSpec(
     lightScheme = GraphiteMonoLightColors,
     darkPocket = GraphiteMonoDarkPocket,
     lightPocket = GraphiteMonoLightPocket,
+)
+
+// ---------------------------------------------------------------------------
+// 6) ChatGPT (Joscha 19.10.2026: "genau die Farbgebung von ChatGPT")
+// ---------------------------------------------------------------------------
+// Hell am 19.10.2026 aus Bildschirmfotos der ChatGPT-App gemessen (Akzent
+// Blau, wie auf Joschas Handy eingestellt): Hintergrund #FAFAFA, Karten und
+// Seitenleiste reinweiss, eigene Nachricht #EEF3FD, Text #0D0D0D, Platzhalter
+// grau, Akzent #4165E8, Abdunklung hinter der Seitenleiste 50 % Schwarz.
+// Dunkel sind die bekannten ChatGPT-Werte (#212121, Leiste #171717, Karten
+// #303030), nicht am Geraet nachgemessen.
+
+private val GptLightBg = Color(0xFFFAFAFA)
+private val GptLightText = Color(0xFF0D0D0D)
+private val GptLightTextSecondary = Color(0xFF5D5D5D)
+private val GptLightAccent = Color(0xFF4165E8)
+private val GptLightBubbleUser = Color(0xFFEEF3FD)
+private val GptLightOutline = Color(0xFFD9D9D9)
+private val GptLightOutlineSoft = Color(0xFFE5E5E5)
+
+private val GptDarkBg = Color(0xFF212121)
+private val GptDarkSidebar = Color(0xFF171717)
+private val GptDarkCard = Color(0xFF303030)
+private val GptDarkText = Color(0xFFECECEC)
+private val GptDarkTextSecondary = Color(0xFFB4B4B4)
+private val GptDarkAccent = Color(0xFF6B8DF2)
+private val GptDarkOutline = Color(0xFF4A4A4A)
+private val GptDarkOutlineSoft = Color(0xFF383838)
+
+private val ChatGptLightColors = lightColorScheme(
+    primary = GptLightAccent,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFDCE4FB),
+    onPrimaryContainer = Color(0xFF0D1B4A),
+    secondary = GptLightTextSecondary,
+    onSecondary = Color.White,
+    // Auswahl (Chips, aktueller Chat in der Leiste) ist bei ChatGPT neutral grau.
+    secondaryContainer = Color(0xFFECECEC),
+    onSecondaryContainer = GptLightText,
+    tertiary = GptLightAccent,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFDCE4FB),
+    onTertiaryContainer = Color(0xFF0D1B4A),
+    background = GptLightBg,
+    onBackground = GptLightText,
+    surface = Color.White,
+    onSurface = GptLightText,
+    surfaceVariant = Color(0xFFF0F0F0),
+    onSurfaceVariant = GptLightTextSecondary,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = GptLightBg,
+    surfaceContainer = Color(0xFFF4F4F4),
+    surfaceContainerHigh = Color(0xFFECECEC),
+    surfaceContainerHighest = Color(0xFFE3E3E3),
+    outline = GptLightOutline,
+    outlineVariant = GptLightOutlineSoft,
+    error = Color(0xFFE02E2A),
+    onError = Color.White,
+)
+
+private val ChatGptDarkColors = darkColorScheme(
+    primary = GptDarkAccent,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF22325F),
+    onPrimaryContainer = Color(0xFFDCE4FB),
+    secondary = GptDarkTextSecondary,
+    onSecondary = GptDarkBg,
+    secondaryContainer = Color(0xFF3A3A3A),
+    onSecondaryContainer = GptDarkText,
+    tertiary = GptDarkAccent,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFF22325F),
+    onTertiaryContainer = Color(0xFFDCE4FB),
+    background = GptDarkBg,
+    onBackground = GptDarkText,
+    surface = GptDarkBg,
+    onSurface = GptDarkText,
+    surfaceVariant = GptDarkCard,
+    onSurfaceVariant = GptDarkTextSecondary,
+    surfaceContainerLowest = GptDarkSidebar,
+    surfaceContainerLow = Color(0xFF1E1E1E),
+    surfaceContainer = Color(0xFF282828),
+    surfaceContainerHigh = GptDarkCard,
+    surfaceContainerHighest = Color(0xFF3A3A3A),
+    outline = GptDarkOutline,
+    outlineVariant = GptDarkOutlineSoft,
+    error = Color(0xFFF87171),
+    onError = Color(0xFF450A0A),
+)
+
+// Keine Lichtflecken im Hintergrund: ChatGPT ist flach.
+private val ChatGptLightPocket = PocketColors(
+    bubbleUser = GptLightBubbleUser,
+    bubbleAssistant = Color(0xFFF4F4F4),
+    onBubbleUser = GptLightText,
+    onBubbleAssistant = GptLightText,
+    accent = GptLightAccent,
+    success = Color(0xFF10A37F),
+    ambientPrimary = Color.Transparent,
+    ambientSecondary = Color.Transparent,
+    surfaceLow = GptLightBg,
+    outlineSoft = GptLightOutlineSoft,
+)
+
+private val ChatGptDarkPocket = PocketColors(
+    bubbleUser = GptDarkCard,
+    bubbleAssistant = Color(0xFF2A2A2A),
+    onBubbleUser = GptDarkText,
+    onBubbleAssistant = GptDarkText,
+    accent = GptDarkAccent,
+    success = Color(0xFF19C37D),
+    ambientPrimary = Color.Transparent,
+    ambientSecondary = Color.Transparent,
+    surfaceLow = GptDarkBg,
+    outlineSoft = GptDarkOutlineSoft,
+)
+
+private val ChatGptSpec = PaletteSpec(
+    darkScheme = ChatGptDarkColors,
+    lightScheme = ChatGptLightColors,
+    darkPocket = ChatGptDarkPocket,
+    lightPocket = ChatGptLightPocket,
 )
