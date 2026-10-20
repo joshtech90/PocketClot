@@ -819,7 +819,8 @@
       applyTheme();
       updateModelButton();
       renderModelMenu();
-      setStatus('settings-backup-status', t('settings_import_done', (r.applied_keys || []).length || 0, r.tts_keys_imported || 0), 'ok');
+      const applied = typeof r.applied_keys === 'number' ? r.applied_keys : (r.applied_keys || []).length;
+      setStatus('settings-backup-status', t('settings_import_done', applied, r.tts_keys_imported || 0), 'ok');
     } catch (err) {
       setStatus('settings-backup-status', t('settings_import_failed', err instanceof SyntaxError ? t('settings_import_bad_json') : apiErrorText(err)), 'error');
     }

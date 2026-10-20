@@ -1209,10 +1209,13 @@ async function reloadChatMessages(cid) {
 }
 
 function updateTopbar() {
-  const gemPrefix = state.gem && state.gem.emoji ? state.gem.emoji + '  ' : '';
   const hasContent = state.messages.length > 0;
-  const title = hasContent || state.gem ? gemPrefix + (state.title || '') : '';
-  els.topbarTitle.textContent = title === t('new_chat') || title === 'Neuer Chat' ? '' : title;
+  // Ein Chat ohne eigenen Titel heisst serverseitig "Neuer Chat"; das zeigen wir nicht.
+  const own = state.title && state.title !== 'Neuer Chat' && state.title !== t('new_chat') ? state.title : '';
+  const title = state.gem
+    ? (state.gem.emoji ? state.gem.emoji + '  ' : '') + (own || state.gem.name || '')
+    : (hasContent ? own : '');
+  els.topbarTitle.textContent = title;
   if (state.view === 'chat') document.title = (els.topbarTitle.textContent ? els.topbarTitle.textContent + ' · ' : '') + 'PocketClot';
   els.shareBtn.classList.toggle('hidden', !hasContent);
 }
@@ -1379,7 +1382,6 @@ function selectModel(key) {
   }
   updateModelButton();
   renderModelMenu();
-  updateSkillsAvailability();
 }
 function setEffort(value, family) {
   const fam = family || familyForKey(effectiveModelKey());
@@ -1471,7 +1473,6 @@ async function loadChatSkills(cid) {
     state.skillsIsOverride = !!r.is_override;
   } catch { state.skills = null; state.skillsIsOverride = false; }
 }
-function updateSkillsAvailability() { /* Platzhalter: der Dialog liest die Familie beim Oeffnen */ }
 function toggleRow(label, desc, checked, disabled) {
   const row = document.createElement('label');
   row.className = 'dlg-toggle';
@@ -2349,6 +2350,8 @@ els.inputForm.addEventListener('submit', async (e) => {
 async function sendMessage(rawText, opts = {}) {
   const content = (rawText || '').trim();
   const uploaded = state.pending.filter((p) => p.uploaded);
+  // Vor einem eventuellen newChat() festhalten: der setzt das Eingabefeld zurueck.
+  const imageMode = state.imageMode;
   if (!content && !uploaded.length) return false;
   if (state.isStreaming) { toast(t('toast_reply_running')); return false; }
   // Ein noch laufender Upload ginge sonst stumm verloren.
@@ -2358,7 +2361,6 @@ async function sendMessage(rawText, opts = {}) {
   if (!state.cid) return false;
   closeChatSearch();
   const atts = uploaded.map((p) => ({ id: p.uploaded.id, filename: p.uploaded.filename, mime_type: p.uploaded.mime_type }));
-  const imageMode = state.imageMode;
   state.messages.push({ id: -Date.now(), role: 'user', content, attachments: atts, created_at: new Date().toISOString() });
   for (const p of state.pending) if (p.previewUrl && p.previewUrl.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
   state.pending = [];
@@ -2668,18 +2670,11 @@ document.addEventListener('keydown', (e) => {
     newChat();
     return;
   }
-  if (mod && !e.shiftKey && e.key.toLowerCase() === 'f' && state.view === 'chat' && state.messages.length
-      && els.settingsModal.classList.contains('hidden') && els.searchModal.classList.contains('hidden')) {
-    e.preventDefault();
-    openChatSearch();
-    return;
-  }
   if (e.key === 'Escape') {
     if (openPopup) { closePopup(); return; }
     if (!els.searchModal.classList.contains('hidden')) { closeSearch(); return; }
     if (searchState.open) { closeChatSearch(); return; }
-    if (isMobile() && els.sidebar.classList.contains('open')) { closeSidebar(); return; }
-    if (state.isStreaming && document.activeElement === els.input) stopGenerating();
+    if (isMobile() && els.sidebar.classList.contains('open')) closeSidebar();
   }
 });
 

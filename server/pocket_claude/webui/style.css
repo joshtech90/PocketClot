@@ -665,8 +665,10 @@ kbd {
 }
 .chat-search-count { font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; padding: 0 4px; }
 .chat-search-count.none { color: var(--danger); }
-::highlight(pc-search) { background-color: color-mix(in srgb, var(--warning) 35%, transparent); color: inherit; }
-::highlight(pc-search-current) { background-color: color-mix(in srgb, var(--accent) 45%, transparent); color: inherit; }
+/* Feste Markerfarben wie bei der Browsersuche: Akzentfarben verschwinden sonst
+   auf der eigenen Nachricht, die selbst in Akzentfarbe steht. */
+::highlight(pc-search) { background-color: rgba(255, 213, 79, 0.5); color: inherit; }
+::highlight(pc-search-current) { background-color: #FFB300; color: #1A1A1A; }
 
 .view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
 
@@ -990,6 +992,8 @@ kbd {
   box-shadow: var(--composer-shadow);
   cursor: text;
 }
+/* Gesperrter Chat: Eingabe sichtbar, aber ausgegraut, bis die PIN stimmt. */
+.composer.composer-locked { opacity: 0.5; pointer-events: none; }
 .composer.expanded {
   grid-template-areas: "pending pending pending" "input input input" "left . right";
   align-items: end;
