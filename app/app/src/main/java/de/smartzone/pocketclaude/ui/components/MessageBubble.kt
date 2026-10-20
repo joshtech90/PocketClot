@@ -475,6 +475,8 @@ private fun AttachmentChip(att: AttachmentRefDto) {
         // nach unten. Beim Lesen wirkt das wie ein „Sprung nach unten" der
         // Ansicht. Mit fester Slot-Größe ist das Layout sofort stabil, Coil
         // füllt den Slot via ContentScale.Crop.
+        // Antippen oeffnet das Vollbild mit Zoom, Teilen und Speichern.
+        var viewerOpen by remember { mutableStateOf(false) }
         coil3.compose.AsyncImage(
             model = url,
             contentDescription = att.filename,
@@ -482,8 +484,17 @@ private fun AttachmentChip(att: AttachmentRefDto) {
             modifier = Modifier
                 .size(width = 200.dp, height = 200.dp)
                 .clip(RoundedCornerShape(PocketRadius.Medium))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { viewerOpen = true },
         )
+        if (viewerOpen) {
+            ImageViewerDialog(
+                image = ViewerImage(att.id, att.filename, att.mimeType),
+                serverBaseUrl = settings.serverUrl,
+                serverToken = settings.serverToken,
+                onDismiss = { viewerOpen = false },
+            )
+        }
         return
     }
     // Nicht-Bilder weiterhin als Chip mit Icon + Filename

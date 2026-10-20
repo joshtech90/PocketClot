@@ -219,11 +219,15 @@ async def transcribe(
     }
     data = {
         "model": model,
-        "language": whisper_lang,
-        "prompt": bias_prompt,
         "response_format": "json",
         "temperature": "0",
     }
+    # Leer heisst: Whisper erkennt die Sprache selbst. Geteilte Sprachnachrichten
+    # koennen in jeder Sprache sein, ein fester Hinweis wuerde sie verbiegen.
+    if whisper_lang:
+        data["language"] = whisper_lang
+    if bias_prompt:
+        data["prompt"] = bias_prompt
     headers = {"Authorization": f"Bearer {api_key}"}
 
     try:

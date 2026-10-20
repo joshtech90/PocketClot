@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
+from pocket_claude import attachments as attachments_mod
 from pocket_claude import (
     __version__, auth_modes, backup, billing, claude_engine, db, gateways,
     image_engine, image_tool, openai_engine, system_prompts, tts, tts_cache,
@@ -822,6 +823,26 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
                     cid, before_message_id=user_msg_id)
             if body.image_mode:
                 log.info("PC_IMG: cid=%s Bild erstellen gewaehlt", cid)
+
+            # Geteilte Sprachnachrichten: einmal per Groq transkribieren, bevor
+            # das Modell die Nachricht sieht. Sprache erkennt Whisper selbst,
+            # ausser der Nutzer hat in der Spracheingabe eine feste gewaehlt.
+            if body.attachment_ids:
+                audio_atts = [a for a in await db.get_attachments(body.attachment_ids)
+                              if attachments_mod.is_audio(a.get("filename") or "",
+                                                          a.get("mime_type") or "")]
+                if audio_atts:
+                    sprache = ""
+                    if (user_kv.get(voice.KV_LANG_MODE) or "").strip().lower() == "override":
+                        sprache = voice.resolve_effective_lang(kv=user_kv, request_locale=None)
+                    hinweis = voice.resolve_prompt(kv=user_kv, lang=sprache)[0] if sprache else ""
+                    fehler = await attachments_mod.ensure_transcripts(
+                        audio_atts,
+                        api_key=(user_kv.get(_KV_VOICE_GROQ_API_KEY) or "").strip(),
+                        whisper_lang=sprache, bias_prompt=hinweis,
+                    )
+                    for f in fehler:
+                        log.warning("PC_AUDIO: cid=%s %s", cid, f)
 
             if use_gateway:
                 engine_stream = openai_engine.stream_reply(

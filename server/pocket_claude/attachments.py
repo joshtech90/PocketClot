@@ -98,6 +98,64 @@ _TEXT_FILENAMES = {
 }
 
 
+# Audio-Anhaenge (geteilte Sprachnachrichten, Diktate) kann kein Modell hier
+# selbst hoeren. Sie werden einmal per Groq Whisper transkribiert, das
+# Transkript liegt als Nachbardatei neben dem Audio und geht als Text in jeden
+# spaeteren Prompt, auch wenn der Verlauf neu aufgebaut wird.
+TRANSCRIPT_SUFFIX = ".transkript.txt"
+_AUDIO_EXTENSIONS = (".ogg", ".opus", ".oga", ".mp3", ".m4a", ".mp4a", ".aac",
+                     ".wav", ".flac", ".webm", ".amr", ".3gp")
+
+
+def is_audio(filename: str, mime: str) -> bool:
+    if (mime or "").lower().startswith("audio/"):
+        return True
+    return (filename or "").lower().endswith(_AUDIO_EXTENSIONS)
+
+
+def transcript_path(path: Path) -> Path:
+    return path.with_name(path.name + TRANSCRIPT_SUFFIX)
+
+
+async def ensure_transcripts(attachments: list[dict], *, api_key: str,
+                             whisper_lang: str = "", bias_prompt: str = "") -> list[str]:
+    """Transkribiert Audio-Anhaenge, die noch kein Transkript haben.
+
+    Liefert Fehlermeldungen fuer den Nutzer zurueck, wirft aber nie: ein
+    fehlgeschlagenes Transkript darf den Chat-Turn nicht kippen, der Prompt
+    sagt dem Modell dann, dass der Inhalt fehlt.
+    """
+    import asyncio
+
+    from pocket_claude import voice
+
+    fehler: list[str] = []
+    for a in attachments:
+        if not is_audio(a.get("filename") or "", a.get("mime_type") or ""):
+            continue
+        path = Path(a["path"])
+        ziel = transcript_path(path)
+        if ziel.exists():
+            continue
+        if not api_key:
+            fehler.append("Kein Groq-Schluessel gesetzt (Einstellungen, Spracheingabe).")
+            continue
+        try:
+            daten = await asyncio.to_thread(path.read_bytes)
+            text = await voice.transcribe(
+                audio_bytes=daten, filename=a.get("filename") or path.name,
+                content_type=a.get("mime_type") or "application/octet-stream",
+                api_key=api_key, whisper_lang=whisper_lang, bias_prompt=bias_prompt,
+                timeout_sec=180.0,
+            )
+            await asyncio.to_thread(ziel.write_text, text, "utf-8")
+            log.info("PC_AUDIO: %s transkribiert (%d Zeichen)", a.get("id"), len(text))
+        except Exception as exc:  # noqa: BLE001 - siehe Docstring
+            log.warning("PC_AUDIO: %s nicht transkribiert: %s", a.get("id"), exc)
+            fehler.append(f"{a.get('filename')}: {exc}")
+    return fehler
+
+
 def looks_like_text(filename: str, mime: str) -> bool:
     """Heuristik: gehört der Anhang inline in den Prompt-Text, oder soll er
     nur per Read-Tool referenziert werden?
@@ -191,6 +249,24 @@ def build_prompt_text(user_msg: dict, attachments_by_id: dict[str, dict],
         if aid in inline_ids:
             parts.append(f"\n\n[Bild '{filename}' ist dieser Nachricht direkt beigefuegt.]")
             continue
+        if is_audio(filename, mime):
+            tp = transcript_path(path)
+            try:
+                transkript = tp.read_text("utf-8") if tp.exists() else ""
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Transkript zu %s nicht lesbar: %s", filename, exc)
+                transkript = ""
+            if transkript:
+                parts.append(
+                    f"\n\n--- Audio: **{filename}** (automatisch per Whisper transkribiert, "
+                    f"Erkennungsfehler moeglich) ---\n{transkript}\n--- Ende Audio ---"
+                )
+            else:
+                parts.append(
+                    f"\n\n[Audio '{filename}': kein Transkript vorhanden, der Inhalt ist "
+                    f"unbekannt. Sag dem Nutzer, dass die Transkription fehlgeschlagen ist.]"
+                )
+            continue
         if looks_like_text(filename, mime):
             try:
                 raw = path.read_bytes()
@@ -229,6 +305,8 @@ def has_binary_attachments(
     for aid in attach_ids:
         a = attachments_by_id.get(aid)
         if not a or aid in inline_ids:
+            continue
+        if is_audio(a["filename"], a["mime_type"]):
             continue
         if not looks_like_text(a["filename"], a["mime_type"]):
             return True

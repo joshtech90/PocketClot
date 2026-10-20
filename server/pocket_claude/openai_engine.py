@@ -118,7 +118,8 @@ async def _message_content(
             continue
         filename = att.get("filename") or "Datei"
         mime = (att.get("mime_type") or "application/octet-stream").lower()
-        if att_mod.looks_like_text(filename, mime):
+        # Audio geht als Transkript-Text rein, wie bei Claude.
+        if att_mod.looks_like_text(filename, mime) or att_mod.is_audio(filename, mime):
             text_ids.append(aid)
         elif mime.startswith("image/"):
             image_atts.append(att)
