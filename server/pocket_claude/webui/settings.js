@@ -82,6 +82,22 @@
     queueSettingsPush();
     if (state.view === 'chat') renderMessages();
   });
+  // Benachrichtigung: die Erlaubnis fragt der Browser nur nach einem Klick ab.
+  const notifyBox = $('setting-notify');
+  function renderNotify() {
+    const supported = 'Notification' in window;
+    const denied = supported && Notification.permission === 'denied';
+    notifyBox.checked = state.notify && supported && Notification.permission === 'granted';
+    notifyBox.disabled = !supported || denied;
+    $('notify-hint').textContent = denied ? t('notify_denied') : t('notify_done_hint');
+  }
+  notifyBox.addEventListener('change', async () => {
+    let on = notifyBox.checked;
+    if (on && Notification.permission !== 'granted') on = (await Notification.requestPermission()) === 'granted';
+    state.notify = on;
+    localStorage.setItem('pc.notify', String(on));
+    renderNotify();
+  });
   const localeSel = $('ui-locale-select');
   localeSel.addEventListener('change', () => {
     window.PocketI18n.setLocale(localeSel.value);
@@ -91,6 +107,7 @@
     applyTheme();
     renderPalettes();
     collapseBox.checked = state.collapseUserMsgs;
+    renderNotify();
     localeSel.value = localStorage.getItem('pc_locale') || '';
   }
 
@@ -271,6 +288,7 @@
   }
   function renderTts(s) {
     ttsStatus = s;
+    state.ttsProvider = s.provider || null;
     ttsProvider.value = s.provider || 'gemini_web';
     renderTtsHint(s);
     renderVoices(s);
@@ -326,6 +344,26 @@
     localStorage.setItem(LS.ttsSpeed, String(state.ttsSpeed));
     queueSettingsPush();
   });
+  // Stimme testen wie in der App: eine vorhandene Antwort mit der gewaehlten
+  // Stimme abspielen (der Server liest nur gespeicherte Nachrichten vor).
+  $('tts-test-btn').addEventListener('click', async () => {
+    const status = $('tts-test-status');
+    status.textContent = '';
+    let msgId = [...state.messages].reverse().find((m) => m.role === 'assistant' && m.id > 0 && m.content)?.id;
+    const recent = state.chats.slice().sort((a, b) => chatSortKey(b).localeCompare(chatSortKey(a))).filter((c) => !c.locked);
+    for (const c of recent.slice(0, 8)) {
+      if (msgId) break;
+      try {
+        const d = await api('GET', '/conversations/' + c.id);
+        msgId = (d.messages || []).find((m) => m.role === 'assistant' && m.content)?.id;
+      } catch { /* naechsten Chat versuchen */ }
+    }
+    if (!msgId) { status.textContent = t('tts_test_no_message'); return; }
+    speak(msgId);
+    $('tts-test-stop').classList.remove('hidden');
+  });
+  $('tts-test-stop').addEventListener('click', () => { stopAudio(); $('tts-test-stop').classList.add('hidden'); });
+  els.audio.addEventListener('ended', () => $('tts-test-stop').classList.add('hidden'));
   autoSpeakBox.addEventListener('change', () => {
     state.autoSpeak = autoSpeakBox.checked;
     localStorage.setItem(LS.autoSpeak, String(state.autoSpeak));

@@ -83,6 +83,12 @@ const state = {
   ttsVoice:  localStorage.getItem(LS.ttsVoice) || 'edge-de-DE-KatjaNeural',
   ttsSpeed:  parseFloat(localStorage.getItem(LS.ttsSpeed) || '1.0') || 1.0,
   autoSpeak: localStorage.getItem(LS.autoSpeak) === 'true',
+  // Vorlese-Anbieter vom Server (GET /tts/status). Bei Gemini Web regelt der
+  // Abspieler das Tempo, der Server kann es dort nicht (wie in der App).
+  ttsProvider: null,
+  // Benachrichtigung, wenn eine Antwort im Hintergrund fertig wird. Bewusst nur
+  // in diesem Browser: die Erlaubnis dafuer gilt ohnehin je Browser.
+  notify: localStorage.getItem('pc.notify') === 'true',
   autoSpeakByChat: readJson(LS.autoSpeakByChat, {}),
   collapseUserMsgs: (localStorage.getItem(LS.collapseUserMsgs) ?? 'true') !== 'false',
 
@@ -708,6 +714,7 @@ async function showApp() {
   await loadServerSettings();
   applyTheme();
   await loadChatModels(false);
+  api('GET', '/tts/status').then((s) => { state.ttsProvider = s.provider || null; }).catch(() => {});
   if (window.PocketGems) window.PocketGems.load();
   await refreshChatList();
   const r = routeFromHash();
@@ -1125,6 +1132,17 @@ async function openChat(cid, opts = {}) {
     const wanted = '#/chat/' + cid;
     if (location.hash !== wanted) history.replaceState(null, '', wanted);
   }
+  // Sofort den neuen Chat zeigen, nicht den alten stehen lassen: sonst
+  // landet eine Eingabe waehrend des Ladens im neuen Chat, waehrend man noch
+  // den alten liest, und ein gesperrter Chat waere kurz ohne Sperre.
+  const known = state.chats.find((c) => c.id === cid);
+  state.messages = [];
+  state.title = known ? known.title : '';
+  state.chatLocked = !!(known && known.locked);
+  state.gem = null;
+  resetComposerFor(cid);
+  if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
+  else { els.messages.innerHTML = ''; els.chatView.classList.remove('is-empty'); }
   markActiveChat();
   closeSidebar();
   try {
@@ -1151,8 +1169,11 @@ function applyDetail(detail) {
   state.streamingText = '';
   state.streamingThinking = '';
   state.isStreaming = false;
-  // Der Server weiss, was zuletzt in diesem Chat lief. Nur wenn nicht, gilt die Vorauswahl.
-  state.convModel = (detail.chat_model || '').trim() || null;
+  // Der Server weiss, was zuletzt in diesem Chat lief. Kennt er nichts, lief
+  // ein Chat mit Nachrichten mit Claude (Bestandschats und ausdruecklich ""):
+  // der darf nicht still zur Vorauswahl wechseln. Nur ein leerer Chat folgt ihr.
+  const stored = (detail.chat_model || '').trim();
+  state.convModel = stored || ((detail.messages || []).length ? '' : null);
   state.gem = null;
   if (detail.gem_id) {
     gemFetch(detail.gem_id).then((g) => {
@@ -2091,6 +2112,7 @@ function openLightbox(url, opts = {}) {
     <div class="lb-stage"><img alt=""></div>
     <div class="lb-bar">
       ${opts.onUseAsReference ? `<button type="button" data-lb="ref" title="${escapeHtml(t('image_use_as_reference'))}"><svg class="icon"><use href="#icon-brush"/></svg></button>` : ''}
+      ${navigator.canShare ? `<button type="button" data-lb="share" title="${escapeHtml(t('image_share'))}"><svg class="icon"><use href="#icon-share"/></svg></button>` : ''}
       <a href="${url}" download="${escapeHtml(opts.filename || 'bild')}" title="${escapeHtml(t('img_action_download'))}"><svg class="icon"><use href="#icon-download"/></svg></a>
       <button type="button" data-lb="close" title="${escapeHtml(t('lightbox_close'))}"><svg class="icon"><use href="#icon-close"/></svg></button>
     </div>`;
@@ -2107,8 +2129,32 @@ function openLightbox(url, opts = {}) {
     if (!b) return;
     if (b.dataset.lb === 'close') close();
     if (b.dataset.lb === 'ref') { close(); opts.onUseAsReference(); }
+    if (b.dataset.lb === 'share') shareImage(url, opts.filename);
   });
   document.body.appendChild(lb);
+}
+
+/** Bild ueber das Teilen-Menue des Systems weitergeben (wie "Bild teilen" der App). */
+async function shareImage(url, filename) {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const blob = await resp.blob();
+    const file = new File([blob], filename || 'bild.png', { type: blob.type || 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return;
+    }
+    // Kein Teilen-Menue fuer Dateien (z.B. Firefox am Desktop): herunterladen.
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    toast(t('toast_action_failed', apiErrorText(e)), { error: true });
+  }
 }
 
 // =========================================================
@@ -2491,7 +2537,9 @@ async function streamReply(content, attachmentIds, imageMode) {
       system_prompt_mode: state.spMode,
       system_prompt: state.spMode === 'CUSTOM' ? state.spCustom : null,
       tts_voice: state.ttsVoice,
-      tts_rate: state.ttsSpeed,
+      // Fuer die Vorab-Erzeugung dieselbe Rate wie spaeter beim Abspielen,
+      // sonst trifft der Cache nicht (siehe ttsRates).
+      tts_rate: ttsRates().server,
       image_mode: !!imageMode,
     }),
     signal: ctrl.signal,
@@ -2593,6 +2641,7 @@ function handleSseEvent(raw) {
       // Vorlesen: im Sprachgespraech immer, sonst nach Chat- bzw. Standardwahl.
       const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
       if (msgId && (voiceLoop || autoSpeakFor(state.cid))) speak(msgId);
+      notifyDone(state.messages[state.messages.length - 1]);
       break;
     }
     case 'error':
@@ -2624,10 +2673,20 @@ function setAudioState(msgId, status) {
   state.audio = { msgId: status === 'idle' ? null : msgId, status };
   renderTtsSlots();
 }
+/** Wie in der App: bei Gemini Web macht der Abspieler das Tempo (der Server
+ *  kann es dort nicht), bei allen anderen Anbietern der Server. */
+function ttsRates() {
+  const web = state.ttsProvider === 'gemini_web';
+  return { server: web ? 1.0 : state.ttsSpeed, player: web ? state.ttsSpeed : 1.0 };
+}
 function speak(messageId) {
   els.audio.pause();
-  const params = new URLSearchParams({ voice: state.ttsVoice, rate: String(state.ttsSpeed), token: state.token });
+  const rates = ttsRates();
+  const params = new URLSearchParams({ voice: state.ttsVoice, rate: String(rates.server), token: state.token });
   els.audio.src = `${state.serverUrl}/messages/${messageId}/audio?${params}`;
+  // Nach dem Laden setzt der Browser playbackRate auf defaultPlaybackRate zurueck.
+  els.audio.defaultPlaybackRate = rates.player;
+  els.audio.playbackRate = rates.player;
   setAudioState(messageId, 'loading');
   els.audio.play().catch((err) => {
     if (err.name === 'AbortError') return;
@@ -2652,6 +2711,19 @@ els.audio.addEventListener('error', () => {
   toast(t('toast_tts_error', t('tts_unavailable')), { error: true });
 });
 function isAudioBusy() { return state.audio.status === 'loading' || state.audio.status === 'playing'; }
+
+/** Antwort fertig, waehrend der Tab im Hintergrund liegt: Systembenachrichtigung
+ *  wie die "Antwort bereit"-Meldung der App. */
+function notifyDone(msg) {
+  if (!state.notify || !document.hidden || !('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const body = (msg && msg.content ? msg.content : '').replace(/[#*_`>\[\]]/g, '').trim().slice(0, 160);
+    const n = new Notification(state.title && state.title !== 'Neuer Chat' ? state.title : t('notify_title'), {
+      body, icon: 'brand-mark.png', tag: 'pc-' + state.cid,
+    });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch (_) { /* manche Browser erlauben Notification nur im Service Worker */ }
+}
 
 // =========================================================
 // Tastatur
