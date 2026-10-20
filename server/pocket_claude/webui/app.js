@@ -1,87 +1,116 @@
 // =====================================================================
-// PocketClot Web-UI v2 — vanilla JS, neue DOM-Struktur.
+// PocketClot Web-UI — Kern: Anmeldung, Seitenleiste, Chat, Eingabefeld.
+// Weitere Teile in eigenen Dateien (gleiche globale Helfer):
+//   voice.js    Diktat und Sprachgespraech
+//   gems.js     eigene Assistenten
+//   images.js   Bilder-Bereich
+//   settings.js Einstellungen
 // =====================================================================
 // PC_SSE LOAD MARKER — bump this any time you change PC_SSE logging.
-// If you don't see this exact line in the console after reload, the
-// browser served a cached app.js.
-console.log('PC_SSE: app.js LOADED build=2026-05-26-tracker');
-// i18n helper — short alias for the global translator.
+console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop');
+// Kurzform fuer die Uebersetzung.
 const t = (k, ...args) => (window.PocketI18n ? window.PocketI18n.t(k, ...args) : k);
 
 const LS = {
   url:        'pc.serverUrl',
   token:      'pc.serverToken',
-  theme:      'pc.theme',
+  theme:      'pc.theme',          // system | light | dark
+  paletteLight: 'pc.paletteLight',
+  paletteDark:  'pc.paletteDark',
   effort:     'pc.effort',
   lastCid:    'pc.lastCid',
   spMode:     'pc.spMode',
   spCustom:   'pc.spCustom',
   ttsVoice:   'pc.ttsVoice',
   ttsSpeed:   'pc.ttsSpeed',
+  autoSpeak:  'pc.autoSpeak',
+  autoSpeakByChat: 'pc.autoSpeakByChat',
   sidebar:    'pc.sidebarCollapsed',
-  // Lange User-Messages einklappen (ChatGPT-Style). Default: AN. Tap auf die
-  // Bubble klappt sie auf / „Mehr anzeigen"-Button.
   collapseUserMsgs: 'pc.collapseUserMsgs',
-  // Zusatz-Modelle: gewaehltes Modell und Denktiefe je Familie.
   chatModel:      'pc.chatModel',
   effortByFamily: 'pc.effortByFamily',
 };
 
-// Denktiefe je Modell-Familie, defensiv aus dem localStorage geladen.
+// Vorgaben wie in der App: hell Nordic Blue, dunkel Midnight Atelier.
+const PALETTES = [
+  { id: 'midnight_atelier', name: 'Midnight Atelier' },
+  { id: 'nordic_blue',      name: 'Nordic Blue' },
+  { id: 'forest_sage',      name: 'Forest Sage' },
+  { id: 'plum_dusk',        name: 'Plum Dusk' },
+  { id: 'graphite_mono',    name: 'Graphite Mono' },
+  { id: 'chatgpt',          name: 'ChatGPT' },
+];
+const DEFAULT_PALETTE = { light: 'nordic_blue', dark: 'midnight_atelier' };
+
+const EFFORT_ORDER = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+const CLAUDE_EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
 const EFFORT_DEFAULTS = { claude: 'high', gemini: 'high', gpt: 'high', other: 'high' };
-function loadLocalEffortByFamily() {
+// Wie in der App: Anhaenge bis 50 MB, hoechstens zwei Uploads gleichzeitig,
+// hoechstens zehn Fotos auf einmal.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_PARALLEL_UPLOADS = 2;
+const MAX_PICK = 10;
+
+function readJson(key, fallback) {
   try {
-    const raw = localStorage.getItem(LS.effortByFamily);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') return Object.assign({}, EFFORT_DEFAULTS, parsed);
-    }
-  } catch (e) { /* kaputter Eintrag: Defaults nehmen */ }
-  return Object.assign({}, EFFORT_DEFAULTS);
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const v = JSON.parse(raw);
+    return v && typeof v === 'object' ? v : fallback;
+  } catch { return fallback; }
+}
+function legacyThemeMode() {
+  const v = localStorage.getItem(LS.theme);
+  return v === 'light' || v === 'dark' ? v : 'system';
 }
 
 const state = {
-  serverUrl: localStorage.getItem(LS.url)        || '',
-  token:     localStorage.getItem(LS.token)      || '',
-  effort:    localStorage.getItem(LS.effort)     || 'high',
-  // Gewaehltes Modell. Leer = Claude-Automatik. Zusatz-Modelle tragen "gw:".
-  chatModel:      localStorage.getItem(LS.chatModel) || '',
-  effortByFamily: loadLocalEffortByFamily(),
-  chatModels:     [],
-  gateways:       [],
-  // Waehrend eines Turns vom Bild-Werkzeug erzeugte Anhaenge.
-  _streamAttachments: [],
-  spMode:    localStorage.getItem(LS.spMode)     || 'STANDARD',
-  spCustom:  localStorage.getItem(LS.spCustom)   || '',
-  // Default-Voice ist Cloud-TTS Studio-B (deutsch, männlich, premium). Mit
-  // Default-Provider Cloud-TTS = 1 Mio Zeichen/Monat gratis bei Privatnutzung.
-  ttsVoice:  localStorage.getItem(LS.ttsVoice)   || 'de-DE-Studio-B',
-  ttsSpeed:  parseFloat(localStorage.getItem(LS.ttsSpeed) || '1.0'),
-  // Long-User-Message-Collapse: Default true, kann in Settings abgeschaltet werden.
+  serverUrl: localStorage.getItem(LS.url)   || '',
+  token:     localStorage.getItem(LS.token) || '',
+  themeMode: legacyThemeMode(),
+  paletteLight: localStorage.getItem(LS.paletteLight) || DEFAULT_PALETTE.light,
+  paletteDark:  localStorage.getItem(LS.paletteDark)  || DEFAULT_PALETTE.dark,
+  effort:    localStorage.getItem(LS.effort) || 'high',
+  // Globale Modell-Vorauswahl: damit starten neue Chats. "" = Claude-Automatik.
+  chatModel: localStorage.getItem(LS.chatModel) || '',
+  // Modell des offenen Chats (vom Server). null = folgt der Vorauswahl.
+  convModel: null,
+  effortByFamily: Object.assign({}, EFFORT_DEFAULTS, readJson(LS.effortByFamily, {})),
+  chatModels: [],
+  gateways:   [],
+  spMode:    localStorage.getItem(LS.spMode)   || 'STANDARD',
+  spCustom:  localStorage.getItem(LS.spCustom) || '',
+  ttsVoice:  localStorage.getItem(LS.ttsVoice) || 'edge-de-DE-KatjaNeural',
+  ttsSpeed:  parseFloat(localStorage.getItem(LS.ttsSpeed) || '1.0') || 1.0,
+  autoSpeak: localStorage.getItem(LS.autoSpeak) === 'true',
+  autoSpeakByChat: readJson(LS.autoSpeakByChat, {}),
   collapseUserMsgs: (localStorage.getItem(LS.collapseUserMsgs) ?? 'true') !== 'false',
 
-  me: null,  // { id, name, is_admin } — vom Server nach Login
+  me: null,
+  view: 'chat',            // chat | images
+  cid: null,
+  title: 'PocketClot',
+  pinned: false,
+  chatLocked: false,
+  unlockedCids: new Set(), // nur in dieser Sitzung entsperrt, bewusst nicht gespeichert
+  gem: null,
+  gems: [],
+  chats: [],               // Liste aus GET /conversations
+  _allCids: [],
+  messages: [],
+  skills: null,            // effektive Skills des offenen Chats
+  skillsIsOverride: false,
 
-  cid:            null,
-  title:          'PocketClot',
-  pinned:         false,
-  messages:       [],
-  streamingText:  '',
-  isStreaming:    false,
-  pendingAttach:  [],
-  audio:          { msgId: null, playing: false },
-  abort:          null,
-  _ttsLoaded:     false,
-  _allCids:       [],
-  // Gems (Custom Agents): das aktuell gebundene Gem des offenen Chats + die
-  // Liste der Gems des Users (für die Sidebar).
-  gem:            null,
-  gems:           [],
-  // Chat-Lock: In-Memory-Set der cids, die in DIESER Browser-Session bereits
-  // per PIN entsperrt wurden. Bewusst NICHT in localStorage — ein Reload
-  // sperrt alles wieder. `locked`-Flag pro Chat kommt vom Server.
-  unlockedCids:   new Set(),
-  chatLocked:     false,  // locked-Flag des aktuell geöffneten Chats
+  isStreaming: false,
+  streamingText: '',
+  streamingThinking: '',
+  _streamAttachments: [],
+  abort: null,
+  stoppedByUser: false,
+
+  pending: [],             // Anhaenge im Eingabefeld
+  imageMode: false,
+  audio: { msgId: null, status: 'idle' },  // idle | loading | playing | paused
 };
 
 // =========================================================
@@ -91,43 +120,51 @@ const $ = (id) => document.getElementById(id);
 const els = {
   login:        $('login'),
   app:          $('app'),
+  main:         $('main'),
   sidebar:      $('sidebar'),
-  chatNav:      $('chat-nav'),
-  searchNav:    $('search-nav'),
-  searchInput:  $('search-input'),
-  newChatBtn:   $('new-chat-btn'),
-  settingsBtn:  $('settings-btn'),
-  themeToggle:  $('theme-toggle'),
-  logoutBtn:    $('logout-btn'),
+  sidebarScrim: $('sidebar-scrim'),
   sidebarToggle: $('sidebar-toggle'),
+  sidebarOpen:  $('sidebar-open'),
+  chatNav:      $('chat-nav'),
+  newChatBtn:   $('new-chat-btn'),
+  headerNewChat: $('header-new-chat'),
+  sbBrand:      $('sb-brand'),
+  sbSearchBtn:  $('sb-search-btn'),
+  imagesBtn:    $('images-btn'),
+  footerUser:   $('footer-user'),
+  profileMenu:  $('profile-menu'),
+  topbar:       $('topbar'),
   topbarTitle:  $('chat-title'),
-  topbarMeta:   $('chat-meta'),
-  messages:     $('messages'),
   effortBtn:    $('effort-btn'),
   effortLabel:  $('effort-label'),
+  modelLabel:   $('model-label'),
   effortMenu:   $('effort-menu'),
+  shareBtn:     $('share-btn'),
   moreBtn:      $('more-btn'),
   moreMenu:     $('more-menu'),
-  pinLabel:     $('pin-label'),
+  chatView:     $('chat-view'),
+  imagesView:   $('images-view'),
+  messages:     $('messages'),
+  scrollDown:   $('scroll-down-btn'),
   inputForm:    $('input-form'),
   input:        $('input'),
   sendBtn:      $('send-btn'),
   attachBtn:    $('attach-btn'),
+  plusMenu:     $('plus-menu'),
+  imageChip:    $('image-chip'),
   fileInput:    $('file-input'),
+  photoInput:   $('photo-input'),
+  cameraInput:  $('camera-input'),
   pendingWrap:  $('pending-attachments'),
+  composerHint: $('composer-hint'),
   audio:        $('audio-player'),
+  searchModal:  $('search-modal'),
+  searchInput:  $('search-input'),
+  searchResults: $('search-results'),
+  searchBar:    $('chat-search-bar'),
+  searchBarInput: $('chat-search-input'),
+  searchBarCount: $('chat-search-count'),
   settingsModal: $('settings-modal'),
-  settingsClose: $('settings-close'),
-  ttsProvider:      $('tts-provider'),
-  ttsProviderHint:  $('tts-provider-hint'),
-  ttsVoice:     $('tts-voice'),
-  ttsSpeed:     $('tts-speed'),
-  ttsSpeedLabel: $('tts-speed-label'),
-  spCustom:     $('sp-custom'),
-  backupExport: $('backup-export-btn'),
-  backupImport: $('backup-import-btn'),
-  backupFileInput: $('backup-file-input'),
-  backupStatus: $('backup-status'),
   promptModal:  $('prompt-modal'),
   promptTitle:  $('prompt-title'),
   promptText:   $('prompt-text'),
@@ -136,77 +173,100 @@ const els = {
   promptCancel: $('prompt-cancel'),
   toast:        $('toast'),
 };
+const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
 
 // =========================================================
-// Theme
+// Hell/Dunkel und Farbschema
 // =========================================================
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+function resolvedDark() {
+  return state.themeMode === 'dark' || (state.themeMode === 'system' && darkQuery.matches);
+}
 function applyTheme() {
-  const saved = localStorage.getItem(LS.theme);
-  if (saved === 'light' || saved === 'dark') {
-    document.documentElement.dataset.theme = saved;
-  } else {
-    delete document.documentElement.dataset.theme;
-  }
-  updateThemeIcon();
+  const dark = resolvedDark();
+  const root = document.documentElement;
+  root.dataset.theme = dark ? 'dark' : 'light';
+  root.dataset.palette = dark ? state.paletteDark : state.paletteLight;
+  // Browserleiste (Handy, PWA) in der Hintergrundfarbe
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim() || '#100E14');
+  document.querySelectorAll('[data-theme-mode]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.themeMode === state.themeMode);
+  });
 }
-function updateThemeIcon() {
-  const isDark = document.documentElement.dataset.theme === 'dark' ||
-    (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-  const icon = els.themeToggle.querySelector('use');
-  icon.setAttribute('href', isDark ? '#icon-sun' : '#icon-moon');
+function setThemeMode(mode, persist = true) {
+  state.themeMode = ['light', 'dark'].includes(mode) ? mode : 'system';
+  localStorage.setItem(LS.theme, state.themeMode);
+  applyTheme();
+  if (persist) queueSettingsPush();
 }
-els.themeToggle.addEventListener('click', () => {
-  const current = document.documentElement.dataset.theme;
-  const next = current === 'dark' ? 'light' : current === 'light' ? 'dark' : 'light';
-  document.documentElement.dataset.theme = next;
-  localStorage.setItem(LS.theme, next);
-  updateThemeIcon();
-  queueSettingsPush();
+function setPalette(mode, id, persist = true) {
+  if (!PALETTES.some((p) => p.id === id)) return;
+  if (mode === 'dark') { state.paletteDark = id; localStorage.setItem(LS.paletteDark, id); }
+  else { state.paletteLight = id; localStorage.setItem(LS.paletteLight, id); }
+  applyTheme();
+  if (persist) queueSettingsPush();
+}
+darkQuery.addEventListener?.('change', applyTheme);
+document.querySelectorAll('[data-theme-mode]').forEach((b) => {
+  b.addEventListener('click', () => setThemeMode(b.dataset.themeMode));
 });
-matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', updateThemeIcon);
 applyTheme();
 
 // =========================================================
-// Toast
+// Hinweis-Leiste
 // =========================================================
 let toastTimer;
 function toast(msg, opts = {}) {
   els.toast.textContent = msg;
   els.toast.className = 'toast' + (opts.error ? ' error' : '');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => els.toast.classList.add('hidden'), opts.duration || 3000);
+  toastTimer = setTimeout(() => els.toast.classList.add('hidden'), opts.duration || (opts.error ? 5000 : 2600));
 }
 
 // =========================================================
-// Markdown
+// Hilfen
 // =========================================================
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[m]));
+}
+function formatBytes(n) {
+  if (!n && n !== 0) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+function fileExt(name) {
+  const m = /\.([a-z0-9]{1,6})$/i.exec(name || '');
+  return m ? m[1].toUpperCase() : '';
+}
+function isImageMime(m) { return (m || '').startsWith('image/'); }
+
 marked.setOptions({ breaks: true, gfm: true });
 function renderMarkdown(text) {
   if (!text) return '';
   return DOMPurify.sanitize(marked.parse(text), { ADD_ATTR: ['target'] });
 }
 
-/** Findet alle <pre><code>…</code></pre>-Blöcke in `root` und packt
- *  Header (Sprache + Copy-Button) drüber. Wird nach jedem Render aufgerufen. */
-function enhanceCodeBlocks(root) {
+/** Nach jedem Rendern: Codebloecke bekommen Kopfzeile mit Sprache und
+ *  Kopieren, Tabellen einen eigenen Rollbalken, Links ein neues Fenster. */
+function enhanceContent(root) {
   for (const pre of root.querySelectorAll('pre')) {
-    if (pre.parentElement?.classList.contains('codeblock')) continue;  // schon dekoriert
+    if (pre.parentElement?.classList.contains('codeblock')) continue;
     const code = pre.querySelector('code');
     if (!code) continue;
-    // Sprache aus class="language-xyz" rausziehen
     let lang = '';
-    for (const cls of code.classList) {
-      if (cls.startsWith('language-')) { lang = cls.slice(9); break; }
-    }
+    for (const cls of code.classList) if (cls.startsWith('language-')) { lang = cls.slice(9); break; }
     const wrap = document.createElement('div');
     wrap.className = 'codeblock';
     const header = document.createElement('div');
     header.className = 'codeblock-header';
     header.innerHTML = `
       <span class="codeblock-lang">${escapeHtml(lang || 'code')}</span>
-      <button type="button" class="codeblock-copy" title="${escapeHtml(t('copy_title'))}">
-        <svg class="icon icon-sm"><use href="#icon-copy"/></svg>
-        <span>${escapeHtml(t('copy'))}</span>
+      <button type="button" class="codeblock-copy">
+        <svg class="icon icon-sm"><use href="#icon-copy"/></svg><span>${escapeHtml(t('copy'))}</span>
       </button>`;
     pre.parentNode.insertBefore(wrap, pre);
     wrap.appendChild(header);
@@ -215,19 +275,22 @@ function enhanceCodeBlocks(root) {
       try {
         await navigator.clipboard.writeText(code.textContent || '');
         const lbl = header.querySelector('.codeblock-copy span');
-        const old = lbl.textContent;
         lbl.textContent = t('toast_copied');
-        setTimeout(() => lbl.textContent = old, 1200);
-      } catch {
-        toast(t('toast_copy_failed'), { error: true });
-      }
+        setTimeout(() => { lbl.textContent = t('copy'); }, 1200);
+      } catch { toast(t('toast_copy_failed'), { error: true }); }
     });
   }
-}
-function escapeHtml(s) {
-  return (s || '').replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[m]));
+  for (const table of root.querySelectorAll('table')) {
+    if (table.parentElement?.classList.contains('table-wrap')) continue;
+    const w = document.createElement('div');
+    w.className = 'table-wrap';
+    table.parentNode.insertBefore(w, table);
+    w.appendChild(table);
+  }
+  for (const a of root.querySelectorAll('a[href]')) {
+    const href = a.getAttribute('href') || '';
+    if (/^https?:/i.test(href)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+  }
 }
 
 // =========================================================
@@ -253,9 +316,202 @@ async function api(method, path, body, opts = {}) {
   const ct = resp.headers.get('content-type') || '';
   return ct.includes('application/json') ? resp.json() : resp.text();
 }
+/** Lesbarer Fehlertext: FastAPI schickt {"detail": "..."}, das soll nicht roh erscheinen. */
+function apiErrorText(e) {
+  if (e instanceof ApiError) {
+    try {
+      const j = JSON.parse(e.body);
+      if (typeof j.detail === 'string') return j.detail;
+      if (Array.isArray(j.detail)) return j.detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
+    } catch { /* kein JSON */ }
+    return String(e.body || `HTTP ${e.status}`).slice(0, 300);
+  }
+  return (e && e.message) || String(e);
+}
+function attachmentUrl(id) {
+  return `${state.serverUrl}/attachments/${encodeURIComponent(id)}?token=${encodeURIComponent(state.token)}`;
+}
+async function uploadFile(blob, filename) {
+  const fd = new FormData();
+  fd.append('file', blob, filename);
+  return api('POST', '/attachments', fd);
+}
+
+/** Bilder vor dem Upload verkleinern, zwei Profile wie ImageCompressor der App:
+ *  'vision' fuer Anhaenge, die ein Modell nur liest, 'edit' fuer Vorlagen, die
+ *  bearbeitet werden (dort begrenzt die Vorlage die Qualitaet des Ergebnisses). */
+const COMPRESS = {
+  vision: { edge: 1568, quality: 0.85, keepBelow: 200 * 1024, keepMax: 1_500_000 },
+  edit:   { edge: 2560, quality: 0.92, keepBelow: 400 * 1024, keepMax: 2_500_000 },
+};
+async function compressImage(file, profile = 'vision') {
+  const p = COMPRESS[profile] || COMPRESS.vision;
+  const name = file.name || 'bild.jpg';
+  if (!isImageMime(file.type) || file.type === 'image/gif' || file.size <= p.keepBelow) {
+    return { blob: file, filename: name };
+  }
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const longest = Math.max(bmp.width, bmp.height);
+    if (longest <= p.edge && file.size <= p.keepMax) { bmp.close(); return { blob: file, filename: name }; }
+    const scale = Math.min(1, p.edge / longest);
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', p.quality));
+    if (!blob) return { blob: file, filename: name };
+    return { blob, filename: name.replace(/\.[^.]+$/, '') + '.jpg' };
+  } catch {
+    return { blob: file, filename: name };
+  }
+}
 
 // =========================================================
-// Login (Username + Passwort) → erstellt Server-Session, Token in localStorage
+// Dialoge und Popups
+// =========================================================
+/** Kleiner Dialog: Titel, Text, beliebiger Inhalt, Knoepfe. Liefert den
+ *  `value` des gedrueckten Knopfs, bei Abbruch null. */
+function openDialog({ title, icon, text, body, actions, wide = false, onMount }) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'modal';
+    wrap.innerHTML = `
+      <div class="modal-card ${wide ? '' : 'small'}" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          ${icon ? `<svg class="icon dlg-icon"><use href="#icon-${icon}"/></svg>` : ''}
+          <h2 style="flex:1"></h2>
+        </div>
+        <div class="modal-body"></div>
+        <div class="modal-footer"></div>
+      </div>`;
+    wrap.querySelector('h2').textContent = title || '';
+    const bodyEl = wrap.querySelector('.modal-body');
+    if (text) {
+      const p = document.createElement('p');
+      p.className = 'dlg-text';
+      p.textContent = text;
+      bodyEl.appendChild(p);
+    }
+    if (body) bodyEl.appendChild(body);
+    if (!text && !body) bodyEl.remove();
+    const foot = wrap.querySelector('.modal-footer');
+    let done = false;
+    const close = (v) => {
+      if (done) return;
+      done = true;
+      wrap.remove();
+      document.removeEventListener('keydown', onKey, true);
+      resolve(v);
+    };
+    for (const a of actions || []) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = a.kind || 'btn-ghost';
+      b.textContent = a.label;
+      b.addEventListener('click', () => close(typeof a.value === 'function' ? a.value() : a.value));
+      foot.appendChild(b);
+    }
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    document.addEventListener('keydown', onKey, true);
+    wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) close(null); });
+    document.body.appendChild(wrap);
+    if (onMount) onMount(wrap, close);
+    const primary = foot.querySelector('.btn-primary, .btn-danger');
+    if (primary && !wrap.querySelector('input, textarea')) primary.focus();
+  });
+}
+async function showConfirm({ title, text, okLabel, danger = false }) {
+  const v = await openDialog({
+    title, text,
+    actions: [
+      { label: t('cancel'), value: false },
+      { label: okLabel || t('ok'), kind: danger ? 'btn-danger' : 'btn-primary', value: true },
+    ],
+  });
+  return v === true;
+}
+/** Eingabe-Dialog (Passwort, PIN, Name). Liefert den Text oder null. */
+function showPrompt({ title, text, placeholder = '', type = 'password', okLabel = 'OK', value = '' }) {
+  return new Promise((resolve) => {
+    els.promptTitle.textContent = title;
+    els.promptText.textContent = text || '';
+    els.promptText.classList.toggle('hidden', !text);
+    els.promptInput.type = type;
+    els.promptInput.placeholder = placeholder;
+    els.promptInput.value = value;
+    els.promptOk.textContent = okLabel;
+    els.promptModal.classList.remove('hidden');
+    setTimeout(() => { els.promptInput.focus(); els.promptInput.select(); }, 30);
+    const close = (val) => {
+      els.promptModal.classList.add('hidden');
+      els.promptOk.onclick = null;
+      els.promptCancel.onclick = null;
+      els.promptInput.onkeydown = null;
+      resolve(val);
+    };
+    els.promptOk.onclick = () => close(els.promptInput.value);
+    els.promptCancel.onclick = () => close(null);
+    els.promptInput.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); close(els.promptInput.value); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(null); }
+    };
+  });
+}
+
+// Immer nur ein Popup-Menue offen. Klick daneben oder Escape schliesst es.
+let openPopup = null;
+function showPopup(el, anchor, onClose) {
+  closePopup();
+  el.classList.remove('hidden');
+  if (anchor) anchor.setAttribute('aria-expanded', 'true');
+  openPopup = { el, anchor, onClose };
+}
+function closePopup() {
+  if (!openPopup) return;
+  const p = openPopup;
+  openPopup = null;
+  if (p.el.isConnected) {
+    if (p.el.dataset.transient === '1') p.el.remove();
+    else p.el.classList.add('hidden');
+  }
+  if (p.anchor) p.anchor.setAttribute('aria-expanded', 'false');
+  document.querySelectorAll('.chat-item.menu-open').forEach((r) => r.classList.remove('menu-open'));
+  if (p.onClose) p.onClose();
+}
+function togglePopup(el, anchor, onOpen) {
+  if (openPopup && openPopup.el === el) { closePopup(); return false; }
+  if (onOpen) onOpen();
+  showPopup(el, anchor);
+  return true;
+}
+document.addEventListener('pointerdown', (e) => {
+  if (!openPopup) return;
+  if (openPopup.el.contains(e.target)) return;
+  if (openPopup.anchor && openPopup.anchor.contains(e.target)) return;
+  closePopup();
+});
+window.addEventListener('resize', closePopup);
+
+/** Menueeintrag fuer dynamisch gebaute Menues. */
+function menuButton({ icon, label, trail, trailOn, danger, disabled, onClick }) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.setAttribute('role', 'menuitem');
+  if (danger) b.classList.add('danger');
+  if (disabled) b.disabled = true;
+  b.innerHTML = `${icon ? `<svg class="icon"><use href="#icon-${icon}"/></svg>` : ''}<span class="label"></span>` +
+    (trail ? `<span class="trail${trailOn ? ' on' : ''}"></span>` : '');
+  b.querySelector('.label').textContent = label;
+  if (trail) b.querySelector('.trail').textContent = trail;
+  b.addEventListener('click', () => { closePopup(); onClick && onClick(); });
+  return b;
+}
+function menuSep() { const d = document.createElement('div'); d.className = 'menu-sep'; return d; }
+
+// =========================================================
+// Anmeldung
 // =========================================================
 $('login-form').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -283,13 +539,12 @@ $('login-form').addEventListener('submit', async (ev) => {
     }
     const data = await resp.json();
     state.serverUrl = url;
-    state.token     = data.token;
-    state.me        = data.user;
+    state.token = data.token;
+    state.me = data.user;
     localStorage.setItem(LS.url, url);
     localStorage.setItem(LS.token, data.token);
     $st.className = 'login-status ok';
     $st.textContent = t('login_signed_in');
-    // Forced-Password-Change: vor dem Öffnen der App den PW-Change-Modal zeigen
     if (data.user && data.user.must_change_password) {
       $('login-password').value = '';
       openPasswordChange({ forced: true });
@@ -302,44 +557,34 @@ $('login-form').addEventListener('submit', async (ev) => {
   }
 });
 
-els.logoutBtn.addEventListener('click', async () => {
-  if (!confirm(t('confirm_logout_session'))) return;
-  // Server-seitig die Session beenden (best effort — funktioniert nicht immer
-  // wenn der Token bereits ungültig ist, dann reicht der lokale Cleanup)
-  try { await api('POST', '/auth/logout'); } catch (_) {}
+async function logout() {
+  if (!(await showConfirm({ title: t('logout_title'), text: t('confirm_logout_session'), okLabel: t('logout_title') }))) return;
+  try { await api('POST', '/auth/logout'); } catch (_) { /* Token evtl. schon ungueltig */ }
   localStorage.removeItem(LS.token);
   wissenVergessen();
   state.token = '';
   state.cid = null;
+  location.hash = '';
   location.reload();
-});
+}
 
-// =========================================================
-// Password-Change-Modal (forced nach Login wenn must_change_password,
-// oder via Settings → „Passwort ändern")
-// =========================================================
+// Passwort aendern: Pflicht nach erstem Login oder aus den Einstellungen
 let _pwChangeForced = false;
 function openPasswordChange({ forced = false } = {}) {
   _pwChangeForced = !!forced;
-  const modal = $('pwchange-modal');
   $('pwchange-title').textContent = forced ? t('pwchange_title_set_now') : t('change_password');
-  $('pwchange-text').textContent = forced
-    ? t('pwchange_text_forced')
-    : t('pwchange_text_normal');
-  // Altes-Passwort-Feld nur bei normaler Änderung anzeigen
+  $('pwchange-text').textContent = forced ? t('pwchange_text_forced') : t('pwchange_text_normal');
   $('pwchange-old-field').style.display = forced ? 'none' : '';
-  $('pwchange-old').value  = '';
-  $('pwchange-new').value  = '';
+  $('pwchange-old').value = '';
+  $('pwchange-new').value = '';
   $('pwchange-new2').value = '';
   $('pwchange-cancel').style.display = forced ? 'none' : '';
   $('pwchange-status').textContent = '';
   $('pwchange-status').className = 'login-status';
-  modal.classList.remove('hidden');
+  $('pwchange-modal').classList.remove('hidden');
   setTimeout(() => ($(forced ? 'pwchange-new' : 'pwchange-old')).focus(), 100);
 }
-function closePasswordChange() {
-  $('pwchange-modal').classList.add('hidden');
-}
+function closePasswordChange() { $('pwchange-modal').classList.add('hidden'); }
 $('pwchange-cancel').addEventListener('click', () => { if (!_pwChangeForced) closePasswordChange(); });
 $('pwchange-form').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -347,73 +592,63 @@ $('pwchange-form').addEventListener('submit', async (ev) => {
   const newPw = $('pwchange-new').value;
   const newPw2 = $('pwchange-new2').value;
   const $st = $('pwchange-status');
-  if (newPw.length < 8) {
-    $st.className = 'login-status error'; $st.textContent = t('pwchange_min_chars'); return;
-  }
-  if (newPw !== newPw2) {
-    $st.className = 'login-status error'; $st.textContent = t('pwchange_mismatch'); return;
-  }
+  if (newPw.length < 8) { $st.className = 'login-status error'; $st.textContent = t('pwchange_min_chars'); return; }
+  if (newPw !== newPw2) { $st.className = 'login-status error'; $st.textContent = t('pwchange_mismatch'); return; }
   $st.className = 'login-status'; $st.textContent = t('pwchange_saving');
   try {
-    const body = _pwChangeForced
-      ? { new_password: newPw }
-      : { old_password: oldPw, new_password: newPw };
+    const body = _pwChangeForced ? { new_password: newPw } : { old_password: oldPw, new_password: newPw };
     await api('POST', '/auth/change-password', body);
     $st.className = 'login-status ok'; $st.textContent = t('pwchange_done');
     if (state.me) state.me.must_change_password = false;
     setTimeout(() => {
       closePasswordChange();
-      if (_pwChangeForced) {
-        _pwChangeForced = false;
-        showApp();
-      } else {
-        toast(t('toast_password_changed'));
-      }
+      if (_pwChangeForced) { _pwChangeForced = false; showApp(); }
+      else toast(t('toast_password_changed'));
     }, 250);
   } catch (e) {
     $st.className = 'login-status error';
-    $st.textContent = t('pwchange_error_prefix', e.message);
+    $st.textContent = t('pwchange_error_prefix', apiErrorText(e));
   }
 });
 
 // =========================================================
-// Server-Side UI-Settings — werden auf dem Mini-PC persistiert, damit
-// jeder Browser/Gerät dieselben Settings sieht. Lokales localStorage bleibt
-// als Cache + Pre-Login-Fallback.
+// Einstellungen auf dem Server: jeder Browser sieht dieselben Werte.
+// localStorage bleibt Zwischenspeicher fuer den Start vor dem Login.
 // =========================================================
-const SERVER_SETTING_KEYS = ['theme', 'effort', 'spMode', 'spCustom', 'ttsVoice', 'ttsSpeed', 'sidebar',
-                             'chatModel', 'effortByFamily'];
 let _settingsPushTimer = null;
+function boolFrom(v) { return v === true || v === 'true' || v === '1'; }
 
 async function loadServerSettings() {
   try {
     const resp = await api('GET', '/ui-settings');
     const s = resp.settings || {};
-    // Lokale Werte mit Server-Werten überschreiben
-    if (s.theme === 'light' || s.theme === 'dark') {
-      localStorage.setItem(LS.theme, s.theme);
-      document.documentElement.dataset.theme = s.theme;
-      updateThemeIcon();
-    }
-    if (s.effort)    { localStorage.setItem(LS.effort, s.effort);     state.effort = s.effort; }
-    if (s.spMode)    { localStorage.setItem(LS.spMode, s.spMode);     state.spMode = s.spMode; }
+    if (['system', 'light', 'dark'].includes(s.theme)) setThemeMode(s.theme, false);
+    if (s.paletteLight) setPalette('light', s.paletteLight, false);
+    if (s.paletteDark) setPalette('dark', s.paletteDark, false);
+    if (s.effort) { localStorage.setItem(LS.effort, s.effort); state.effort = s.effort; }
+    if (s.spMode) { localStorage.setItem(LS.spMode, s.spMode); state.spMode = s.spMode; }
     if (s.spCustom !== undefined) { localStorage.setItem(LS.spCustom, s.spCustom); state.spCustom = s.spCustom; }
-    if (s.ttsVoice)  { localStorage.setItem(LS.ttsVoice, s.ttsVoice); state.ttsVoice = s.ttsVoice; }
-    if (s.ttsSpeed)  { localStorage.setItem(LS.ttsSpeed, s.ttsSpeed); state.ttsSpeed = parseFloat(s.ttsSpeed); }
-    if (s.sidebar)   {
+    if (s.ttsVoice) { localStorage.setItem(LS.ttsVoice, s.ttsVoice); state.ttsVoice = s.ttsVoice; }
+    if (s.ttsSpeed) { localStorage.setItem(LS.ttsSpeed, s.ttsSpeed); state.ttsSpeed = parseFloat(s.ttsSpeed) || 1.0; }
+    if (s.autoSpeak !== undefined) { state.autoSpeak = boolFrom(s.autoSpeak); localStorage.setItem(LS.autoSpeak, String(state.autoSpeak)); }
+    if (s.collapseUserMsgs !== undefined) {
+      state.collapseUserMsgs = boolFrom(s.collapseUserMsgs);
+      localStorage.setItem(LS.collapseUserMsgs, String(state.collapseUserMsgs));
+    }
+    if (s.autoSpeakByChat) {
+      try {
+        const m = JSON.parse(s.autoSpeakByChat);
+        if (m && typeof m === 'object') { state.autoSpeakByChat = m; localStorage.setItem(LS.autoSpeakByChat, JSON.stringify(m)); }
+      } catch { /* kaputter Eintrag: lokalen Stand behalten */ }
+    }
+    if (s.sidebar) {
       localStorage.setItem(LS.sidebar, s.sidebar);
-      if (s.sidebar === '1' && !matchMedia('(max-width: 768px)').matches) {
-        els.app.classList.add('sidebar-collapsed');
-      }
+      if (!isMobile()) els.app.classList.toggle('sidebar-collapsed', s.sidebar === '1');
     }
-    if (s.chatModel !== undefined) {
-      localStorage.setItem(LS.chatModel, s.chatModel);
-      state.chatModel = s.chatModel;
-    }
+    if (s.chatModel !== undefined) { localStorage.setItem(LS.chatModel, s.chatModel); state.chatModel = s.chatModel; }
     if (s.effortByFamily !== undefined) {
       try {
-        const parsed = typeof s.effortByFamily === 'string'
-          ? JSON.parse(s.effortByFamily) : s.effortByFamily;
+        const parsed = typeof s.effortByFamily === 'string' ? JSON.parse(s.effortByFamily) : s.effortByFamily;
         if (parsed && typeof parsed === 'object') {
           state.effortByFamily = Object.assign({}, EFFORT_DEFAULTS, parsed);
           localStorage.setItem(LS.effortByFamily, JSON.stringify(state.effortByFamily));
@@ -421,27 +656,29 @@ async function loadServerSettings() {
       } catch (e) { console.log('effortByFamily unlesbar:', e.message); }
     }
   } catch (e) {
-    // Server kann älter sein und den Endpoint nicht haben — nicht fatal
     console.log('Server-Settings nicht abrufbar:', e.message);
   }
 }
-
 function queueSettingsPush() {
-  // Debounce: bei mehreren Änderungen kurz hintereinander nur einmal pushen
   clearTimeout(_settingsPushTimer);
   _settingsPushTimer = setTimeout(pushSettingsToServer, 600);
 }
-
 async function pushSettingsToServer() {
+  if (!state.token) return;
   const payload = {
-    theme:    localStorage.getItem(LS.theme) || '',
-    effort:   state.effort,
-    spMode:   state.spMode,
+    theme: state.themeMode,
+    paletteLight: state.paletteLight,
+    paletteDark: state.paletteDark,
+    effort: state.effort,
+    spMode: state.spMode,
     spCustom: state.spCustom,
     ttsVoice: state.ttsVoice,
-    ttsSpeed: state.ttsSpeed.toString(),
-    sidebar:  localStorage.getItem(LS.sidebar) || '0',
-    chatModel:      state.chatModel,
+    ttsSpeed: String(state.ttsSpeed),
+    autoSpeak: String(state.autoSpeak),
+    autoSpeakByChat: JSON.stringify(state.autoSpeakByChat),
+    collapseUserMsgs: String(state.collapseUserMsgs),
+    sidebar: localStorage.getItem(LS.sidebar) || '0',
+    chatModel: state.chatModel,
     effortByFamily: JSON.stringify(state.effortByFamily),
   };
   try { await api('PUT', '/ui-settings', payload); }
@@ -449,776 +686,880 @@ async function pushSettingsToServer() {
 }
 
 // =========================================================
-// Bootstrap
+// Start und Navigation (#/chat/<id>, #/images)
 // =========================================================
-function cidFromHash() {
-  // #/chat/abc-123 → "abc-123"
+function routeFromHash() {
+  if (/^#\/images\b/.test(location.hash)) return { view: 'images' };
   const m = location.hash.match(/^#\/chat\/([^/?]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
+  return { view: 'chat', cid: m ? decodeURIComponent(m[1]) : null };
 }
 
 async function showApp() {
   els.login.classList.add('hidden');
   els.app.classList.remove('hidden');
-  // /me holen — User-Identität, Admin-Flag (steuert Sichtbarkeit der
-  // Admin-Sections)
   try {
     state.me = await api('GET', '/me');
-    renderFooterUser();
-    applyAdminVisibility();
   } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return showLogin();
     state.me = null;
   }
-  // Server-Settings holen (überschreibt lokales), dann UI initialisieren
+  renderFooterUser();
+  applyAdminVisibility();
   await loadServerSettings();
-  // Modell-Liste holen (baut auch das Dropdown und den Button-Text auf).
+  applyTheme();
   await loadChatModels(false);
   if (window.PocketGems) window.PocketGems.load();
-  refreshChatList().then(() => {
-    // Cleaner Link öffnet immer einen neuen Chat (wie ChatGPT/Gemini Web).
-    // Vergangene Chats bleiben über die Sidebar erreichbar.
-    // Nur wenn ein konkreter Chat im URL-Hash steht (#/chat/<cid>), wird der geladen.
-    const fromHash = cidFromHash();
-    if (fromHash && state._allCids.includes(fromHash)) {
-      openChat(fromHash, { fromHash: true });
-    } else {
-      newChat();
-    }
-  });
+  await refreshChatList();
+  const r = routeFromHash();
+  if (r.view === 'images') { showImagesView(); return; }
+  if (r.cid && state._allCids.includes(r.cid)) openChat(r.cid, { fromHash: true });
+  else newChat();
 }
 
-// Browser-Back/Forward: Hash ändert sich → entsprechenden Chat öffnen
 window.addEventListener('hashchange', () => {
-  const cid = cidFromHash();
-  if (cid && cid !== state.cid && state._allCids.includes(cid)) {
-    openChat(cid, { fromHash: true });
-  }
+  const r = routeFromHash();
+  if (r.view === 'images') { if (state.view !== 'images') showImagesView(); return; }
+  if (state.view !== 'chat') showChatView();
+  if (r.cid && r.cid !== state.cid && state._allCids.includes(r.cid)) openChat(r.cid, { fromHash: true });
 });
+
 function showLogin() {
-  $('login-url').value = state.serverUrl;
+  $('login-url').value = state.serverUrl || location.origin;
   els.login.classList.remove('hidden');
   els.app.classList.add('hidden');
 }
-if (state.serverUrl && state.token) showApp(); else showLogin();
+
+function showChatView() {
+  state.view = 'chat';
+  els.main.classList.remove('images-mode');
+  els.chatView.classList.remove('hidden');
+  els.imagesView.classList.add('hidden');
+  els.imagesBtn.classList.remove('active');
+  if (window.PocketImages) window.PocketImages.hide();
+  markActiveChat();
+  updateTopbar();
+}
+function showImagesView() {
+  closeChatSearch();
+  state.view = 'images';
+  els.main.classList.add('images-mode');
+  els.chatView.classList.add('hidden');
+  els.imagesView.classList.remove('hidden');
+  els.imagesBtn.classList.add('active');
+  document.querySelectorAll('.chat-item.active').forEach((el) => el.classList.remove('active'));
+  if (location.hash !== '#/images') history.replaceState(null, '', '#/images');
+  document.title = t('nav_images') + ' · PocketClot';
+  els.topbar.classList.remove('scrolled');
+  if (isMobile()) closeSidebar();
+  if (window.PocketImages) window.PocketImages.show();
+}
 
 // =========================================================
-// Chat-Liste — gruppiert nach Datum
+// Seitenleiste
 // =========================================================
+function closeSidebar() { els.sidebar.classList.remove('open'); }
+function toggleSidebar() {
+  if (isMobile()) { els.sidebar.classList.toggle('open'); return; }
+  const collapsed = els.app.classList.toggle('sidebar-collapsed');
+  localStorage.setItem(LS.sidebar, collapsed ? '1' : '0');
+  queueSettingsPush();
+}
+els.sidebarToggle.addEventListener('click', toggleSidebar);
+els.sidebarOpen.addEventListener('click', toggleSidebar);
+els.sidebarScrim.addEventListener('click', closeSidebar);
+if (localStorage.getItem(LS.sidebar) === '1' && !isMobile()) els.app.classList.add('sidebar-collapsed');
+els.newChatBtn.addEventListener('click', () => newChat());
+els.headerNewChat.addEventListener('click', () => newChat());
+els.sbBrand.addEventListener('click', () => newChat());
+els.imagesBtn.addEventListener('click', () => showImagesView());
+els.sbSearchBtn.addEventListener('click', () => openSearch());
+$('search-kbd').textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
 async function refreshChatList() {
   try {
     const list = await api('GET', '/conversations');
-    state._allCids = list.map(c => c.id);
-    renderChatList(list);
+    state.chats = list;
+    state._allCids = list.map((c) => c.id);
+    renderChatList();
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) return showLogin();
-    toast(t('toast_list_failed', e.message), { error: true });
+    toast(t('toast_list_failed', apiErrorText(e)), { error: true });
   }
 }
 
-function relativeDateGroup(iso) {
-  const d = new Date(iso);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = Math.round((today - dDay) / 86400000);
-  if (diff <= 0) return t('group_today');
-  if (diff === 1) return t('group_yesterday');
-  if (diff < 7) return t('group_this_week');
-  if (diff < 30) return t('group_last_30_days');
-  return t('group_older');
-}
+function chatSortKey(c) { return c.last_message_at || c.created_at || ''; }
 
-function renderChatList(items) {
-  // Sortieren: pinned zuerst (eigene Gruppe), Rest nach last_message_at
-  items.sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    const ta = a.last_message_at || a.created_at;
-    const tb = b.last_message_at || b.created_at;
-    return tb.localeCompare(ta);
-  });
+/** Abschnitte wie in der App: Angeheftet, dann Letzte. */
+function renderChatList() {
+  const items = state.chats.slice().sort((a, b) => chatSortKey(b).localeCompare(chatSortKey(a)));
   els.chatNav.innerHTML = '';
   if (!items.length) {
-    els.chatNav.innerHTML = `<div class="empty-chats">${t('no_chats_yet')}</div>`;
+    els.chatNav.innerHTML = `<div class="sb-section"><div class="sb-label"><span>${escapeHtml(t('section_recent'))}</span></div><div class="empty-chats">${escapeHtml(t('no_chats_yet'))}</div></div>`;
     return;
   }
-
-  // Gruppen aufbauen
-  const groups = new Map();
-  const pinned = items.filter(c => c.pinned);
-  const others = items.filter(c => !c.pinned);
-  if (pinned.length) groups.set(t('pinned_group'), pinned);
-  for (const c of others) {
-    const key = relativeDateGroup(c.last_message_at || c.created_at);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(c);
-  }
-
+  const groups = [
+    [t('convo_pinned'), items.filter((c) => c.pinned)],
+    [t('section_recent'), items.filter((c) => !c.pinned)],
+  ];
   for (const [label, chats] of groups) {
-    const grp = document.createElement('div');
-    grp.className = 'chat-nav-group';
-    const h = document.createElement('div');
-    h.className = 'chat-nav-label';
-    h.textContent = label;
-    grp.appendChild(h);
-    for (const c of chats) {
-      const li = document.createElement('div');
-      li.className = 'chat-item' + (c.id === state.cid ? ' active' : '');
-      li.dataset.cid = c.id;
-      const lockMark = c.locked
-        ? `<span class="lock-mark" title="${escapeHtml(t('chat_locked_badge'))}" aria-label="${escapeHtml(t('chat_locked_badge'))}"><svg><use href="#icon-lock-filled"/></svg></span>`
-        : '';
-      li.innerHTML = `
-        <span class="title">${escapeHtml(c.title || t('no_title'))}</span>
-        ${lockMark}
-        <button class="chat-row-more" type="button" aria-label="${escapeHtml(t('more'))}"
-                title="${escapeHtml(t('more'))}">
-          <svg><use href="#icon-more"/></svg>
-        </button>
-      `;
-      // Row click → open; "..." click → menu (stopPropagation prevents both)
-      li.addEventListener('click', () => openChat(c.id));
-      const moreBtn = li.querySelector('.chat-row-more');
-      moreBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openChatRowMenu(li, c);
-      });
-      grp.appendChild(li);
-    }
-    els.chatNav.appendChild(grp);
+    if (!chats.length) continue;
+    const sec = document.createElement('section');
+    sec.className = 'sb-section';
+    sec.innerHTML = `<div class="sb-label"><span>${escapeHtml(label)}</span></div><div class="sb-group"></div>`;
+    const list = sec.querySelector('.sb-group');
+    for (const c of chats) list.appendChild(chatRow(c));
+    els.chatNav.appendChild(sec);
   }
 }
 
-// =========================================================
-// Per-chat row menu (Rename / Pin / Delete)
-// =========================================================
-let openMenu = null;
-
-function closeChatRowMenu() {
-  if (openMenu) {
-    openMenu.remove();
-    openMenu = null;
-  }
-  document.querySelectorAll('.chat-item.menu-open').forEach(el => el.classList.remove('menu-open'));
+function chatRow(c) {
+  const row = document.createElement('div');
+  row.className = 'chat-item' + (c.id === state.cid && state.view === 'chat' ? ' active' : '');
+  row.dataset.cid = c.id;
+  row.setAttribute('role', 'link');
+  row.tabIndex = 0;
+  const lock = c.locked
+    ? `<span class="lock-mark" title="${escapeHtml(t('chat_locked_badge'))}"><svg><use href="#icon-lock-filled"/></svg></span>` : '';
+  row.innerHTML = `
+    <span class="title">${escapeHtml(c.title || t('no_title'))}</span>
+    ${lock}
+    <button class="chat-row-more" type="button" aria-label="${escapeHtml(t('more'))}" title="${escapeHtml(t('more'))}">
+      <svg><use href="#icon-more"/></svg>
+    </button>`;
+  row.addEventListener('click', () => openChat(c.id));
+  row.addEventListener('keydown', (e) => { if (e.key === 'Enter') openChat(c.id); });
+  row.querySelector('.chat-row-more').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openChatRowMenu(row, c, e.currentTarget);
+  });
+  return row;
 }
 
-function openChatRowMenu(rowEl, chat) {
-  closeChatRowMenu();
-  rowEl.classList.add('menu-open');
+function markActiveChat() {
+  document.querySelectorAll('.chat-item[data-cid]').forEach((el) => {
+    el.classList.toggle('active', state.view === 'chat' && el.dataset.cid === state.cid);
+  });
+}
 
+function openChatRowMenu(row, chat, anchor) {
+  if (openPopup && openPopup.anchor === anchor) { closePopup(); return; }
   const menu = document.createElement('div');
-  menu.className = 'chat-row-menu';
-  menu.innerHTML = `
-    <button data-act="rename" type="button">
-      <svg><use href="#icon-edit"/></svg> ${escapeHtml(t('rename'))}
-    </button>
-    <button data-act="pin" type="button">
-      <svg><use href="#icon-${chat.pinned ? 'pin-filled' : 'pin'}"/></svg> ${escapeHtml(chat.pinned ? t('unpin') : t('pin'))}
-    </button>
-    <button data-act="lock" type="button">
-      <svg><use href="#icon-${chat.locked ? 'unlock' : 'lock'}"/></svg> ${escapeHtml(chat.locked ? t('unlock_chat') : t('lock_chat'))}
-    </button>
-    <hr>
-    <button data-act="delete" class="danger" type="button">
-      <svg><use href="#icon-trash"/></svg> ${escapeHtml(t('delete'))}
-    </button>
-  `;
-  // Stop click-through so the row click doesn't fire while the menu is open
-  menu.addEventListener('click', e => e.stopPropagation());
+  menu.className = 'menu chat-row-menu';
+  menu.dataset.transient = '1';
+  menu.append(
+    menuButton({ icon: 'edit', label: t('rename'), onClick: () => renameInline(row, chat) }),
+    menuButton({ icon: chat.pinned ? 'pin-filled' : 'pin', label: chat.pinned ? t('unpin') : t('pin'), onClick: () => togglePin(chat) }),
+    menuButton({ icon: chat.locked ? 'unlock' : 'lock', label: chat.locked ? t('unlock_chat') : t('lock_chat'), onClick: () => toggleLock(chat) }),
+    menuSep(),
+    menuButton({ icon: 'trash', label: t('delete'), danger: true, onClick: () => deleteChat(chat) }),
+  );
   document.body.appendChild(menu);
-
-  // Position next to the "..." trigger
-  const btn = rowEl.querySelector('.chat-row-more');
-  const rect = btn.getBoundingClientRect();
-  const menuW = 180;
-  let left = rect.right + 6;
-  if (left + menuW > window.innerWidth - 8) left = rect.left - menuW - 6;
-  menu.style.left = Math.max(8, left) + 'px';
-  menu.style.top = Math.min(rect.bottom + 4, window.innerHeight - 180) + 'px';
-
-  // Wire actions
-  menu.querySelector('[data-act="rename"]').addEventListener('click', async () => {
-    closeChatRowMenu();
-    const next = window.prompt(t('rename'), chat.title || '');
-    if (next === null) return;
-    const trimmed = next.trim();
-    if (!trimmed || trimmed === chat.title) return;
-    try {
-      await api('PATCH', '/conversations/' + chat.id, { title: trimmed });
-      await refreshChatList();
-      if (state.cid === chat.id) {
-        els.chatTitle.textContent = trimmed;
-      }
-    } catch (e) {
-      toast(t('toast_error_prefix', e.message), { error: true });
-    }
-  });
-
-  menu.querySelector('[data-act="pin"]').addEventListener('click', async () => {
-    closeChatRowMenu();
-    try {
-      const next = !chat.pinned;
-      await api('PATCH', '/conversations/' + chat.id, { pinned: next });
-      if (state.cid === chat.id) state.pinned = next;
-      await refreshChatList();
-    } catch (e) {
-      toast(t('toast_error_prefix', e.message), { error: true });
-    }
-  });
-
-  menu.querySelector('[data-act="lock"]').addEventListener('click', async () => {
-    closeChatRowMenu();
-    if (chat.locked) {
-      // Entsperren (locked → false): erst PIN verifizieren, dann Flag löschen.
-      const ok = await verifyPinDialog();
-      if (!ok) return;
-      try {
-        await api('PATCH', '/conversations/' + chat.id, { locked: false });
-        state.unlockedCids.add(chat.id);   // in dieser Session sichtbar halten
-        if (state.cid === chat.id) {
-          state.chatLocked = false;
-          renderMessages();
-        }
-        await refreshChatList();
-        toast(t('toast_chat_unlocked'));
-      } catch (e) {
-        toast(t('toast_error_prefix', e.message), { error: true });
-      }
-    } else {
-      // Sperren (false → true). Server lehnt mit 400 ab, wenn keine PIN gesetzt.
-      try {
-        await api('PATCH', '/conversations/' + chat.id, { locked: true });
-        state.unlockedCids.delete(chat.id);  // frisch gesperrt → wieder Gate zeigen
-        if (state.cid === chat.id) {
-          state.chatLocked = true;
-          renderMessages();
-        }
-        await refreshChatList();
-        toast(t('toast_chat_locked'));
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 400) {
-          // Keine PIN gesetzt → User zum Settings-Chat-Lock schicken.
-          toast(t('chat_lock_need_pin_first'), { error: true });
-          openSettings();
-          document.getElementById('chat-lock-section')
-            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          toast(t('toast_error_prefix', e.message), { error: true });
-        }
-      }
-    }
-  });
-
-  menu.querySelector('[data-act="delete"]').addEventListener('click', async () => {
-    closeChatRowMenu();
-    if (!window.confirm(t('confirm_delete_chat', chat.title || t('no_title')))) return;
-    try {
-      await api('DELETE', '/conversations/' + chat.id);
-      // If the deleted chat was open, drop the active chat
-      if (state.cid === chat.id) {
-        state.cid = null;
-        state.pinned = false;
-        els.messages.innerHTML = '';
-        els.chatTitle.textContent = t('app_name');
-      }
-      await refreshChatList();
-    } catch (e) {
-      toast(t('toast_error_prefix', e.message), { error: true });
-    }
-  });
-
-  openMenu = menu;
+  const r = anchor.getBoundingClientRect();
+  const w = 220;
+  let left = r.right + 6;
+  if (left + w > window.innerWidth - 8) left = Math.max(8, r.left - w);
+  menu.style.left = left + 'px';
+  menu.style.top = Math.min(r.top - 6, window.innerHeight - 200) + 'px';
+  row.classList.add('menu-open');
+  showPopup(menu, anchor);
 }
 
-// Click anywhere else → close
-document.addEventListener('click', (e) => {
-  if (openMenu && !openMenu.contains(e.target)) closeChatRowMenu();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeChatRowMenu();
-});
-window.addEventListener('resize', closeChatRowMenu);
-els.chatNav.addEventListener('scroll', closeChatRowMenu, { passive: true });
-
-// =========================================================
-// Suche
-// =========================================================
-let searchTimer;
-els.searchInput.addEventListener('input', () => {
-  clearTimeout(searchTimer);
-  const q = els.searchInput.value.trim();
-  if (!q) {
-    els.searchNav.classList.add('hidden');
-    els.chatNav.classList.remove('hidden');
+/** Umbenennen direkt in der Zeile wie bei ChatGPT. */
+function renameInline(row, chat) {
+  const titleEl = row.querySelector('.title');
+  if (!titleEl) return;
+  const input = document.createElement('input');
+  input.className = 'rename-input';
+  input.value = chat.title || '';
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+  let finished = false;
+  const finish = async (save) => {
+    if (finished) return;
+    finished = true;
+    const next = input.value.trim();
+    if (save && next && next !== chat.title) await renameChat(chat.id, next);
+    else renderChatList();
+  };
+  input.addEventListener('click', (e) => e.stopPropagation());
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+async function renameChat(cid, title) {
+  try {
+    await api('PATCH', '/conversations/' + cid, { title });
+    if (state.cid === cid) { state.title = title; updateTopbar(); }
+    await refreshChatList();
+  } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
+}
+async function togglePin(chat) {
+  try {
+    const next = !chat.pinned;
+    await api('PATCH', '/conversations/' + chat.id, { pinned: next });
+    if (state.cid === chat.id) state.pinned = next;
+    await refreshChatList();
+  } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
+}
+async function toggleLock(chat) {
+  if (chat.locked) {
+    if (!(await verifyPinDialog())) return;
+    try {
+      await api('PATCH', '/conversations/' + chat.id, { locked: false });
+      state.unlockedCids.add(chat.id);
+      if (state.cid === chat.id) { state.chatLocked = false; renderMessages(); }
+      await refreshChatList();
+      toast(t('toast_chat_unlocked'));
+    } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
     return;
   }
-  searchTimer = setTimeout(() => doSearch(q), 250);
-});
+  try {
+    await api('PATCH', '/conversations/' + chat.id, { locked: true });
+    state.unlockedCids.delete(chat.id);
+    if (state.cid === chat.id) { state.chatLocked = true; renderMessages(); }
+    await refreshChatList();
+    toast(t('toast_chat_locked'));
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 400) {
+      // Ohne PIN laesst der Server nicht sperren: dorthin, wo man sie setzt.
+      toast(t('chat_lock_need_pin_first'), { error: true });
+      if (window.openSettings) window.openSettings('privacy');
+    } else {
+      toast(t('toast_error_prefix', apiErrorText(e)), { error: true });
+    }
+  }
+}
+async function deleteChat(chat) {
+  const ok = await showConfirm({
+    title: t('delete_chat_title'),
+    text: t('confirm_delete_chat', chat.title || t('no_title')),
+    okLabel: t('delete'), danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api('DELETE', '/conversations/' + chat.id);
+    const wasOpen = state.cid === chat.id;
+    await refreshChatList();
+    if (wasOpen) newChat();
+  } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
+}
 
-async function doSearch(q) {
+// Profil unten in der Leiste: Einstellungen, Design, Abmelden
+function renderFooterUser() {
+  const name = state.me?.name || '';
+  const initial = (name || '?').trim().slice(0, 1).toUpperCase();
+  const role = state.me?.is_admin ? t('admin_label') : '';
+  els.footerUser.innerHTML = `
+    <span class="avatar">${escapeHtml(initial)}</span>
+    <span class="who"><span class="name">${escapeHtml(name)}</span>${role ? `<span class="role">${escapeHtml(role)}</span>` : ''}</span>
+    <svg class="icon"><use href="#icon-expand-less"/></svg>`;
+  $('profile-menu-head').innerHTML = `
+    <span class="avatar">${escapeHtml(initial)}</span>
+    <span><span class="name">${escapeHtml(name)}</span><br><span class="sub">${escapeHtml(state.serverUrl.replace(/^https?:\/\//, ''))}</span></span>`;
+}
+els.footerUser.addEventListener('click', () => togglePopup(els.profileMenu, els.footerUser, applyTheme));
+els.profileMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-profile]');
+  if (!b) return;
+  closePopup();
+  if (b.dataset.profile === 'settings') window.openSettings && window.openSettings();
+  if (b.dataset.profile === 'logout') logout();
+});
+function applyAdminVisibility() {
+  const isAdmin = !!(state.me && state.me.is_admin);
+  document.querySelectorAll('.admin-only').forEach((el) => el.classList.toggle('hidden', !isAdmin));
+}
+
+// =========================================================
+// Chats durchsuchen (⌘K): Titel sofort, Volltext nach 250 ms
+// =========================================================
+let searchTimer = null;
+let searchSeq = 0;
+function openSearch() {
+  closePopup();
+  if (isMobile()) closeSidebar();
+  els.searchModal.classList.remove('hidden');
+  els.searchInput.value = '';
+  renderSearch('');
+  setTimeout(() => els.searchInput.focus(), 20);
+}
+function closeSearch() { els.searchModal.classList.add('hidden'); }
+$('search-close').addEventListener('click', closeSearch);
+els.searchModal.addEventListener('mousedown', (e) => { if (e.target === els.searchModal) closeSearch(); });
+els.searchInput.addEventListener('input', () => {
+  const q = els.searchInput.value.trim();
+  renderSearch(q);
+  clearTimeout(searchTimer);
+  if (q.length >= 2) searchTimer = setTimeout(() => fullTextSearch(q), 250);
+});
+els.searchInput.addEventListener('keydown', (e) => {
+  const items = [...els.searchResults.querySelectorAll('.sr-item')];
+  if (!items.length) { if (e.key === 'Escape') closeSearch(); return; }
+  let i = items.findIndex((x) => x.classList.contains('kbd-focus'));
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    i = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+    items.forEach((x, j) => x.classList.toggle('kbd-focus', j === i));
+    items[i].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    (items[i] || items[0]).click();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeSearch();
+  }
+});
+function highlightTitle(title, q) {
+  const safe = escapeHtml(title);
+  if (!q) return safe;
+  const idx = title.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return safe;
+  return escapeHtml(title.slice(0, idx)) + '<b>' + escapeHtml(title.slice(idx, idx + q.length)) + '</b>' + escapeHtml(title.slice(idx + q.length));
+}
+function relativeWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+  if (diff <= 0) return t('group_today');
+  if (diff === 1) return t('group_yesterday');
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+function searchItem({ icon, titleHtml, snippetHtml, when, onClick }) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'sr-item';
+  b.innerHTML = `<svg class="icon"><use href="#icon-${icon}"/></svg>
+    <span class="sr-text"><span class="sr-title">${titleHtml}</span>${snippetHtml ? `<span class="sr-snippet">${snippetHtml}</span>` : ''}</span>
+    ${when ? `<span class="sr-when">${escapeHtml(when)}</span>` : ''}`;
+  b.addEventListener('click', () => { closeSearch(); onClick(); });
+  return b;
+}
+function renderSearch(q) {
+  searchSeq++;
+  const box = els.searchResults;
+  box.innerHTML = '';
+  if (!q) {
+    box.appendChild(searchItem({ icon: 'new-chat', titleHtml: escapeHtml(t('new_chat')), onClick: () => newChat() }));
+  }
+  const sorted = state.chats.slice().sort((a, b) => chatSortKey(b).localeCompare(chatSortKey(a)));
+  const matches = q ? sorted.filter((c) => (c.title || '').toLowerCase().includes(q.toLowerCase())) : sorted;
+  if (matches.length) {
+    const lbl = document.createElement('div');
+    lbl.className = 'sr-label';
+    lbl.textContent = q ? t('search_section_chats') : t('section_recent');
+    box.appendChild(lbl);
+    for (const c of matches.slice(0, q ? 30 : 12)) {
+      box.appendChild(searchItem({
+        icon: c.locked ? 'lock' : 'chat',
+        titleHtml: highlightTitle(c.title || t('no_title'), q),
+        when: relativeWhen(chatSortKey(c)),
+        onClick: () => { showChatView(); openChat(c.id); },
+      }));
+    }
+  }
+  if (q && !matches.length) {
+    const p = document.createElement('div');
+    p.className = 'sr-empty';
+    p.id = 'sr-pending';
+    p.textContent = q.length >= 2 ? t('search_running') : t('no_search_results', q);
+    box.appendChild(p);
+  }
+  const first = box.querySelector('.sr-item');
+  if (first) first.classList.add('kbd-focus');
+}
+async function fullTextSearch(q) {
+  const seq = searchSeq;
   try {
     const res = await api('GET', '/search?q=' + encodeURIComponent(q));
-    els.searchNav.innerHTML = '';
-    if (!res.hits.length) {
-      els.searchNav.innerHTML = `<div class="empty-chats">${t('no_search_results', escapeHtml(q))}</div>`;
-    } else {
-      for (const h of res.hits) {
-        const li = document.createElement('div');
-        li.className = 'chat-item search-hit';
-        const snippet = h.snippet.replace(/\[\[([^\]]+)\]\]/g, '<b>$1</b>');
-        li.innerHTML = `
-          <span class="title">${escapeHtml(h.conversation_title)}</span>
-          <span class="snippet">${snippet}</span>
-        `;
-        li.addEventListener('click', () => {
-          openChat(h.conversation_id);
-          els.searchInput.value = '';
-          els.searchNav.classList.add('hidden');
-          els.chatNav.classList.remove('hidden');
-        });
-        els.searchNav.appendChild(li);
+    if (seq !== searchSeq) return;   // inzwischen weitergetippt
+    const box = els.searchResults;
+    box.querySelector('#sr-pending')?.remove();
+    const hits = (res.hits || []).filter((h) => !state.chats.find((c) => c.id === h.conversation_id)?.locked);
+    if (!hits.length) {
+      if (!box.querySelector('.sr-item')) {
+        box.innerHTML = `<div class="sr-empty">${escapeHtml(t('no_search_results', q))}</div>`;
       }
+      return;
     }
-    els.searchNav.classList.remove('hidden');
-    els.chatNav.classList.add('hidden');
+    const lbl = document.createElement('div');
+    lbl.className = 'sr-label';
+    lbl.textContent = t('search_section_messages');
+    box.appendChild(lbl);
+    for (const h of hits.slice(0, 30)) {
+      // Der Treffer kommt als [[...]] markiert; erst escapen, dann markieren.
+      const snippet = escapeHtml(h.snippet || '').replace(/\[\[(.+?)\]\]/g, '<b>$1</b>');
+      box.appendChild(searchItem({
+        icon: h.role === 'user' ? 'person' : 'forum',
+        titleHtml: escapeHtml(h.conversation_title || t('no_title')),
+        snippetHtml: snippet,
+        when: relativeWhen(h.created_at),
+        onClick: () => { showChatView(); openChat(h.conversation_id); },
+      }));
+    }
+    if (!box.querySelector('.kbd-focus')) box.querySelector('.sr-item')?.classList.add('kbd-focus');
   } catch (e) {
-    toast(t('toast_search_failed', e.message), { error: true });
+    if (seq === searchSeq) toast(t('toast_search_failed', apiErrorText(e)), { error: true });
   }
 }
 
 // =========================================================
-// Chat-Aktionen
+// Chats oeffnen und anlegen
 // =========================================================
 async function openChat(cid, opts = {}) {
-  if (state.cid === cid && !state.isStreaming) {
-    els.sidebar.classList.remove('open');
+  if (state.view !== 'chat') showChatView();
+  if (state.cid === cid && !opts.reload) {
+    closeSidebar();
     return;
   }
-  abortStream();
-  // Voice-Cleanup beim Chat-Wechsel — sonst hängt eine laufende Aufnahme
-  // bzw. ein Auto-Mode-Loop weiter aus dem alten Chat. Audio (TTS-Playback)
-  // ebenfalls stoppen, sonst spielt's beim Switch weiter.
-  if (window.PocketVoice) {
-    try { window.PocketVoice.resetForChatSwitch(); } catch (_) {}
-  }
-  document.querySelectorAll('audio').forEach((a) => {
-    try { a.pause(); a.currentTime = 0; } catch (_) {}
-  });
+  stopStreamLocal();
+  if (window.PocketVoice) { try { window.PocketVoice.resetForChatSwitch(); } catch (_) {} }
+  stopAudio();
+  closeChatSearch();
   state.cid = cid;
   localStorage.setItem(LS.lastCid, cid);
-  // URL aktualisieren — bei direkter Navigation oder beim Stellen einer
-  // neuen Chat-ID. Wir nutzen Hash-Routing damit kein Server-Side-Rewrite
-  // nötig ist (alle Static-Routes liefern weiter die index.html).
   if (!opts.fromHash) {
-    const wantedHash = '#/chat/' + cid;
-    if (location.hash !== wantedHash) {
-      history.replaceState(null, '', wantedHash);
-    }
+    const wanted = '#/chat/' + cid;
+    if (location.hash !== wanted) history.replaceState(null, '', wanted);
   }
-  document.querySelectorAll('.chat-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.cid === cid);
-  });
-  els.sidebar.classList.remove('open');
+  markActiveChat();
+  closeSidebar();
   try {
     const detail = await api('GET', '/conversations/' + cid);
-    state.title = detail.title;
-    state.pinned = detail.pinned;
-    state.chatLocked = !!detail.locked;
-    state.messages = detail.messages || [];
-    state.streamingText = '';
-    state.isStreaming = false;
-    // Gem-Bindung wiederherstellen (für Header-Emoji + Starter im leeren Chat).
-    state.gem = detail.gem_id ? await gemFetch(detail.gem_id).catch(() => null) : null;
-    updateTopbar(detail.total_tokens || 0);
-    // Gesperrter Chat, in dieser Session noch nicht entsperrt → Lock-Gate zeigen.
-    // ABSICHTLICH: Die Messages liegen zu diesem Zeitpunkt schon in
-    // state.messages — die Chat-Sperre ist ein reines UI-Gate gegen Blicke
-    // über die Schulter, kein Schutz gegen DevTools/API-Zugriff des ohnehin
-    // eingeloggten Account-Inhabers (siehe Design-Kommentar im Server,
-    // Chat-Sperre-Block). Kein Bug.
-    if (state.chatLocked && !state.unlockedCids.has(cid)) {
-      renderLockGate(cid);
-    } else {
-      renderMessages();
-      scrollToVeryBottom();
-    }
+    if (state.cid !== cid) return;   // inzwischen anderer Chat
+    applyDetail(detail);
+    resetComposerFor(cid);
+    if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
+    else { renderMessages(); scrollToVeryBottom(); }
+    loadChatSkills(cid);
+    // Das Modell dieses Chats muss in der Liste stehen, auch wenn es nicht mehr kuratiert ist.
+    if (state.convModel && !state.chatModels.some((m) => m.key === state.convModel)) loadChatModels(false);
+    if (!opts.keepFocus && !isMobile()) els.input.focus();
   } catch (e) {
-    toast(t('toast_load_chat_failed', e.message), { error: true });
+    if (e instanceof ApiError && e.status === 404) { newChat(); return; }
+    toast(t('toast_load_chat_failed', apiErrorText(e)), { error: true });
   }
 }
+function applyDetail(detail) {
+  state.title = detail.title;
+  state.pinned = !!detail.pinned;
+  state.chatLocked = !!detail.locked;
+  state.messages = detail.messages || [];
+  state.streamingText = '';
+  state.streamingThinking = '';
+  state.isStreaming = false;
+  // Der Server weiss, was zuletzt in diesem Chat lief. Nur wenn nicht, gilt die Vorauswahl.
+  state.convModel = (detail.chat_model || '').trim() || null;
+  state.gem = null;
+  if (detail.gem_id) {
+    gemFetch(detail.gem_id).then((g) => {
+      if (state.cid === detail.id) { state.gem = g; updateTopbar(); if (!state.messages.length) renderMessages(); }
+    }).catch(() => {});
+  }
+  updateTopbar();
+  updateModelButton();
+  renderModelMenu();
+}
 
-async function newChat() {
-  abortStream();
+async function newChat(opts = {}) {
+  if (state.view !== 'chat') showChatView();
+  stopStreamLocal();
+  if (window.PocketVoice) { try { window.PocketVoice.resetForChatSwitch(); } catch (_) {} }
+  stopAudio();
+  closeChatSearch();
   try {
-    const c = await api('POST', '/conversations', {});
+    const c = await api('POST', '/conversations', opts.gemId ? { gem_id: opts.gemId } : {});
     state.cid = c.id;
     state.title = c.title;
     state.pinned = false;
     state.chatLocked = false;
-    state.gem = null;
+    state.gem = opts.gem || null;
     state.messages = [];
-    state.streamingText = '';
-    state.isStreaming = false;
-    updateTopbar(0);
+    state.convModel = null;
+    state.skills = null;
+    state.skillsIsOverride = false;
+    resetComposerFor(c.id);
+    updateTopbar();
+    updateModelButton();
+    renderModelMenu();
     renderMessages();
-    await refreshChatList();
     localStorage.setItem(LS.lastCid, c.id);
     history.replaceState(null, '', '#/chat/' + c.id);
-    els.input.focus();
+    markActiveChat();
+    closeSidebar();
+    loadChatSkills(c.id);
+    if (!isMobile()) els.input.focus();
   } catch (e) {
-    toast(t('toast_new_chat_failed', e.message), { error: true });
+    if (e instanceof ApiError && e.status === 401) return showLogin();
+    toast(t('toast_new_chat_failed', apiErrorText(e)), { error: true });
   }
 }
 
-function updateTopbar(tokens) {
-  const gemPrefix = (state.gem && state.gem.emoji) ? state.gem.emoji + '  ' : '';
-  els.topbarTitle.textContent = gemPrefix + (state.title || 'PocketClot');
-  const pct = Math.round((tokens / 200000) * 100);
-  if (state.messages.length) {
-    els.topbarMeta.textContent = t('messages_context_format', state.messages.length, pct);
-    els.topbarMeta.classList.toggle('warn', pct >= 85);
-  } else {
-    els.topbarMeta.textContent = '';
-  }
+async function reloadChatMessages(cid) {
+  try {
+    const detail = await api('GET', `/conversations/${cid}`);
+    if (state.cid !== cid) return;
+    applyDetail(detail);
+    if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
+    else renderMessages();
+  } catch (_) { /* naechster Klick laedt neu */ }
 }
 
-els.newChatBtn.addEventListener('click', newChat);
-els.sidebarToggle.addEventListener('click', () => {
-  if (window.matchMedia('(max-width: 768px)').matches) {
-    els.sidebar.classList.toggle('open');
-  } else {
-    const collapsed = els.app.classList.toggle('sidebar-collapsed');
-    localStorage.setItem(LS.sidebar, collapsed ? '1' : '0');
-    queueSettingsPush();
-  }
-});
-// Sidebar-Zustand beim Start aus localStorage restoren (nur Desktop)
-if (localStorage.getItem(LS.sidebar) === '1' &&
-    !window.matchMedia('(max-width: 768px)').matches) {
-  els.app.classList.add('sidebar-collapsed');
+function updateTopbar() {
+  const gemPrefix = state.gem && state.gem.emoji ? state.gem.emoji + '  ' : '';
+  const hasContent = state.messages.length > 0;
+  const title = hasContent || state.gem ? gemPrefix + (state.title || '') : '';
+  els.topbarTitle.textContent = title === t('new_chat') || title === 'Neuer Chat' ? '' : title;
+  if (state.view === 'chat') document.title = (els.topbarTitle.textContent ? els.topbarTitle.textContent + ' · ' : '') + 'PocketClot';
+  els.shareBtn.classList.toggle('hidden', !hasContent);
 }
 
 // =========================================================
-// Modell- und Denktiefe-Dropdown
-// Claude bleibt das primaere Modell und steht immer zuoberst. Die
-// Zusatz-Modelle kommen live vom Server (GET /chat/models), damit neu
-// eingeloggte Konten ohne App-Update auftauchen.
+// Modell und Denktiefe (ModelSheet der App als Popover)
 // =========================================================
-// Hilfsfunktion: Ermittelt die Modell-Familie anhand des Keys
 function familyForKey(key) {
   if (!key) return 'claude';
-  const found = state.chatModels.find(m => m.key === key);
+  const found = state.chatModels.find((m) => m.key === key);
   if (found && found.family) return found.family;
   if (!key.startsWith('gw:')) return 'claude';
-
-  const lower = key.toLowerCase();
-  if (lower.includes('gemini')) return 'gemini';
-  if (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3') || lower.includes('o4')) return 'gpt';
+  const low = key.toLowerCase();
+  if (low.includes('gemini')) return 'gemini';
+  if (low.includes('gpt') || /(^|[:/-])o\d/.test(low)) return 'gpt';
   return 'other';
 }
-
-// Liefert die Denktiefe fuer die aktuell ausgewaehlte Familie
+/** Das Modell, mit dem jetzt gesendet wird: das des Chats, sonst die Vorauswahl. */
+function effectiveModelKey() {
+  return state.convModel != null ? state.convModel : (state.chatModel || '');
+}
+function modelEfforts(key) {
+  if (!key) return CLAUDE_EFFORTS;
+  const m = state.chatModels.find((x) => x.key === key);
+  if (m && Array.isArray(m.efforts) && m.efforts.length) return m.efforts;
+  return familyForKey(key) === 'claude' ? CLAUDE_EFFORTS : [];
+}
+/** Gemerkt wird pro Familie, geklemmt auf das, was das Modell kann. */
+function clampEffort(effort, available) {
+  if (!available.length || available.includes(effort)) return effort;
+  const idx = EFFORT_ORDER.indexOf(effort);
+  for (let i = idx; i >= 0; i--) if (available.includes(EFFORT_ORDER[i])) return EFFORT_ORDER[i];
+  for (let i = idx + 1; i < EFFORT_ORDER.length; i++) if (available.includes(EFFORT_ORDER[i])) return EFFORT_ORDER[i];
+  return available[0];
+}
 function currentEffort() {
-  const fam = familyForKey(state.chatModel);
-  return (state.effortByFamily && state.effortByFamily[fam]) || 'high';
+  const key = effectiveModelKey();
+  const fam = familyForKey(key);
+  return clampEffort(state.effortByFamily[fam] || 'high', modelEfforts(key));
+}
+function formatEffortLabel(eff) {
+  if (!eff) return '';
+  const k = 'effort_' + eff;
+  const label = t(k);
+  return label && label !== k ? label : eff.charAt(0).toUpperCase() + eff.slice(1);
+}
+function modelLabel(key) {
+  if (!key) return t('model_family_claude');
+  const m = state.chatModels.find((x) => x.key === key);
+  if (m) return m.label || m.key;
+  return key.startsWith('gw:') ? key.split(':').pop() : key;
 }
 
-// Laedt die Modell- und Gateway-Liste vom Server
 async function loadChatModels(force = false) {
   try {
-    const url = '/chat/models' + (force ? '?refresh=1' : '');
-    const resp = await api('GET', url);
+    const include = effectiveModelKey();
+    const qs = new URLSearchParams();
+    if (force) qs.set('refresh', '1');
+    if (include) qs.set('include', include);
+    const resp = await api('GET', '/chat/models' + (qs.toString() ? '?' + qs : ''));
     state.chatModels = Array.isArray(resp.models) ? resp.models : [];
-    state.gateways   = Array.isArray(resp.gateways) ? resp.gateways : [];
+    state.gateways = Array.isArray(resp.gateways) ? resp.gateways : [];
+    // Ein Modell, das der Server nicht mehr anbietet, darf nicht stehenbleiben:
+    // sonst laeuft jede Nachricht in einen Fehler.
+    if (state.chatModel && !state.chatModels.some((m) => m.key === state.chatModel)) {
+      state.chatModel = '';
+      localStorage.setItem(LS.chatModel, '');
+      queueSettingsPush();
+    }
   } catch (e) {
     console.log('Modell-Liste nicht abrufbar, Fallback auf Claude:', e.message);
-    state.chatModels = [
-      {
-        key: '',
-        family: 'claude',
-        label: t('model_auto'),
-        efforts: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
-        default_effort: 'high'
-      }
-    ];
+    state.chatModels = [];
     state.gateways = [];
   }
   renderModelMenu();
   updateModelButton();
+  document.dispatchEvent(new CustomEvent('pc:models-loaded'));
 }
 
-// Formatiert die Bezeichnung einer Denktiefe
-// Uebersetzt wie in der App ("Hoch" statt "High"). Unbekannte Stufen behalten
-// ihre Kennung, damit eine neue Stufe vom Server trotzdem sichtbar bleibt.
-function formatEffortLabel(eff) {
-  if (!eff) return '';
-  const key = 'effort_' + eff;
-  const label = t(key);
-  if (label && label !== key) return label;
-  return eff.charAt(0).toUpperCase() + eff.slice(1);
-}
-
-// Baut das Modell- und Denktiefe-Dropdown dynamisch auf
-function renderModelMenu() {
-  const menu = els.effortMenu || document.getElementById('effort-menu');
-  if (!menu) return;
-
-  let html = '';
-
-  // 1. Kopfzeile mit Titel und Reload-Button
-  html += '<div class="dropdown-header flex-between">';
-  html += '  <span class="dropdown-title">' + t('model_menu_title') + '</span>';
-  html += '  <button type="button" id="model-refresh-btn" class="icon-btn-sm" title="' + t('model_refresh') + '">';
-  html += '    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg>';
-  html += '  </button>';
-  html += '</div>';
-
-  // 2. Modelle nach Familien geordnet
-  const families = [
-    { id: 'claude', label: t('model_family_claude') },
-    { id: 'gemini', label: t('model_family_gemini') },
-    { id: 'gpt',    label: t('model_family_gpt') },
-    { id: 'other',  label: t('model_family_other') }
-  ];
-
-  families.forEach(fam => {
-    const list = state.chatModels.filter(m => m.family === fam.id);
-    if (fam.id !== 'claude' && list.length === 0) return;
-
-    html += '<div class="dropdown-section-title">' + fam.label + '</div>';
-
-    // Bei Claude steht immer der Automatik-Eintrag an oberster Stelle
-    if (fam.id === 'claude') {
-      const isAutoActive = (state.chatModel === '');
-      html += '<button type="button" class="dropdown-item' + (isAutoActive ? ' active' : '') + '" data-model="">';
-      html += '  <span>' + t('model_auto') + '</span>';
-      html += '</button>';
-    }
-
-    list.forEach(m => {
-      if (fam.id === 'claude' && m.key === '') return;
-      const isActive = (state.chatModel === m.key);
-      html += '<button type="button" class="dropdown-item' + (isActive ? ' active' : '') + '" data-model="' + m.key + '">';
-      html += '  <span class="model-name">' + (m.label || m.key) + '</span>';
-      if (m.gateway_label) {
-        html += '  <small class="gateway-tag muted">' + m.gateway_label + '</small>';
-      }
-      html += '</button>';
-    });
-  });
-
-  // 3. Nicht erreichbare Gateways anzeigen
-  if (Array.isArray(state.gateways)) {
-    const unreachable = state.gateways.filter(g => g && g.reachable === false);
-    if (unreachable.length > 0) {
-      unreachable.forEach(gw => {
-        const errText = gw.last_error || t('model_gateway_unreachable');
-        html += '<div class="dropdown-notice muted">';
-        html += '  <span>' + (gw.label || gw.id) + ': ' + errText + '</span>';
-        html += '</div>';
-      });
-    }
-  }
-
-  // 4. Trennstrich
-  html += '<div class="dropdown-divider"></div>';
-
-  // 5. Denktiefe-Buttons fuer das aktuell gewaehlte Modell ermitteln
-  let availableEfforts = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
-  if (state.chatModel !== '') {
-    const selectedModel = state.chatModels.find(m => m.key === state.chatModel);
-    if (selectedModel && Array.isArray(selectedModel.efforts) && selectedModel.efforts.length > 0) {
-      availableEfforts = selectedModel.efforts;
-    }
-  }
-
-  const activeEffort = currentEffort();
-  availableEfforts.forEach(eff => {
-    const isActive = (activeEffort === eff);
-    html += '<button type="button" class="dropdown-item' + (isActive ? ' active' : '') + '" data-effort="' + eff + '">';
-    html += '  <span>' + formatEffortLabel(eff) + '</span>';
-    html += '</button>';
-  });
-
-  menu.innerHTML = html;
-}
-
-// Aktualisiert das gewaehlte Chat-Modell
-function setChatModel(key, persist = true) {
-  state.chatModel = key || '';
-  if (persist) {
-    localStorage.setItem(LS.chatModel, state.chatModel);
-    queueSettingsPush();
-  }
-
-  // Pruefen, ob die bisherige Denktiefe vom neuen Modell unterstuetzt wird
-  const fam = familyForKey(state.chatModel);
-  const curEff = currentEffort();
-  if (state.chatModel !== '') {
-    const selected = state.chatModels.find(m => m.key === state.chatModel);
-    if (selected && Array.isArray(selected.efforts) && selected.efforts.length > 0) {
-      if (!selected.efforts.includes(curEff)) {
-        const nextEff = selected.default_effort || selected.efforts[0] || 'high';
-        state.effortByFamily[fam] = nextEff;
-        if (persist) {
-          localStorage.setItem(LS.effortByFamily, JSON.stringify(state.effortByFamily));
-        }
-      }
-    }
-  }
-
-  renderModelMenu();
-  updateModelButton();
-}
-
-// Aktualisiert die Denktiefe der aktiven Modell-Familie
-function setEffort(value, persist = true) {
-  const fam = familyForKey(state.chatModel);
-  if (!state.effortByFamily) {
-    state.effortByFamily = { claude: 'high', gemini: 'high', gpt: 'high' };
-  }
-  state.effortByFamily[fam] = value;
-  state.effort = value; // Abwaertskompatibilitaet
-
-  if (persist) {
-    localStorage.setItem(LS.effortByFamily, JSON.stringify(state.effortByFamily));
-    localStorage.setItem(LS.effort, value);
-    queueSettingsPush();
-  }
-
-  renderModelMenu();
-  updateModelButton();
-}
-
-// Aktualisiert die Anzeige im Pill-Button
 function updateModelButton() {
-  const modelSpan  = document.getElementById('model-label');
-  const effortSpan = document.getElementById('effort-label');
-
-  if (modelSpan) {
-    if (!state.chatModel) {
-      modelSpan.textContent = '';
-    } else {
-      const found = state.chatModels.find(m => m.key === state.chatModel);
-      modelSpan.textContent = found ? (found.label || found.key) : state.chatModel;
-    }
-  }
-
-  if (effortSpan) {
-    effortSpan.textContent = formatEffortLabel(currentEffort());
-  }
+  els.modelLabel.textContent = modelLabel(effectiveModelKey());
+  const eff = currentEffort();
+  els.effortLabel.textContent = eff ? formatEffortLabel(eff) : '';
 }
 
-// Event-Listener fuer Button und Dropdown
-els.effortBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  els.effortMenu.classList.toggle('hidden');
-  if (els.moreMenu) els.moreMenu.classList.add('hidden');
-});
+function renderModelMenu() {
+  const menu = els.effortMenu;
+  const key = effectiveModelKey();
+  menu.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'mm-head';
+  head.innerHTML = `<div><div class="mm-title">${escapeHtml(t('model_menu_title'))}</div>
+    <div class="mm-sub">${escapeHtml(modelLabel(key))} · ${escapeHtml(formatEffortLabel(currentEffort()))}</div></div>
+    <button type="button" class="icon-btn" data-refresh title="${escapeHtml(t('model_refresh'))}"><svg class="icon"><use href="#icon-refresh"/></svg></button>`;
+  head.querySelector('[data-refresh]').addEventListener('click', (e) => { e.stopPropagation(); loadChatModels(true); });
+  menu.appendChild(head);
 
-els.effortMenu.addEventListener('click', (e) => {
-  // Reload-Button im Header
-  const refreshBtn = e.target.closest('#model-refresh-btn');
-  if (refreshBtn) {
-    e.stopPropagation();
-    loadChatModels(true);
-    return;
-  }
-
-  // Klick auf ein Modell
-  const modelBtn = e.target.closest('button[data-model]');
-  if (modelBtn) {
-    const modelKey = modelBtn.dataset.model;
-    setChatModel(modelKey);
-    return;
-  }
-
-  // Klick auf eine Denktiefe
-  const effortBtn = e.target.closest('button[data-effort]');
-  if (effortBtn) {
-    const eff = effortBtn.dataset.effort;
-    setEffort(eff);
-    els.effortMenu.classList.add('hidden');
-    return;
-  }
-});
-
-// More-Menü
-els.moreBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  els.pinLabel.textContent = state.pinned ? t('unpin') : t('pin');
-  els.moreMenu.classList.toggle('hidden');
-  els.effortMenu.classList.add('hidden');
-});
-els.moreMenu.addEventListener('click', async (e) => {
-  const btn = e.target.closest('button');
-  if (!btn) return;
-  const action = btn.dataset.action;
-  els.moreMenu.classList.add('hidden');
-  if (!state.cid) return;
-  try {
-    if (action === 'rename') {
-      const newTitle = prompt(t('rename_prompt'), state.title);
-      if (newTitle && newTitle.trim()) {
-        await api('PATCH', '/conversations/' + state.cid, { title: newTitle.trim() });
-        state.title = newTitle.trim();
-        updateTopbar(0);
-        refreshChatList();
-      }
-    } else if (action === 'pin') {
-      await api('PATCH', '/conversations/' + state.cid, { pinned: !state.pinned });
-      state.pinned = !state.pinned;
-      refreshChatList();
-    } else if (action === 'share') {
-      // Export eines gesperrten, nicht entsperrten Chats verweigern — sonst
-      // ließe sich der Klartext an der Sperre vorbei herunterladen (die Topbar
-      // liegt neben dem Gate, nicht dahinter).
-      if (state.chatLocked && !state.unlockedCids.has(state.cid)) {
-        toast(t('chat_lock_need_pin_first'), { error: true });
-        return;
-      }
-      // Markdown-Export holen
-      const md = await api('GET', '/conversations/' + state.cid + '/export.md');
-      const blob = new Blob([md], { type: 'text/markdown' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${state.title || 'chat'}.md`.replace(/[^\w.-]+/g, '_');
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(a.href);
-    } else if (action === 'auto-mode') {
-      // Auto-Mode toggle — delegiert in den Voice-Block unten.
-      if (window.PocketVoice) window.PocketVoice.toggleAutoMode();
-    } else if (action === 'delete') {
-      if (!confirm(t('confirm_delete_chat', state.title))) return;
-      await api('DELETE', '/conversations/' + state.cid);
-      state.cid = null;
-      await refreshChatList();
-      if (state._allCids.length) openChat(state._allCids[0]);
-      else newChat();
+  const families = [
+    ['claude', t('model_family_claude')],
+    ['gemini', t('model_family_gemini')],
+    ['gpt', t('model_family_gpt')],
+    ['other', t('model_family_other')],
+  ];
+  for (const [fam, label] of families) {
+    const list = state.chatModels.filter((m) => m.family === fam);
+    if (fam !== 'claude' && !list.length) continue;
+    const h = document.createElement('div');
+    h.className = 'mm-family';
+    h.textContent = label;
+    menu.appendChild(h);
+    const rows = fam === 'claude' ? [{ key: '', label: t('model_auto') }, ...list] : list;
+    for (const m of rows) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mm-model' + (m.key === key ? ' selected' : '');
+      b.innerHTML = `<svg class="icon mm-check"><use href="#icon-check"/></svg>
+        <span class="label">${escapeHtml(m.label || m.key)}${m.gateway_label ? `<span class="mm-gw">${escapeHtml(m.gateway_label)}</span>` : ''}</span>`;
+      b.addEventListener('click', () => selectModel(m.key));
+      menu.appendChild(b);
     }
-  } catch (e) {
-    toast(t('toast_action_failed', e.message), { error: true });
   }
-});
+  const down = (state.gateways || []).filter((g) => g && g.reachable === false);
+  for (const gw of down) {
+    const n = document.createElement('div');
+    n.className = 'mm-notice';
+    n.textContent = `${gw.label || gw.id}: ${gw.last_error || t('model_gateway_unreachable')}`;
+    menu.appendChild(n);
+  }
+  menu.appendChild(menuSep());
+  const eff = document.createElement('div');
+  eff.className = 'mm-effort';
+  const efforts = modelEfforts(key);
+  eff.innerHTML = `<div class="mm-family">${escapeHtml(t('effort_label'))}</div>`;
+  if (!efforts.length) {
+    eff.insertAdjacentHTML('beforeend', `<div class="mm-notice" style="color:var(--text-muted)">${escapeHtml(t('effort_not_supported'))}</div>`);
+  } else {
+    const row = document.createElement('div');
+    row.className = 'chip-row';
+    const cur = currentEffort();
+    for (const e of EFFORT_ORDER.filter((x) => efforts.includes(x))) {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'chip' + (e === cur ? ' active' : '');
+      c.textContent = formatEffortLabel(e);
+      c.addEventListener('click', () => { setEffort(e); closePopup(); });
+      row.appendChild(c);
+    }
+    eff.appendChild(row);
+  }
+  menu.appendChild(eff);
+}
 
-// Globaler Click → Dropdowns schließen
-document.addEventListener('click', () => {
-  els.effortMenu.classList.add('hidden');
-  els.moreMenu.classList.add('hidden');
-});
+/** Modellwechsel gilt sofort fuer diesen Chat und wird die neue Vorauswahl,
+ *  damit der naechste Chat genauso startet (wie selectModel in der App). */
+function selectModel(key) {
+  key = key || '';
+  state.convModel = key;
+  state.chatModel = key;
+  localStorage.setItem(LS.chatModel, key);
+  queueSettingsPush();
+  if (state.cid) {
+    api('PATCH', '/conversations/' + state.cid, { chat_model: key })
+      .catch((e) => console.log('Modell am Chat nicht gespeichert:', e.message));
+  }
+  updateModelButton();
+  renderModelMenu();
+  updateSkillsAvailability();
+}
+function setEffort(value, family) {
+  const fam = family || familyForKey(effectiveModelKey());
+  state.effortByFamily[fam] = value;
+  state.effort = value;
+  localStorage.setItem(LS.effortByFamily, JSON.stringify(state.effortByFamily));
+  localStorage.setItem(LS.effort, value);
+  queueSettingsPush();
+  updateModelButton();
+  renderModelMenu();
+  document.dispatchEvent(new CustomEvent('pc:effort-changed'));
+}
+els.effortBtn.addEventListener('click', () => togglePopup(els.effortMenu, els.effortBtn, renderModelMenu));
 
 // =========================================================
-// Render Messages
+// Chat-Menue (Mehr): wie in der App
 // =========================================================
-/** Composer sperren/entsperren, wenn das Lock-Gate sichtbar ist. sendBtn nur
- *  dann wieder aktivieren, wenn gerade nicht gestreamt wird. */
+function autoSpeakOverride(cid) {
+  const v = state.autoSpeakByChat[cid || state.cid];
+  return v === true || v === false ? v : null;
+}
+function autoSpeakFor(cid) {
+  const o = autoSpeakOverride(cid);
+  return o === null ? state.autoSpeak : o;
+}
+function buildMoreMenu() {
+  const m = els.moreMenu;
+  m.innerHTML = '';
+  const chat = state.chats.find((c) => c.id === state.cid) || { id: state.cid, title: state.title, pinned: state.pinned, locked: state.chatLocked };
+  const hasMsgs = state.messages.length > 0;
+  const ov = autoSpeakOverride();
+  const autoOn = window.PocketVoice && window.PocketVoice.isAutoMode();
+  m.append(
+    menuButton({ icon: 'edit', label: t('rename'), disabled: !hasMsgs, onClick: renameCurrentChat }),
+    menuButton({ icon: state.pinned ? 'pin-filled' : 'pin', label: state.pinned ? t('unpin') : t('pin'), disabled: !hasMsgs, onClick: () => togglePin(chat) }),
+    menuButton({ icon: state.chatLocked ? 'unlock' : 'lock', label: state.chatLocked ? t('unlock_chat') : t('lock_chat'), disabled: !hasMsgs, onClick: () => toggleLock(chat) }),
+    menuSep(),
+    menuButton({ icon: 'extension', label: t('skills_for_this_chat'), trail: state.skillsIsOverride ? t('skills_own') : '', trailOn: true, onClick: openSkillsDialog }),
+    menuButton({ icon: 'speaker', label: t('auto_speak_menu'), trail: ov === null ? '' : (ov ? t('chat_auto_speak_marker_on') : t('chat_auto_speak_marker_off')), trailOn: ov === true, onClick: openAutoSpeakDialog }),
+    menuButton({ icon: 'voice', label: autoOn ? t('auto_mode_stop') : t('voice_conversation'), onClick: () => window.PocketVoice && window.PocketVoice.toggleAutoMode() }),
+    menuButton({ icon: 'search', label: t('search_in_chat'), disabled: !hasMsgs, onClick: openChatSearch }),
+    menuSep(),
+    menuButton({ icon: 'share', label: t('share_as_markdown'), disabled: !hasMsgs, onClick: () => exportMarkdown('share') }),
+    menuButton({ icon: 'download', label: t('save_as_markdown'), disabled: !hasMsgs, onClick: () => exportMarkdown('save') }),
+    menuSep(),
+    menuButton({ icon: 'trash', label: t('delete'), danger: true, disabled: !hasMsgs, onClick: () => deleteChat(chat) }),
+  );
+}
+els.moreBtn.addEventListener('click', () => togglePopup(els.moreMenu, els.moreBtn, buildMoreMenu));
+els.shareBtn.addEventListener('click', () => exportMarkdown('share'));
+
+async function renameCurrentChat() {
+  const next = await showPrompt({ title: t('rename'), type: 'text', value: state.title || '', okLabel: t('save') });
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (trimmed && trimmed !== state.title) renameChat(state.cid, trimmed);
+}
+
+/** Teilen: mit Web-Share als Datei (Handy, Safari), sonst Download. */
+async function exportMarkdown(mode) {
+  if (!state.cid) return;
+  if (state.chatLocked && !state.unlockedCids.has(state.cid)) {
+    toast(t('chat_lock_need_pin_first'), { error: true });
+    return;
+  }
+  try {
+    const md = await api('GET', '/conversations/' + state.cid + '/export.md');
+    const safe = (state.title || 'chat').replace(/[^\p{L}\p{N}\-_ ]/gu, '_').slice(0, 60).trim() || 'chat';
+    const file = new File([md], safe + '.md', { type: 'text/markdown' });
+    if (mode === 'share' && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: state.title }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    if (mode === 'share') toast(t('toast_markdown_saved'));
+  } catch (e) { toast(t('toast_action_failed', apiErrorText(e)), { error: true }); }
+}
+
+// Skills fuer diesen Chat: Override setzen oder auf den Standard zuruecksetzen
+async function loadChatSkills(cid) {
+  try {
+    const r = await api('GET', `/conversations/${cid}/skills`);
+    if (state.cid !== cid) return;
+    state.skills = r.skills;
+    state.skillsIsOverride = !!r.is_override;
+  } catch { state.skills = null; state.skillsIsOverride = false; }
+}
+function updateSkillsAvailability() { /* Platzhalter: der Dialog liest die Familie beim Oeffnen */ }
+function toggleRow(label, desc, checked, disabled) {
+  const row = document.createElement('label');
+  row.className = 'dlg-toggle';
+  row.innerHTML = `<span class="set-text"><span class="set-title"></span><span class="set-hint"></span></span>
+    <input type="checkbox" class="switch">`;
+  row.querySelector('.set-title').textContent = label;
+  row.querySelector('.set-hint').textContent = desc;
+  const input = row.querySelector('input');
+  input.checked = !!checked;
+  input.disabled = !!disabled;
+  return { row, input };
+}
+async function openSkillsDialog() {
+  if (!state.cid) return;
+  await loadChatSkills(state.cid);
+  const s = Object.assign({ web_search: true, web_fetch: true, code_execution: false, image_generation: true }, state.skills || {});
+  const codeAvailable = familyForKey(effectiveModelKey()) === 'claude';
+  const body = document.createElement('div');
+  const intro = document.createElement('p');
+  intro.className = 'dlg-text';
+  intro.textContent = state.skillsIsOverride ? t('chat_skills_dialog_body_override') : t('chat_skills_dialog_body_default');
+  body.appendChild(intro);
+  const ws = toggleRow(t('skill_web_search'), t('skill_web_search_desc'), s.web_search);
+  const wf = toggleRow(t('skill_web_fetch'), t('skill_web_fetch_desc'), s.web_fetch);
+  const code = toggleRow(t('skill_code'), codeAvailable ? t('skill_code_desc') : t('chat_skill_claude_only'), s.code_execution && codeAvailable, !codeAvailable);
+  body.append(ws.row, wf.row, code.row);
+  const actions = [{ label: t('cancel'), value: null }];
+  if (state.skillsIsOverride) actions.push({ label: t('chat_skills_reset_default'), value: 'reset' });
+  actions.push({ label: t('chat_skills_save_for_chat'), kind: 'btn-primary', value: 'save' });
+  const res = await openDialog({ title: t('chat_skills_dialog_title'), icon: 'extension', body, actions });
+  if (!res) return;
+  try {
+    const payload = res === 'reset' ? { skills: null } : {
+      // Bild-Einstellung mitnehmen, sonst faellt sie beim Speichern auf den Standard zurueck.
+      skills: { ...s, web_search: ws.input.checked, web_fetch: wf.input.checked, code_execution: code.input.checked },
+    };
+    const r = await api('PUT', `/conversations/${state.cid}/skills`, payload);
+    state.skills = r.skills;
+    state.skillsIsOverride = !!r.is_override;
+    toast(res === 'reset' ? t('toast_skills_reset') : t('toast_skills_saved'));
+  } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
+}
+
+async function openAutoSpeakDialog() {
+  const cid = state.cid;
+  const ov = autoSpeakOverride(cid);
+  const body = document.createElement('div');
+  const intro = document.createElement('p');
+  intro.className = 'dlg-text';
+  intro.textContent = t('chat_auto_speak_dialog_body');
+  body.appendChild(intro);
+  const opts = [
+    [null, t('chat_auto_speak_default_label', state.autoSpeak ? t('chat_auto_speak_on') : t('chat_auto_speak_off'))],
+    [true, t('chat_auto_speak_always_on')],
+    [false, t('chat_auto_speak_always_off')],
+  ];
+  let close;
+  for (const [val, label] of opts) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dlg-option' + (ov === val ? ' selected' : '');
+    b.innerHTML = `<svg class="icon"><use href="#icon-${ov === val ? 'check-circle' : 'radio'}"/></svg><span></span>`;
+    b.querySelector('span').textContent = label;
+    b.addEventListener('click', () => {
+      if (val === null) delete state.autoSpeakByChat[cid]; else state.autoSpeakByChat[cid] = val;
+      localStorage.setItem(LS.autoSpeakByChat, JSON.stringify(state.autoSpeakByChat));
+      queueSettingsPush();
+      close && close(true);
+    });
+    body.appendChild(b);
+  }
+  await openDialog({
+    title: t('chat_auto_speak_dialog_title'), icon: 'speaker', body,
+    actions: [{ label: t('close'), value: null }],
+    onMount: (_w, c) => { close = c; },
+  });
+}
+
+// =========================================================
+// Verlauf
+// =========================================================
 function setComposerLocked(locked) {
   els.input.disabled = locked;
-  if (locked) els.sendBtn.disabled = true;
-  else if (!state.isStreaming) els.sendBtn.disabled = false;
   els.inputForm.classList.toggle('composer-locked', locked);
+  updateComposerState();
 }
 
 function renderMessages() {
-  // Gesperrter, in dieser Session nicht entsperrter Chat → Gate statt Inhalt.
   if (state.chatLocked && state.cid && !state.unlockedCids.has(state.cid)) {
     setComposerLocked(true);
     renderLockGate(state.cid);
@@ -1229,127 +1570,185 @@ function renderMessages() {
   const inner = document.createElement('div');
   inner.className = 'messages-inner';
   els.messages.appendChild(inner);
-
-  if (!state.messages.length && !state.isStreaming) {
-    // Leerer Gem-Chat: Gem-Kopf + tappbare Gesprächs-Starter (statt generischem Hinweis).
-    if (state.gem) { inner.appendChild(gemWelcomeEl(state.gem)); return; }
-    inner.innerHTML = `
-      <div class="empty-hint">
-        <div class="e-logo"><img class="brand-mark" src="brand-mark.png" alt=""></div>
-        <h3>${escapeHtml(t('empty_hint_title'))}</h3>
-        <p>${escapeHtml(t('empty_hint_body'))}</p>
-      </div>`;
+  const empty = !state.messages.length && !state.isStreaming;
+  els.chatView.classList.toggle('is-empty', empty);
+  updateTopbar();
+  if (empty) {
+    if (state.gem) inner.appendChild(gemWelcomeEl(state.gem));
+    else {
+      const first = (state.me?.name || '').split(/\s+/)[0];
+      inner.innerHTML = `
+        <div class="empty-hero">
+          <img class="e-logo brand-mark" src="brand-mark.png" alt="">
+          <h3>${escapeHtml(first ? t('greeting_named', first) : t('greeting'))}</h3>
+        </div>`;
+    }
+    updateScrollUi();
     return;
   }
-  for (const m of state.messages) inner.appendChild(renderMessage(m));
-  if (state.isStreaming) {
-    inner.appendChild(renderStreamingPlaceholder());
-  }
-  enhanceCodeBlocks(inner);
+  const lastAssistantIdx = (() => {
+    for (let i = state.messages.length - 1; i >= 0; i--) if (state.messages[i].role === 'assistant') return i;
+    return -1;
+  })();
+  state.messages.forEach((m, i) => inner.appendChild(renderMessage(m, i === lastAssistantIdx && !state.isStreaming)));
+  if (state.isStreaming) inner.appendChild(renderStreamingMessage());
+  enhanceContent(inner);
+  if (searchState.open) refreshChatSearch();
+  updateScrollUi();
 }
 
-function renderMessage(m) {
+function ttsButtonsHtml(m) {
+  const a = state.audio.msgId === m.id ? state.audio.status : 'idle';
+  if (a === 'loading') return `<span class="spin"><span class="spinner" style="width:16px;height:16px"></span></span>`;
+  if (a === 'playing') {
+    return `<button class="icon-btn active" data-tool="pause" title="${escapeHtml(t('bubble_pause'))}"><svg class="icon"><use href="#icon-pause"/></svg></button>
+      <button class="icon-btn" data-tool="stop-tts" title="${escapeHtml(t('stop_reading'))}"><svg class="icon"><use href="#icon-stop"/></svg></button>`;
+  }
+  if (a === 'paused') {
+    return `<button class="icon-btn active" data-tool="resume" title="${escapeHtml(t('bubble_resume'))}"><svg class="icon"><use href="#icon-play"/></svg></button>
+      <button class="icon-btn" data-tool="stop-tts" title="${escapeHtml(t('stop_reading'))}"><svg class="icon"><use href="#icon-stop"/></svg></button>`;
+  }
+  return `<button class="icon-btn" data-tool="tts" title="${escapeHtml(t('tts_title'))}"><svg class="icon"><use href="#icon-speaker"/></svg></button>`;
+}
+
+function renderMessage(m, isLast) {
   const div = document.createElement('div');
-  div.className = 'msg ' + (m.role === 'user' ? 'user' : 'assistant');
+  div.className = 'msg ' + (m.role === 'user' ? 'user' : 'assistant') + (isLast ? ' last' : '');
+  div.dataset.mid = m.id;
   const attHtml = attachmentsToHtml(m.attachments);
   if (m.role === 'user') {
-    const textHtml = escapeHtml(m.content || '').replace(/\n/g, '<br>');
-    // Bei aktiviertem collapseUserMsgs starten wir mit .collapsed —
-    // applyUserBubbleCollapse() checkt nach dem Layout, ob die Bubble
-    // wirklich overflowt, und entfernt sonst die Klasse + den Toggle.
-    const bubbleClass = state.collapseUserMsgs ? 'bubble collapsed' : 'bubble';
-    div.innerHTML = `
-      <div>
-        ${attHtml}
-        ${m.content ? `<div class="${bubbleClass}">${textHtml}</div>` : ''}
-      </div>`;
-    if (m.content && state.collapseUserMsgs) {
+    div.innerHTML = `${attHtml}${m.content ? `<div class="bubble"></div>` : ''}
+      ${m.content ? `<div class="msg-tools"><button class="icon-btn" data-tool="copy" title="${escapeHtml(t('copy_title'))}"><svg class="icon"><use href="#icon-copy"/></svg></button></div>` : ''}`;
+    if (m.content) {
       const bubble = div.querySelector('.bubble');
-      // Tap auf die Bubble toggelt auf/zu — kein separater Button mehr
-      // (selbsterklärend). Text-Selektion bleibt unangetastet: wenn der User
-      // gerade etwas markiert hat, kein Toggle.
-      bubble.addEventListener('click', () => {
-        if (window.getSelection().toString()) return;
-        bubble.classList.toggle('collapsed');
-      });
-      // Nach dem Layout entscheiden, ob die Collapse-Klasse überhaupt
-      // sinnvoll ist (kein Overflow → kein Collapse).
-      requestAnimationFrame(() => {
-        const overflows = bubble.scrollHeight > bubble.clientHeight + 1;
-        if (!overflows) bubble.classList.remove('collapsed');
-      });
+      bubble.textContent = m.content;
+      if (state.collapseUserMsgs) {
+        bubble.classList.add('collapsed');
+        // Erst nach dem Layout entscheiden, ob es ueberhaupt etwas einzuklappen gibt.
+        requestAnimationFrame(() => {
+          if (bubble.scrollHeight <= bubble.clientHeight + 2) bubble.classList.remove('collapsed');
+          else bubble.classList.add('collapsible');
+        });
+        bubble.addEventListener('click', () => {
+          if (window.getSelection().toString()) return;
+          if (!bubble.classList.contains('collapsible')) return;
+          bubble.classList.toggle('collapsed');
+        });
+      }
     }
   } else {
-    const speakerActive = state.audio.msgId === m.id && state.audio.playing;
-    div.innerHTML = `
-      <div>
-        ${attHtml}
-        <div class="content">${renderMarkdown(m.content)}</div>
-        <div class="msg-tools">
-          <button class="icon-btn ${speakerActive ? 'active' : ''}" data-id="${m.id}" data-tool="tts" title="${escapeHtml(t('tts_title'))}">
-            <svg class="icon"><use href="#icon-speaker"/></svg>
-          </button>
-          <button class="icon-btn" data-tool="copy" title="${escapeHtml(t('copy_title'))}">
-            <svg class="icon"><use href="#icon-copy"/></svg>
-          </button>
-        </div>
-      </div>`;
-    div.querySelector('[data-tool="tts"]').addEventListener('click', (e) => {
-      toggleTts(m.id, e.currentTarget);
-    });
-    div.querySelector('[data-tool="copy"]').addEventListener('click', () => {
-      navigator.clipboard.writeText(m.content).then(() => toast(t('toast_copied')));
+    const thinking = m._thinking ? thinkingEl(m._thinking, false) : null;
+    div.innerHTML = `<div class="content">${renderMarkdown(m.content)}</div>${attHtml}`;
+    if (thinking) div.prepend(thinking);
+    if (m.content || (m.attachments || []).length) {
+      const tools = document.createElement('div');
+      tools.className = 'msg-tools';
+      const serverId = typeof m.id === 'number' && m.id > 0;
+      tools.innerHTML = `${serverId && m.content ? `<span class="tts-slot">${ttsButtonsHtml(m)}</span>` : ''}
+        <button class="icon-btn" data-tool="copy" title="${escapeHtml(t('copy_title'))}"><svg class="icon"><use href="#icon-copy"/></svg></button>
+        ${serverId ? `<button class="icon-btn" data-tool="rewind" title="${escapeHtml(t('bubble_rewind'))}"><svg class="icon"><use href="#icon-history"/></svg></button>` : ''}`;
+      div.appendChild(tools);
+    }
+  }
+  div.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tool]');
+    if (!b) return;
+    const tool = b.dataset.tool;
+    if (tool === 'copy') {
+      navigator.clipboard.writeText(m.content || '').then(() => toast(t('toast_copied')), () => toast(t('toast_copy_failed'), { error: true }));
+    } else if (tool === 'tts') speak(m.id);
+    else if (tool === 'pause') pauseAudio();
+    else if (tool === 'resume') resumeAudio();
+    else if (tool === 'stop-tts') stopAudio();
+    else if (tool === 'rewind') openRewindDialog(m);
+  });
+  return div;
+}
+
+function thinkingEl(text, live) {
+  const box = document.createElement('div');
+  box.className = 'thinking' + (live ? ' live' : '');
+  box.innerHTML = `<button type="button" class="thinking-toggle">
+      <span class="${live ? 'shimmer' : ''}">${escapeHtml(live ? t('bubble_thinking_live') : t('thinking_show'))}</span>
+      ${live ? '' : '<svg class="icon"><use href="#icon-chevron-down"/></svg>'}
+    </button>
+    <div class="thinking-body"><div></div></div>`;
+  box.querySelector('.thinking-body > div').textContent = (text || '').trim();
+  if (!live) {
+    box.querySelector('.thinking-toggle').addEventListener('click', () => {
+      box.classList.toggle('open');
+      box.querySelector('.thinking-toggle span').textContent = box.classList.contains('open') ? t('thinking_hide') : t('thinking_show');
     });
   }
-  return div;
+  return box;
 }
 
-function renderStreamingPlaceholder() {
+function renderStreamingMessage() {
   const div = document.createElement('div');
-  div.className = 'msg assistant';
+  div.className = 'msg assistant streaming';
   div.id = 'streaming-msg';
-  div.innerHTML = `
-    <div>
-      <div class="content">${state.streamingText
-        ? renderMarkdown(state.streamingText)
-        : '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>'}</div>
-    </div>`;
+  fillStreamingMessage(div);
   return div;
+}
+function fillStreamingMessage(div) {
+  const text = state.streamingText;
+  const thinking = state.streamingThinking;
+  div.innerHTML = '';
+  if (thinking) div.appendChild(thinkingEl(thinking, !text));
+  if (!text) {
+    if (!thinking) {
+      div.insertAdjacentHTML('beforeend', `<div class="waiting"><img class="brand-mark brand-pulse" src="brand-mark.png" alt="">
+        <span class="shimmer">${escapeHtml(t('bubble_thinking_live'))}</span></div>`);
+    }
+  } else {
+    const c = document.createElement('div');
+    c.className = 'content';
+    c.innerHTML = renderMarkdown(text);
+    div.appendChild(c);
+    div.insertAdjacentHTML('beforeend', '<div class="streaming-dots"><span></span><span></span><span></span></div>');
+  }
+  if (state._streamAttachments.length) div.insertAdjacentHTML('beforeend', attachmentsToHtml(state._streamAttachments));
+  enhanceContent(div);
+}
+let _streamRaf = 0;
+function updateStreaming() {
+  // Hoechstens ein Neuzeichnen pro Bild, sonst bremst Markdown lange Antworten aus.
+  if (_streamRaf) return;
+  _streamRaf = requestAnimationFrame(() => {
+    _streamRaf = 0;
+    let div = $('streaming-msg');
+    if (!div) { renderMessages(); div = $('streaming-msg'); }
+    if (div) fillStreamingMessage(div);
+    scrollToBottom();
+  });
 }
 
 // =========================================================
-// Chat-Lock: Gate im Chat-Bereich + PIN-Verify-Modal
+// Gesperrte Chats: PIN statt Inhalt
 // =========================================================
-/** Rendert das Lock-Gate (5-stellige PIN-Eingabe) statt der Nachrichten.
- *  Bei korrekter PIN wird der Chat in dieser Session als entsperrt gemerkt
- *  und normal gerendert. */
 function renderLockGate(cid) {
+  els.chatView.classList.remove('is-empty');
   els.messages.innerHTML = '';
   const inner = document.createElement('div');
   inner.className = 'messages-inner';
   els.messages.appendChild(inner);
-
   const gate = document.createElement('div');
   gate.className = 'lock-gate';
   gate.innerHTML = `
     <div class="lock-gate-icon"><svg><use href="#icon-lock"/></svg></div>
     <h3>${escapeHtml(t('lock_gate_title'))}</h3>
     <p>${escapeHtml(t('lock_gate_hint'))}</p>
-    <input type="password" inputmode="numeric" maxlength="5" autocomplete="off"
-           aria-label="${escapeHtml(t('chat_lock_pin'))}">
+    <input type="password" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="${escapeHtml(t('chat_lock_pin'))}">
     <div class="lock-gate-error"></div>
-    <button type="button" class="btn-primary" data-role="unlock">${escapeHtml(t('lock_gate_unlock'))}</button>
-  `;
+    <button type="button" class="btn-primary" data-role="unlock">${escapeHtml(t('lock_gate_unlock'))}</button>`;
   inner.appendChild(gate);
-
+  setComposerLocked(true);
   const input = gate.querySelector('input');
   const errEl = gate.querySelector('.lock-gate-error');
   const btn = gate.querySelector('[data-role="unlock"]');
-  let countdownTimer = null;
-
+  let countdown = null;
   const onlyDigits = () => { input.value = input.value.replace(/\D/g, '').slice(0, 5); };
   input.addEventListener('input', onlyDigits);
-
   const submit = async () => {
     onlyDigits();
     if (input.value.length !== 5) { errEl.textContent = t('chat_lock_pin_5_digits'); return; }
@@ -1358,63 +1757,44 @@ function renderLockGate(cid) {
       const r = await api('POST', '/me/chat-lock/verify', { pin: input.value });
       if (r.ok) {
         state.unlockedCids.add(cid);
-        // Nur rendern wenn der User noch im selben Chat ist.
         if (state.cid === cid) { renderMessages(); scrollToVeryBottom(); }
         return;
       }
-      // Falsch: entweder normaler Fehlversuch oder Lockout mit Countdown.
       input.value = '';
       const wait = r.retry_after_seconds || 0;
-      if (wait > 0) {
-        startLockout(wait);
-      } else {
-        errEl.textContent = t('lock_gate_wrong');
-        btn.disabled = false;
-        input.focus();
-      }
+      if (wait > 0) startLockout(wait);
+      else { errEl.textContent = t('lock_gate_wrong'); btn.disabled = false; input.focus(); }
     } catch (e) {
-      errEl.textContent = t('toast_error_prefix', e.message);
+      errEl.textContent = t('toast_error_prefix', apiErrorText(e));
       btn.disabled = false;
     }
   };
-
   function startLockout(seconds) {
-    input.disabled = true;
-    btn.disabled = true;
+    input.disabled = true; btn.disabled = true;
     let remaining = seconds;
     const tick = () => {
       errEl.textContent = t('lock_gate_locked_out', remaining);
       if (remaining <= 0) {
-        clearInterval(countdownTimer); countdownTimer = null;
-        input.disabled = false; btn.disabled = false;
-        errEl.textContent = '';
+        clearInterval(countdown); countdown = null;
+        input.disabled = false; btn.disabled = false; errEl.textContent = '';
         input.focus();
         return;
       }
       remaining -= 1;
     };
     tick();
-    countdownTimer = setInterval(tick, 1000);
+    countdown = setInterval(tick, 1000);
   }
-
   btn.addEventListener('click', submit);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); submit(); }
-  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
   setTimeout(() => input.focus(), 50);
 }
 
-/** Modaler PIN-Prompt (für „Chat entsperren" im Kontextmenü). Liefert true,
- *  wenn die eingegebene PIN vom Server als korrekt bestätigt wurde. Nutzt den
- *  vorhandenen Prompt-Modal-Mechanismus + /me/chat-lock/verify. */
 async function verifyPinDialog() {
   while (true) {
     const pin = await showPrompt({
-      title: t('lock_gate_title'),
-      text: t('lock_gate_hint'),
-      placeholder: t('chat_lock_pin'),
-      type: 'password',
-      okLabel: t('lock_gate_unlock'),
+      title: t('lock_gate_title'), text: t('lock_gate_hint'),
+      placeholder: t('chat_lock_pin'), type: 'password', okLabel: t('lock_gate_unlock'),
     });
     if (pin === null) return false;
     const digits = (pin || '').replace(/\D/g, '');
@@ -1422,240 +1802,238 @@ async function verifyPinDialog() {
     try {
       const r = await api('POST', '/me/chat-lock/verify', { pin: digits });
       if (r.ok) return true;
-      if (r.retry_after_seconds > 0) {
-        toast(t('lock_gate_locked_out', r.retry_after_seconds), { error: true });
-        return false;
-      }
+      if (r.retry_after_seconds > 0) { toast(t('lock_gate_locked_out', r.retry_after_seconds), { error: true }); return false; }
       toast(t('lock_gate_wrong'), { error: true });
     } catch (e) {
-      toast(t('toast_error_prefix', e.message), { error: true });
+      toast(t('toast_error_prefix', apiErrorText(e)), { error: true });
       return false;
     }
   }
 }
 
-function updateStreaming() {
-  let div = $('streaming-msg');
-  if (!div) { renderMessages(); div = $('streaming-msg'); }
-  if (div) {
-    const content = div.querySelector('.content');
-    content.innerHTML = renderMarkdown(state.streamingText);
-    enhanceCodeBlocks(content);
-  }
+// =========================================================
+// Scrollen
+// =========================================================
+function distanceFromBottom() {
+  const m = els.messages;
+  return m.scrollHeight - m.scrollTop - m.clientHeight;
 }
-
 function scrollToBottom(force = false) {
-  // Bei Streaming-Deltas: nur scrollen wenn der User eh nah am Ende ist
-  const m = els.messages;
-  const nearBottom = m.scrollHeight - m.scrollTop - m.clientHeight < 200;
-  if (force || nearBottom) {
-    m.scrollTop = m.scrollHeight + 1000000;
-  }
+  if (force || distanceFromBottom() < 200) els.messages.scrollTop = els.messages.scrollHeight + 1e6;
+  updateScrollUi();
 }
+function updateScrollUi() {
+  els.scrollDown.classList.toggle('hidden', state.view !== 'chat' || distanceFromBottom() < 400);
+  els.topbar.classList.toggle('scrolled', state.view === 'chat' && els.messages.scrollTop > 4);
+}
+els.messages.addEventListener('scroll', updateScrollUi, { passive: true });
+els.scrollDown.addEventListener('click', () => {
+  els.messages.scrollTo({ top: els.messages.scrollHeight, behavior: 'smooth' });
+});
 
-// Beim Chat-Öffnen: hart ans Ende halten, bis ALLES gerendert ist
-// (Markdown, Code-Highlight, Bilder, Schriften). Strategie:
-//  1) Sofort scrollen + Retry-Loop für ~1.5s
-//  2) ResizeObserver auf den Messages-Container — solange der „pin to bottom"-
-//     Modus aktiv ist, bei jeder Höhen-Änderung wieder runterspringen
-//  3) Auf jedes <img load> reagieren
-//  4) Modus endet, sobald der User selbst scrollt
+// Beim Oeffnen: am Ende halten, bis Markdown, Code und Bilder fertig gelayoutet
+// sind. Endet, sobald der Nutzer selbst scrollt, spaetestens nach 4 Sekunden.
 let _pinBottomCleanup = null;
-async function scrollToVeryBottom() {
+function scrollToVeryBottom() {
   const m = els.messages;
-  // alten Pin-Modus aufräumen
   if (_pinBottomCleanup) { _pinBottomCleanup(); _pinBottomCleanup = null; }
-
-  const jump = () => { m.scrollTop = m.scrollHeight + 1000000; };
+  const jump = () => { m.scrollTop = m.scrollHeight + 1e6; };
   jump();
-
-  // (1) Retry-Loop — mehrere Anläufe in einer Sekunde
   const retries = setInterval(jump, 80);
   setTimeout(() => clearInterval(retries), 1500);
-
-  // (2) ResizeObserver: jedes Mal wenn die Höhe wächst → wieder ans Ende
   let userScrolled = false;
-  const onScroll = () => {
-    // nur als User-Aktion werten, wenn er WIRKLICH weg vom Ende ist
-    if (m.scrollHeight - m.scrollTop - m.clientHeight > 80) userScrolled = true;
-  };
+  const onScroll = () => { if (distanceFromBottom() > 80) userScrolled = true; };
   m.addEventListener('scroll', onScroll, { passive: true });
-
   const ro = new ResizeObserver(() => { if (!userScrolled) jump(); });
   ro.observe(m);
   for (const child of m.children) ro.observe(child);
-
-  // (3) Bilder, die später laden, ziehen auch nach unten
-  const imgListeners = [];
+  const imgs = [];
   for (const img of m.querySelectorAll('img')) {
     if (!img.complete) {
       const h = () => { if (!userScrolled) jump(); };
       img.addEventListener('load', h, { once: true });
       img.addEventListener('error', h, { once: true });
-      imgListeners.push([img, h]);
+      imgs.push([img, h]);
     }
   }
-
-  // Pin-Modus nach 4s automatisch beenden — danach ist „normal nahe-am-Ende"-
-  // Scroll-Verhalten zuständig (scrollToBottom bei neuen Messages).
   const stopAt = setTimeout(stop, 4000);
   function stop() {
     clearTimeout(stopAt);
     clearInterval(retries);
     m.removeEventListener('scroll', onScroll);
     ro.disconnect();
-    for (const [img, h] of imgListeners) {
-      img.removeEventListener('load', h);
-      img.removeEventListener('error', h);
-    }
+    for (const [img, h] of imgs) { img.removeEventListener('load', h); img.removeEventListener('error', h); }
     _pinBottomCleanup = null;
+    updateScrollUi();
   }
   _pinBottomCleanup = stop;
 }
 
 // =========================================================
-// Attachments
+// Zurueckspringen: ab einer Antwort weitermachen, wahlweise mit anderem Modell
 // =========================================================
-els.attachBtn.addEventListener('click', () => els.fileInput.click());
-els.fileInput.addEventListener('change', async (e) => {
-  const files = [...e.target.files];
-  els.fileInput.value = '';
-  for (const f of files) await uploadAttachment(f);
-});
-
-// --- Drag & Drop: Dateien ins Chatfenster ziehen → Overlay + Upload ---
-(function setupDragDrop() {
-  const overlay = document.getElementById('drop-overlay');
-  if (!overlay) return;
-  let dragDepth = 0;
-  const accepted = (f) =>
-    !!f && (
-      (f.type || '').startsWith('image/') ||
-      f.type === 'application/pdf' ||
-      f.type === 'text/plain' ||
-      f.type === 'text/markdown' ||
-      /\.(txt|md)$/i.test(f.name || '')
-    );
-  const dragHasFiles = (e) =>
-    !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
-  // Nur im Chat-Mode droppen — nicht über Login, Settings-Modal oder Bild-Mode.
-  const canDrop = () => {
-    const login = document.getElementById('login');
-    const settings = document.getElementById('settings-modal');
-    const loginHidden = !login || login.classList.contains('hidden');
-    const settingsHidden = !settings || settings.classList.contains('hidden');
-    const imageMode = els.inputForm && els.inputForm.classList.contains('image-mode');
-    return loginHidden && settingsHidden && !imageMode;
-  };
-  const hideOverlay = () => { dragDepth = 0; overlay.classList.add('hidden'); };
-
-  window.addEventListener('dragenter', (e) => {
-    if (!dragHasFiles(e)) return;
-    e.preventDefault();
-    if (!canDrop()) return;
-    dragDepth++;
-    overlay.classList.remove('hidden');
-  });
-  window.addEventListener('dragover', (e) => {
-    if (!dragHasFiles(e)) return;
-    e.preventDefault();
-    if (canDrop()) { try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {} }
-  });
-  window.addEventListener('dragleave', (e) => {
-    if (!dragHasFiles(e)) return;
-    dragDepth = Math.max(0, dragDepth - 1);
-    if (dragDepth === 0) overlay.classList.add('hidden');
-  });
-  window.addEventListener('drop', async (e) => {
-    if (!dragHasFiles(e)) return;
-    e.preventDefault();           // verhindert, dass der Browser die Datei öffnet
-    hideOverlay();
-    if (!canDrop()) return;
-    const files = Array.from(e.dataTransfer.files || []);
-    let skipped = 0;
-    for (const f of files) {
-      if (accepted(f)) await uploadAttachment(f);
-      else skipped++;
+async function openRewindDialog(m) {
+  if (state.isStreaming) return;
+  const idx = state.messages.findIndex((x) => x.id === m.id);
+  if (idx < 0) return;
+  const dropped = state.messages.length - idx - 1;
+  const current = effectiveModelKey();
+  let chosen = current;
+  const body = document.createElement('div');
+  const p = document.createElement('p');
+  p.className = 'dlg-text';
+  p.textContent = dropped === 0 ? t('rewind_body_none') : dropped === 1 ? t('rewind_body_one') : t('rewind_body_many', dropped);
+  body.appendChild(p);
+  const options = [{ key: '', label: t('model_auto') }, ...state.chatModels.filter((x) => x.key)];
+  if (options.length > 1) {
+    const lbl = document.createElement('div');
+    lbl.className = 'dlg-label';
+    lbl.textContent = t('rewind_dialog_model_label');
+    body.appendChild(lbl);
+    const row = document.createElement('div');
+    row.className = 'chip-row';
+    for (const o of options) {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'chip' + (o.key === current ? ' active' : '');
+      c.textContent = o.label || o.key;
+      c.addEventListener('click', () => {
+        chosen = o.key;
+        row.querySelectorAll('.chip').forEach((x) => x.classList.toggle('active', x === c));
+      });
+      row.appendChild(c);
     }
-    if (skipped) toast(t('drop_unsupported'), { error: true });
-  });
-})();
-
-async function uploadAttachment(file) {
-  const placeholder = { id: 'pending-' + Math.random(), filename: file.name, _uploading: true, mime_type: file.type };
-  // Local preview falls Bild
-  if (file.type.startsWith('image/')) {
-    placeholder._previewUrl = URL.createObjectURL(file);
+    body.appendChild(row);
   }
-  state.pendingAttach.push(placeholder);
-  renderPending();
+  const ok = await openDialog({
+    title: t('rewind_dialog_title'), icon: 'history', body,
+    actions: [{ label: t('cancel'), value: false }, { label: t('rewind_dialog_confirm'), kind: 'btn-primary', value: true }],
+  });
+  if (!ok) return;
+  const cid = state.cid;
   try {
-    const prepared = await maybeCompressImage(file);
-    const fd = new FormData();
-    fd.append('file', prepared.blob, prepared.filename);
-    const r = await api('POST', '/attachments', fd);
-    const idx = state.pendingAttach.indexOf(placeholder);
-    if (idx >= 0) {
-      r._previewUrl = placeholder._previewUrl;  // Preview behalten
-      state.pendingAttach[idx] = r;
+    // Nur mitschicken, was sich wirklich aendert: sonst gilt es serverseitig als Wechsel.
+    const payload = { message_id: m.id };
+    if (chosen !== current) payload.chat_model = chosen;
+    const res = await api('POST', `/conversations/${cid}/rewind`, payload);
+    if (res.chat_model != null && chosen !== current) {
+      const fam = familyForKey(res.chat_model);
+      selectModel(res.chat_model);
+      // Nach einem echten Wechsel mit hoher Denktiefe weiter, wie in der App.
+      if (state.effortByFamily[fam] !== 'high') setEffort('high', fam);
     }
-    renderPending();
+    toast(t('toast_rewind_done'));
   } catch (e) {
-    state.pendingAttach = state.pendingAttach.filter(a => a !== placeholder);
-    renderPending();
-    toast(t('toast_upload_failed', e.message), { error: true });
+    toast(t('toast_error_prefix', apiErrorText(e)), { error: true });
   }
+  // In jedem Fall den Serverstand uebernehmen: der Ruecksprung kann gelungen
+  // und nur die Antwort verloren gegangen sein.
+  await reloadChatMessages(cid);
+  scrollToVeryBottom();
 }
 
-function renderPending() {
-  if (!state.pendingAttach.length) {
-    els.pendingWrap.classList.add('hidden');
-    els.pendingWrap.innerHTML = '';
-    return;
+// =========================================================
+// Suche im Chat (Markierungen ueber die CSS-Highlight-API)
+// =========================================================
+const searchState = { open: false, ranges: [], index: -1 };
+function openChatSearch() {
+  if (state.view !== 'chat') return;
+  searchState.open = true;
+  els.searchBar.classList.remove('hidden');
+  els.searchBarInput.value = '';
+  els.searchBarCount.textContent = '';
+  setTimeout(() => els.searchBarInput.focus(), 20);
+}
+function closeChatSearch() {
+  if (!searchState.open) return;
+  searchState.open = false;
+  els.searchBar.classList.add('hidden');
+  searchState.ranges = [];
+  searchState.index = -1;
+  if (window.CSS && CSS.highlights) { CSS.highlights.delete('pc-search'); CSS.highlights.delete('pc-search-current'); }
+}
+function refreshChatSearch(keepIndex = true) {
+  const q = els.searchBarInput.value.trim().toLowerCase();
+  const ranges = [];
+  if (q) {
+    const roots = els.messages.querySelectorAll('.msg .bubble, .msg .content');
+    for (const root of roots) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const text = node.nodeValue.toLowerCase();
+        let from = 0, i;
+        while ((i = text.indexOf(q, from)) >= 0) {
+          const r = new Range();
+          r.setStart(node, i);
+          r.setEnd(node, i + q.length);
+          ranges.push(r);
+          from = i + q.length;
+        }
+      }
+    }
   }
-  els.pendingWrap.classList.remove('hidden');
-  els.pendingWrap.innerHTML = '';
-  for (const a of state.pendingAttach) {
-    const chip = document.createElement('div');
-    chip.className = 'att-chip';
-    const preview = a._previewUrl
-      ? `<img class="att-preview" src="${a._previewUrl}" alt="">`
-      : `<div class="att-preview" style="display:flex;align-items:center;justify-content:center;color:var(--text-muted)"><svg class="icon"><use href="#icon-file"/></svg></div>`;
-    const sz = a.size_bytes ? ` · ${(a.size_bytes/1024).toFixed(0)} KB` : '';
-    chip.innerHTML = `
-      ${preview}
-      <div class="att-info">
-        <span class="name">${a._uploading ? '⏳ ' : ''}${escapeHtml(a.filename)}</span>
-        <span class="meta">${sz}</span>
-      </div>
-      <button class="rm" type="button" title="${escapeHtml(t('remove_title'))}"><svg class="icon" style="width:14px;height:14px"><use href="#icon-close"/></svg></button>
-    `;
-    chip.querySelector('.rm').onclick = () => {
-      state.pendingAttach = state.pendingAttach.filter(x => x !== a);
-      if (a._previewUrl) URL.revokeObjectURL(a._previewUrl);
-      renderPending();
-    };
-    els.pendingWrap.appendChild(chip);
+  searchState.ranges = ranges;
+  if (!keepIndex || searchState.index >= ranges.length) searchState.index = ranges.length ? ranges.length - 1 : -1;
+  paintChatSearch();
+}
+function paintChatSearch() {
+  const { ranges, index } = searchState;
+  const q = els.searchBarInput.value.trim();
+  els.searchBarCount.textContent = q ? (ranges.length ? `${index + 1}/${ranges.length}` : t('search_no_matches')) : '';
+  els.searchBarCount.classList.toggle('none', !!q && !ranges.length);
+  if (window.CSS && CSS.highlights && typeof Highlight === 'function') {
+    CSS.highlights.set('pc-search', new Highlight(...ranges));
+    if (index >= 0) CSS.highlights.set('pc-search-current', new Highlight(ranges[index]));
+    else CSS.highlights.delete('pc-search-current');
+  }
+  if (index >= 0) {
+    const el = ranges[index].startContainer.parentElement;
+    const bubble = el && el.closest('.bubble.collapsed');
+    if (bubble) bubble.classList.remove('collapsed');
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 }
+function stepChatSearch(dir) {
+  const n = searchState.ranges.length;
+  if (!n) return;
+  searchState.index = (searchState.index + dir + n) % n;
+  paintChatSearch();
+}
+els.searchBarInput.addEventListener('input', () => refreshChatSearch(false));
+els.searchBarInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); stepChatSearch(e.shiftKey ? 1 : -1); }
+  if (e.key === 'Escape') { e.preventDefault(); closeChatSearch(); }
+});
+$('chat-search-prev').addEventListener('click', () => stepChatSearch(-1));
+$('chat-search-next').addEventListener('click', () => stepChatSearch(1));
+$('chat-search-close').addEventListener('click', closeChatSearch);
 
+// =========================================================
+// Anhaenge im Verlauf und Bildbetrachter
+// =========================================================
+function providerFromFilename(name) {
+  const m = /^(gemini|gpt)-\d+\./i.exec(name || '');
+  return m ? (m[1].toLowerCase() === 'gpt' ? 'GPT' : 'Gemini') : '';
+}
 function attachmentsToHtml(atts) {
   if (!atts || !atts.length) return '';
-  const images = atts.filter(a => (a.mime_type || '').startsWith('image/'));
-  const others = atts.filter(a => !(a.mime_type || '').startsWith('image/'));
-
+  const images = atts.filter((a) => isImageMime(a.mime_type));
+  const others = atts.filter((a) => !isImageMime(a.mime_type));
   let html = '';
   if (images.length) {
-    html += '<div class="image-grid">';
+    html += `<div class="image-grid${images.length === 1 ? ' single' : ''}">`;
     for (const a of images) {
-      const url = `${state.serverUrl}/attachments/${a.id}?token=${encodeURIComponent(state.token)}`;
+      const url = attachmentUrl(a.id);
+      const prov = providerFromFilename(a.filename);
       html += `
         <figure data-att-id="${escapeHtml(a.id)}">
-          <img src="${url}" alt="${escapeHtml(a.filename)}" data-lightbox="${url}">
+          <img src="${url}" alt="${escapeHtml(a.filename)}" loading="lazy"
+               data-lightbox="${url}" data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}">
+          ${prov ? `<span class="img-provider-tag">${prov}</span>` : ''}
           <div class="img-actions">
-            <button title="${escapeHtml(t('img_action_zoom'))}" data-action="zoom" data-url="${url}"><svg class="icon"><use href="#icon-zoom"/></svg></button>
-            <button title="${escapeHtml(t('img_action_edit'))}" data-action="edit" data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}"><svg class="icon"><use href="#icon-wand"/></svg></button>
-            <a href="${url}" download="${escapeHtml(a.filename)}" title="${escapeHtml(t('img_action_download'))}"><button data-action="download"><svg class="icon"><use href="#icon-download"/></svg></button></a>
+            <button type="button" title="${escapeHtml(t('img_action_edit'))}" data-img-action="edit" data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}"><svg class="icon"><use href="#icon-brush"/></svg></button>
+            <a href="${url}" download="${escapeHtml(a.filename)}" title="${escapeHtml(t('img_action_download'))}"><svg class="icon"><use href="#icon-download"/></svg></a>
           </div>
         </figure>`;
     }
@@ -1664,9 +2042,9 @@ function attachmentsToHtml(atts) {
   if (others.length) {
     html += '<div class="attachments">';
     for (const a of others) {
-      const url = `${state.serverUrl}/attachments/${a.id}?token=${encodeURIComponent(state.token)}`;
-      html += `<a class="file-card" href="${url}" target="_blank" rel="noopener">
-        <svg class="icon"><use href="#icon-file"/></svg>${escapeHtml(a.filename)}
+      html += `<a class="file-card" href="${attachmentUrl(a.id)}" target="_blank" rel="noopener">
+        <span class="file-ico"><svg class="icon"><use href="#icon-file"/></svg></span>
+        <span><span class="file-name">${escapeHtml(a.filename)}</span><span class="file-type">${escapeHtml(fileExt(a.filename) || a.mime_type || '')}</span></span>
       </a>`;
     }
     html += '</div>';
@@ -1674,364 +2052,394 @@ function attachmentsToHtml(atts) {
   return html;
 }
 
-// Lightbox: Bild groß zeigen wenn man drauf klickt
+/** Bild als Vorlage im Chat weiterbearbeiten: Bildmodus an, Bild als Anhang. */
+function editImageInChat(att) {
+  if (state.view !== 'chat') showChatView();
+  if (!state.pending.some((p) => p.uploaded && p.uploaded.id === att.id)) {
+    state.pending.push({
+      key: 'existing-' + att.id, filename: att.filename, mime: att.mime_type,
+      previewUrl: attachmentUrl(att.id), uploading: false, error: null,
+      uploaded: { id: att.id, filename: att.filename, mime_type: att.mime_type },
+    });
+  }
+  setImageMode(true);
+  renderPending();
+  els.input.focus();
+  toast(t('toast_image_set_as_edit'));
+}
+
 document.addEventListener('click', (e) => {
-  const img = e.target.closest && e.target.closest('img[data-lightbox]');
+  const img = e.target.closest && e.target.closest('.msg img[data-lightbox]');
   if (img) {
-    const url = img.dataset.lightbox;
-    openLightbox(url);
+    const att = { id: img.dataset.attId, filename: img.dataset.filename, mime_type: img.dataset.mime };
+    openLightbox(img.dataset.lightbox, { filename: att.filename, onUseAsReference: () => editImageInChat(att) });
     return;
   }
-  const btn = e.target.closest && e.target.closest('button[data-action]');
-  if (btn) {
-    const act = btn.dataset.action;
-    if (act === 'zoom') { openLightbox(btn.dataset.url); }
-    else if (act === 'edit') {
-      // Bild als Pending-Attachment für Edit-Generation einfügen + Image-Mode an
-      state.pendingAttach.push({
-        id: btn.dataset.attId,
-        filename: btn.dataset.filename,
-        mime_type: btn.dataset.mime,
-        _existing: true,
-      });
-      renderPending();
-      setImageMode(true);
-      els.input.focus();
-      toast(t('toast_image_set_as_edit'));
-    }
-  }
+  const btn = e.target.closest && e.target.closest('[data-img-action="edit"]');
+  if (btn) editImageInChat({ id: btn.dataset.attId, filename: btn.dataset.filename, mime_type: btn.dataset.mime });
 });
 
-function openLightbox(url) {
-  const old = document.getElementById('lightbox'); if (old) old.remove();
+/** Vollbild-Betrachter: Klick zoomt auf Originalgroesse, Leiste mit
+ *  Herunterladen und "als Vorlage". */
+function openLightbox(url, opts = {}) {
+  document.getElementById('lightbox')?.remove();
   const lb = document.createElement('div');
   lb.id = 'lightbox';
   lb.className = 'lightbox';
-  lb.innerHTML = `<button class="lb-close" aria-label="${escapeHtml(t('lightbox_close'))}"><svg class="icon"><use href="#icon-close"/></svg></button><img src="${url}">`;
+  lb.innerHTML = `
+    <div class="lb-stage"><img alt=""></div>
+    <div class="lb-bar">
+      ${opts.onUseAsReference ? `<button type="button" data-lb="ref" title="${escapeHtml(t('image_use_as_reference'))}"><svg class="icon"><use href="#icon-brush"/></svg></button>` : ''}
+      <a href="${url}" download="${escapeHtml(opts.filename || 'bild')}" title="${escapeHtml(t('img_action_download'))}"><svg class="icon"><use href="#icon-download"/></svg></a>
+      <button type="button" data-lb="close" title="${escapeHtml(t('lightbox_close'))}"><svg class="icon"><use href="#icon-close"/></svg></button>
+    </div>`;
+  const stage = lb.querySelector('.lb-stage');
+  const img = lb.querySelector('img');
+  img.src = url;
+  const close = () => { lb.remove(); document.removeEventListener('keydown', onKey, true); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', onKey, true);
+  img.addEventListener('click', (e) => { e.stopPropagation(); stage.classList.toggle('zoomed'); });
+  stage.addEventListener('click', (e) => { if (e.target === stage) close(); });
   lb.addEventListener('click', (e) => {
-    // closest(): seit dem Symbol im Knopf trifft der Klick oft das <svg>, nicht den Knopf.
-    if (e.target === lb || e.target.closest('.lb-close')) lb.remove();
-  });
-  document.addEventListener('keydown', function esc(e) {
-    if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', esc); }
+    const b = e.target.closest('[data-lb]');
+    if (!b) return;
+    if (b.dataset.lb === 'close') close();
+    if (b.dataset.lb === 'ref') { close(); opts.onUseAsReference(); }
   });
   document.body.appendChild(lb);
 }
 
-async function maybeCompressImage(file) {
-  const MAX_EDGE = 1568;
-  const Q = 0.85;
-  const SKIP = 200 * 1024;
-  if (!file.type.startsWith('image/')) return { blob: file, filename: file.name };
-  if (file.type === 'image/gif') return { blob: file, filename: file.name };
-  if (file.size <= SKIP) return { blob: file, filename: file.name };
-  try {
-    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    const longest = Math.max(bmp.width, bmp.height);
-    if (longest <= MAX_EDGE && file.size <= 1_500_000) {
-      bmp.close();
-      return { blob: file, filename: file.name };
+// =========================================================
+// Eingabefeld: Anhaenge, Plus-Menue, Bildmodus, runder Knopf
+// =========================================================
+let _pendingSeq = 0;
+let _uploadsRunning = 0;
+const _uploadQueue = [];
+
+function addFiles(fileList, opts = {}) {
+  let files = Array.from(fileList || []);
+  if (!files.length) return;
+  if (opts.photos && files.length > MAX_PICK) {
+    toast(t('toast_pick_limit', MAX_PICK));
+    files = files.slice(0, MAX_PICK);
+  }
+  if (state.chatLocked && !state.unlockedCids.has(state.cid)) return;
+  for (const file of files) {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast(t('toast_file_too_large', file.name, 50), { error: true });
+      continue;
     }
-    const scale = MAX_EDGE / longest;
-    const w = Math.round(bmp.width * (scale < 1 ? scale : 1));
-    const h = Math.round(bmp.height * (scale < 1 ? scale : 1));
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
-    bmp.close();
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', Q));
-    if (!blob) return { blob: file, filename: file.name };
-    return { blob, filename: file.name.replace(/\.[^.]+$/, '') + '.jpg' };
-  } catch (_) {
-    return { blob: file, filename: file.name };
+    const item = {
+      key: 'p' + (++_pendingSeq),
+      file,
+      filename: file.name || 'datei',
+      mime: file.type || '',
+      size: file.size,
+      previewUrl: isImageMime(file.type) ? URL.createObjectURL(file) : null,
+      uploading: true,
+      error: null,
+      uploaded: null,
+    };
+    state.pending.push(item);
+    _uploadQueue.push(item);
+  }
+  renderPending();
+  pumpUploads();
+}
+function pumpUploads() {
+  while (_uploadsRunning < MAX_PARALLEL_UPLOADS && _uploadQueue.length) {
+    const item = _uploadQueue.shift();
+    if (!state.pending.includes(item)) continue;   // inzwischen entfernt
+    _uploadsRunning++;
+    (async () => {
+      try {
+        const prepared = await compressImage(item.file, 'vision');
+        const r = await uploadFile(prepared.blob, prepared.filename);
+        item.uploaded = r;
+      } catch (e) {
+        item.error = apiErrorText(e);
+        toast(t('toast_upload_failed', item.error), { error: true });
+      } finally {
+        item.uploading = false;
+        _uploadsRunning--;
+        renderPending();
+        pumpUploads();
+      }
+    })();
   }
 }
-
-// =========================================================
-// Image-Mode (Gemini / Nano Banana)
-// =========================================================
-const imageState = {
-  enabled: false,
-  config: null,       // { models, aspect_ratios, max_candidates, default_*, configured, api_key_masked }
-  model: null,
-  aspect: '1:1',
-  count: 1,
-  busy: false,
-  configLoaded: false,
-};
-
-const imgEls = {
-  toggle:    $('image-mode-btn'),
-  panel:     $('image-options'),
-  modelSel:  $('image-model'),
-  aspectCh:  $('image-aspect-chips'),
-  countCh:   $('image-count-chips'),
-  status:    $('image-options-status'),
-  composer:  null, // gesetzt unten
-  hint:      $('composer-hint'),
-  input:     $('input'),
-};
-imgEls.composer = els.inputForm; // <form class="composer">
-
-async function loadImageConfig() {
-  if (imageState.configLoaded) return;
-  try {
-    imageState.config = await api('GET', '/images/config');
-    imageState.configLoaded = true;
-    imageState.model = imageState.config.default_model;
-    imageState.aspect = imageState.config.default_aspect;
-    // Modell-Select
-    imgEls.modelSel.innerHTML = '';
-    for (const m of imageState.config.models) {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.label;
-      opt.title = m.description || '';
-      if (m.id === imageState.model) opt.selected = true;
-      imgEls.modelSel.appendChild(opt);
-    }
-    imgEls.modelSel.addEventListener('change', () => {
-      imageState.model = imgEls.modelSel.value;
-    });
-    // Aspect-Chips
-    imgEls.aspectCh.innerHTML = '';
-    for (const a of imageState.config.aspect_ratios) {
-      const b = document.createElement('button');
-      b.className = 'chip' + (a.id === imageState.aspect ? ' active' : '');
-      b.type = 'button';
-      b.dataset.aspect = a.id;
-      b.textContent = a.id;
-      b.title = a.label;
-      b.addEventListener('click', () => {
-        imageState.aspect = a.id;
-        imgEls.aspectCh.querySelectorAll('.chip').forEach(c =>
-          c.classList.toggle('active', c.dataset.aspect === a.id));
-      });
-      imgEls.aspectCh.appendChild(b);
-    }
-    // Count-Chips
-    imgEls.countCh.querySelectorAll('.chip').forEach(c => {
-      const n = parseInt(c.dataset.count, 10);
-      c.classList.toggle('active', n === imageState.count);
-      c.addEventListener('click', () => {
-        imageState.count = n;
-        imgEls.countCh.querySelectorAll('.chip').forEach(cc =>
-          cc.classList.toggle('active', parseInt(cc.dataset.count, 10) === n));
-      });
-    });
-  } catch (e) {
-    setImageStatus(t('image_mode_config_unavailable', e.message), 'error');
-  }
+function removePending(item) {
+  state.pending = state.pending.filter((x) => x !== item);
+  if (item.previewUrl && item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl);
+  renderPending();
 }
-
-function setImageStatus(text, kind = '') {
-  if (!imgEls.status) return;
-  imgEls.status.textContent = text || '';
-  imgEls.status.className = 'image-options-status' + (kind ? ' ' + kind : '');
-}
-
-async function setImageMode(on) {
-  imageState.enabled = !!on;
-  imgEls.toggle.classList.toggle('image-active', on);
-  imgEls.panel.classList.toggle('hidden', !on);
-  imgEls.composer.classList.toggle('image-mode', on);
-  if (on) {
-    await loadImageConfig();
-    imgEls.input.placeholder = t('image_mode_placeholder');
-    imgEls.hint.innerHTML = t('image_mode_hint') +
-      (imageState.config && !imageState.config.configured
-        ? ` · <span style="color:var(--danger)">${t('image_mode_hint_no_key').replace(/^ · /, '')}</span>`
-        : ''
-      );
-    if (!imageState.config?.configured) {
-      setImageStatus(t('image_mode_no_key_hint'), 'error');
+function renderPending() {
+  const wrap = els.pendingWrap;
+  wrap.innerHTML = '';
+  wrap.classList.toggle('hidden', !state.pending.length);
+  for (const p of state.pending) {
+    const tile = document.createElement('div');
+    const isImg = isImageMime(p.mime) && p.previewUrl;
+    tile.className = 'pend-tile ' + (isImg ? 'image' : 'file');
+    if (isImg) {
+      tile.innerHTML = `<img alt="">`;
+      tile.querySelector('img').src = p.previewUrl;
     } else {
-      setImageStatus('');
+      tile.innerHTML = `<span class="file-ico"><svg class="icon"><use href="#icon-file"/></svg></span>
+        <span><span class="pend-name"></span><span class="pend-meta"></span></span>`;
+      tile.querySelector('.pend-name').textContent = p.filename;
+      tile.querySelector('.pend-meta').textContent = [fileExt(p.filename), formatBytes(p.size)].filter(Boolean).join(' · ');
     }
-  } else {
-    imgEls.input.placeholder = t('compose_placeholder');
-    imgEls.hint.textContent = t('composer_hint');
-    setImageStatus('');
+    if (p.uploading) tile.insertAdjacentHTML('beforeend', '<div class="pend-overlay"><span class="spinner"></span></div>');
+    else if (p.error) tile.insertAdjacentHTML('beforeend', `<div class="pend-overlay error" title="${escapeHtml(p.error)}"><svg class="icon"><use href="#icon-error"/></svg></div>`);
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'pend-remove';
+    rm.title = t('remove_title');
+    rm.innerHTML = '<svg class="icon"><use href="#icon-close"/></svg>';
+    rm.addEventListener('click', (e) => { e.stopPropagation(); removePending(p); });
+    tile.appendChild(rm);
+    wrap.appendChild(tile);
   }
+  updateComposerState();
+}
+/** Beim Chatwechsel: angefangene Anhaenge und Bildmodus gehoeren zum alten Chat. */
+function resetComposerFor(_cid) {
+  for (const p of state.pending) if (p.previewUrl && p.previewUrl.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
+  state.pending = [];
+  _uploadQueue.length = 0;
+  setImageMode(false);
+  renderPending();
 }
 
-imgEls.toggle.addEventListener('click', () => setImageMode(!imageState.enabled));
+function setImageMode(on) {
+  state.imageMode = !!on;
+  els.imageChip.classList.toggle('hidden', !state.imageMode);
+  els.input.placeholder = state.imageMode ? t('hint_image_mode') : t('compose_placeholder');
+  updateComposerState();
+}
+els.imageChip.addEventListener('click', (e) => { e.stopPropagation(); setImageMode(false); els.input.focus(); });
 
-async function generateImage(prompt) {
-  if (imageState.busy) return;
-  if (!imageState.config?.configured) {
-    setImageStatus(t('image_mode_no_key_short'), 'error');
-    return;
-  }
-  imageState.busy = true;
-  els.sendBtn.disabled = true;
-  setImageStatus(t('image_mode_status_generating', imageState.count, imageState.aspect, imageState.model), 'busy');
-
-  if (!state.cid) await newChat();
-
-  // Optional: gepastete/angehängte Bilder als Referenz nehmen
-  const refIds = state.pendingAttach
-    .filter(a => !a._uploading && (a.mime_type || '').startsWith('image/'))
-    .map(a => a.id);
-
-  try {
-    const resp = await api('POST', '/images/generate', {
-      prompt,
-      conversation_id: state.cid,
-      model: imageState.model,
-      aspect_ratio: imageState.aspect,
-      count: imageState.count,
-      reference_attachment_ids: refIds,
-    });
-    // Pending aufräumen
-    for (const a of state.pendingAttach) if (a._previewUrl) URL.revokeObjectURL(a._previewUrl);
-    state.pendingAttach = [];
-    renderPending();
-    els.input.value = '';
-    autoResize();
-    setImageStatus(
-      resp.attachments.length === 1
-        ? t('image_mode_status_done_singular', resp.attachments.length)
-        : t('image_mode_status_done_plural', resp.attachments.length),
-      'ok',
-    );
-    // Chat neu laden, damit die neuen Messages erscheinen
-    await reloadChatMessages(state.cid);
-    setTimeout(scrollToVeryBottom, 50);
-  } catch (e) {
-    let msg = e.message || 'Unknown error';
-    if (e instanceof ApiError) {
-      msg = e.status === 502 ? msg : `HTTP ${e.status}: ${msg}`;
-    }
-    setImageStatus(t('image_mode_error_prefix', msg), 'error');
-    toast(t('toast_image_gen_failed', msg), { error: true });
-  } finally {
-    imageState.busy = false;
-    els.sendBtn.disabled = false;
-    els.input.focus();
-  }
+function hasSendableContent() {
+  return !!els.input.value.trim() || state.pending.some((p) => p.uploaded);
+}
+/** Karte aufklappen (Fokus, Text, Anhaenge, Bildmodus) und den runden Knopf
+ *  passend schalten: Sprachgespraech, Senden oder Stoppen. */
+function updateComposerState() {
+  const focused = document.activeElement === els.input;
+  const expanded = focused || !!els.input.value || state.pending.length > 0 || state.imageMode;
+  els.inputForm.classList.toggle('expanded', expanded);
+  const btn = els.sendBtn;
+  const uploading = state.pending.some((p) => p.uploading);
+  let mode;
+  if (state.isStreaming) mode = 'stop';
+  else if (hasSendableContent() || uploading) mode = 'send';
+  else mode = 'voice';
+  btn.dataset.mode = mode;
+  btn.disabled = mode === 'send' && (uploading || !hasSendableContent());
+  const icon = { stop: 'stop', send: 'arrow-up', voice: 'voice' }[mode];
+  btn.innerHTML = `<svg class="icon"><use href="#icon-${icon}"/></svg>`;
+  btn.title = mode === 'stop' ? t('stop') : mode === 'send' ? t('send_title') : t('voice_conversation');
 }
 
-async function reloadChatMessages(cid) {
-  try {
-    const detail = await api('GET', `/conversations/${cid}`);
-    state.messages = detail.messages;
-    state.title = detail.title;
-    state.pinned = !!detail.pinned;
-    state.chatLocked = !!detail.locked;
-    updateTopbar(detail.total_tokens || 0);
-    renderMessages();
-  } catch (_) { /* swallow */ }
+function autoResize() {
+  els.input.style.height = 'auto';
+  els.input.style.height = Math.min(els.input.scrollHeight, Math.round(window.innerHeight * 0.4)) + 'px';
 }
+els.input.addEventListener('input', () => { autoResize(); updateComposerState(); });
+els.input.addEventListener('focus', updateComposerState);
+els.input.addEventListener('blur', () => setTimeout(updateComposerState, 120));
+els.input.addEventListener('keydown', (e) => {
+  // Enter sendet, Umschalt+Enter macht eine neue Zeile (wie ChatGPT).
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    if (!state.isStreaming) els.inputForm.requestSubmit();
+    else toast(t('toast_reply_running'));
+  }
+});
+els.input.addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+// Klick irgendwo auf die Karte setzt den Cursor ins Feld.
+els.inputForm.addEventListener('mousedown', (e) => {
+  if (e.target.closest('button, input, .pend-tile, .menu')) return;
+  if (e.target !== els.input) { e.preventDefault(); els.input.focus(); }
+});
+
+els.attachBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePopup(els.plusMenu, els.attachBtn); });
+els.plusMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-plus]');
+  if (!b) return;
+  closePopup();
+  const what = b.dataset.plus;
+  if (what === 'photos') els.photoInput.click();
+  else if (what === 'files') els.fileInput.click();
+  else if (what === 'camera') els.cameraInput.click();
+  else if (what === 'image') { setImageMode(true); els.input.focus(); }
+});
+for (const [input, photos] of [[els.fileInput, false], [els.photoInput, true], [els.cameraInput, true]]) {
+  input.addEventListener('change', (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    addFiles(files, { photos });
+  });
+}
+
+// Dateien ins Fenster ziehen: Overlay und Upload (nur in der Chat-Ansicht)
+(function setupDragDrop() {
+  const overlay = $('drop-overlay');
+  let depth = 0;
+  const hasFiles = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  const canDrop = () => els.login.classList.contains('hidden') && els.settingsModal.classList.contains('hidden') && state.view === 'chat';
+  window.addEventListener('dragenter', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    if (!canDrop()) return;
+    depth++;
+    overlay.classList.remove('hidden');
+  });
+  window.addEventListener('dragover', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    if (canDrop()) { try { e.dataTransfer.dropEffect = 'copy'; } catch (_) {} }
+  });
+  window.addEventListener('dragleave', (e) => {
+    if (!hasFiles(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (!depth) overlay.classList.add('hidden');
+  });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth = 0;
+    overlay.classList.add('hidden');
+    if (!canDrop()) return;
+    addFiles(e.dataTransfer.files);
+  });
+})();
+
+// Runder Knopf: Senden (submit), Stoppen oder Sprachgespraech
+els.sendBtn.addEventListener('click', (e) => {
+  const mode = els.sendBtn.dataset.mode;
+  if (mode === 'stop') { e.preventDefault(); stopGenerating(); }
+  else if (mode === 'voice') { e.preventDefault(); if (window.PocketVoice) window.PocketVoice.toggleAutoMode(); }
+});
 
 // =========================================================
-// Senden + Streaming
+// Senden und Streamen
 // =========================================================
 els.inputForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const content = els.input.value.trim();
-  if (!content) return;
-  // Waehrend eine Antwort laeuft, wird nicht gesendet. Ohne Hinweis sah das so
-  // aus, als ginge die Eingabe manchmal verloren (lange Denkphasen zeigen nur
-  // Punkte, der Text blieb einfach im Feld stehen).
-  if (state.isStreaming) { toast(t('toast_reply_running')); return; }
-  // Gesperrter, nicht entsperrter Chat → kein Senden (das Gate liegt zwar über
-  // der Nachrichtenliste, aber der Composer ist ein Geschwister-Element; ohne
-  // diesen Riegel könnte man in einen gesperrten Chat schreiben).
-  if (state.cid && state.chatLocked && !state.unlockedCids.has(state.cid)) return;
-  if (imageState.enabled) { generateImage(content); return; }
+  await sendMessage(els.input.value);
+});
+
+/** Sendet Text plus fertig hochgeladene Anhaenge. Liefert true, wenn ein
+ *  Turn gestartet wurde (fuer das Sprachgespraech). */
+async function sendMessage(rawText, opts = {}) {
+  const content = (rawText || '').trim();
+  const uploaded = state.pending.filter((p) => p.uploaded);
+  if (!content && !uploaded.length) return false;
+  if (state.isStreaming) { toast(t('toast_reply_running')); return false; }
+  // Ein noch laufender Upload ginge sonst stumm verloren.
+  if (state.pending.some((p) => p.uploading)) { toast(t('chat_wait_for_uploads')); return false; }
+  if (state.cid && state.chatLocked && !state.unlockedCids.has(state.cid)) return false;
   if (!state.cid) await newChat();
-  const sentAttach = state.pendingAttach
-    .filter(a => !a._uploading)
-    .map(a => ({ id: a.id, filename: a.filename, mime_type: a.mime_type }));
-  state.messages.push({
-    id: -Date.now(),
-    role: 'user',
-    content,
-    attachments: sentAttach,
-    created_at: new Date().toISOString(),
-  });
-  // Pending-Preview-URLs aufräumen
-  for (const a of state.pendingAttach) if (a._previewUrl) URL.revokeObjectURL(a._previewUrl);
-  state.pendingAttach = [];
+  if (!state.cid) return false;
+  closeChatSearch();
+  const atts = uploaded.map((p) => ({ id: p.uploaded.id, filename: p.uploaded.filename, mime_type: p.uploaded.mime_type }));
+  const imageMode = state.imageMode;
+  state.messages.push({ id: -Date.now(), role: 'user', content, attachments: atts, created_at: new Date().toISOString() });
+  for (const p of state.pending) if (p.previewUrl && p.previewUrl.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
+  state.pending = [];
+  setImageMode(false);
   renderPending();
+  if (!opts.keepInput) { els.input.value = ''; autoResize(); }
   state.streamingText = '';
+  state.streamingThinking = '';
+  state._streamAttachments = [];
   state.isStreaming = true;
-  els.input.value = '';
-  autoResize();
-  els.sendBtn.disabled = true;
+  state.stoppedByUser = false;
+  updateComposerState();
   renderMessages();
   scrollToBottom(true);
-  // PC_SSE diagnostic — see "denkt"-bug investigation
   state._sseTurnStart = performance.now();
   state._sseGotDone = false;
   state._sseGotError = false;
   state._sseDeltaCount = 0;
-  console.log('PC_SSE: submit START cid=%s content_len=%d', state.cid, content.length);
+  const cidAtSubmit = state.cid;
+  console.log('PC_SSE: submit START cid=%s content_len=%d image_mode=%s', cidAtSubmit, content.length, imageMode);
   try {
-    await streamReply(content);
-  } catch (e) {
-    console.log('PC_SSE: submit CATCH', e?.name, e?.message);
-    if (e.name !== 'AbortError') toast(t('toast_reply_failed', e.message), { error: true });
+    await streamReply(content, atts.map((a) => a.id), imageMode);
+  } catch (err) {
+    console.log('PC_SSE: submit CATCH', err?.name, err?.message);
+    if (err.name !== 'AbortError') {
+      toast(t('toast_reply_failed', apiErrorText(err)), { error: true });
+    }
   } finally {
     const dt = (performance.now() - state._sseTurnStart).toFixed(0);
-    console.log('PC_SSE: submit FINALLY cid=%s gotDone=%s gotError=%s deltas=%d isStreaming=%s elapsed=%sms streamingTextLen=%d',
-      state.cid, state._sseGotDone, state._sseGotError,
-      state._sseDeltaCount, state.isStreaming, dt, state.streamingText.length);
-    // Safety net: if the stream ended without a `done` event but we have
-    // accumulated streaming text, the assistant message was very likely
-    // saved server-side. Force a reload so the dots-placeholder isn't
-    // stuck forever (matches the "refresh fixes it" workaround).
-    if (state.isStreaming && !state._sseGotDone && !state._sseGotError) {
-      console.warn('PC_SSE: submit RESCUE — stream ended without done; reloading messages');
-      const cidAtSubmit = state.cid;
-      state.isStreaming = false;
-      state.streamingText = '';
-      reloadChatMessages(cidAtSubmit);
+    console.log('PC_SSE: submit FINALLY cid=%s gotDone=%s gotError=%s deltas=%d elapsed=%sms',
+      cidAtSubmit, state._sseGotDone, state._sseGotError, state._sseDeltaCount, dt);
+    if (state.cid === cidAtSubmit && state.isStreaming && !state._sseGotDone && !state._sseGotError) {
+      if (state.stoppedByUser) finalizeStopped();
+      else {
+        // Stream zu, aber weder done noch Fehler: der Server hat die Antwort
+        // vermutlich gespeichert. Neu laden statt Punkte stehen zu lassen.
+        console.warn('PC_SSE: submit RESCUE — stream ended without done; reloading messages');
+        state.isStreaming = false;
+        state.streamingText = '';
+        reloadChatMessages(cidAtSubmit);
+      }
     }
     state.isStreaming = false;
-    els.sendBtn.disabled = false;
-    els.input.focus();
-  }
-});
-
-els.input.addEventListener('input', autoResize);
-function autoResize() {
-  els.input.style.height = 'auto';
-  els.input.style.height = Math.min(240, els.input.scrollHeight) + 'px';
-}
-els.input.addEventListener('keydown', (e) => {
-  // Enter ohne Modifier → senden; Shift+Enter → Zeilenumbruch (ChatGPT-Style)
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    els.inputForm.requestSubmit();
-  }
-});
-
-function abortStream() {
-  if (state.abort) {
-    try { state.abort.abort(); } catch {}
     state.abort = null;
+    updateComposerState();
   }
+  refreshChatList();
+  return true;
 }
 
-// =========================================================
-// Gedaechtnis-Schluessel (wie in der App): je Konto ein Eintrag, gebunden an die
-// Server-Adresse, fuer die er eingetragen wurde. Geht nur ueber HTTPS und nur mit
-// Chat-Nachrichten raus; der Server entschluesselt damit nur fuer diese Antwort.
-// =========================================================
+function stopStreamLocal() {
+  if (state.abort) { try { state.abort.abort(); } catch {} state.abort = null; }
+  state.isStreaming = false;
+  state.streamingText = '';
+  state.streamingThinking = '';
+  state._streamAttachments = [];
+}
+/** Stoppen wie in der App: Verbindung kappen, bisherigen Text als
+ *  abgebrochene Antwort stehen lassen. */
+function stopGenerating() {
+  if (!state.isStreaming) return;
+  state.stoppedByUser = true;
+  if (state.abort) { try { state.abort.abort(); } catch {} }
+}
+function finalizeStopped() {
+  const partial = state.streamingText;
+  if (partial) {
+    state.messages.push({
+      id: -Date.now(), role: 'assistant',
+      content: partial + '\n\n_' + t('generated_chat_aborted') + '_',
+      attachments: state._streamAttachments.slice(),
+      _thinking: state.streamingThinking,
+      created_at: new Date().toISOString(),
+    });
+  }
+  state.isStreaming = false;
+  state.streamingText = '';
+  state.streamingThinking = '';
+  state._streamAttachments = [];
+  renderMessages();
+}
+
+// Gedaechtnis-Schluessel (wie in der App): je Konto ein Eintrag, gebunden an
+// die Server-Adresse. Geht nur ueber HTTPS und nur mit Chat-Nachrichten raus.
 const WISSEN_PREFIX = 'pc.wissen.';
-const WISSEN_FORMAT = /^[A-Za-z0-9_-]{43}=?$/;   // 32 Byte als base64url
-
-function serverOrigin() {
-  try { return new URL(state.serverUrl).origin; } catch { return ''; }
-}
-
-// HTTPS, oder unverschluesselt nur zum eigenen Rechner (lokaler Testserver)
+const WISSEN_FORMAT = /^[A-Za-z0-9_-]{43}=?$/;
+function serverOrigin() { try { return new URL(state.serverUrl).origin; } catch { return ''; } }
 function sichereHerkunft(origin) {
   return origin.startsWith('https://') || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
-
 function wissenSchluessel() {
   if (!state.me || !state.me.id) return '';
   const origin = serverOrigin();
@@ -2041,16 +2449,12 @@ function wissenSchluessel() {
     return e && e.o === origin && WISSEN_FORMAT.test(e.k || '') ? e.k : '';
   } catch { return ''; }
 }
-
-/** Beim Abmelden alle Schluessel aus diesem Browser entfernen. */
 function wissenVergessen() {
-  Object.keys(localStorage)
-    .filter((k) => k.startsWith(WISSEN_PREFIX))
-    .forEach((k) => localStorage.removeItem(k));
+  Object.keys(localStorage).filter((k) => k.startsWith(WISSEN_PREFIX)).forEach((k) => localStorage.removeItem(k));
 }
 
-async function streamReply(content) {
-  abortStream();
+async function streamReply(content, attachmentIds, imageMode) {
+  if (state.abort) { try { state.abort.abort(); } catch {} }
   const ctrl = new AbortController();
   state.abort = ctrl;
   const headers = {
@@ -2068,58 +2472,40 @@ async function streamReply(content) {
     redirect: wissen ? 'error' : 'follow',
     body: JSON.stringify({
       content,
-      attachment_ids: state.messages[state.messages.length - 1]?.attachments?.map(a => a.id) || [],
+      attachment_ids: attachmentIds,
       effort: currentEffort(),
-      // Leerer String heisst ausdruecklich "nimm Claude". `null` waere
-      // "keine Angabe" und wuerde das zuletzt benutzte Modell weiterlaufen
-      // lassen, deshalb hier bewusst kein `|| null`.
-      model: state.chatModel,
+      // Leerer String heisst ausdruecklich "nimm Claude". null waere "keine
+      // Angabe" und liesse das zuletzt benutzte Modell weiterlaufen.
+      model: effectiveModelKey(),
       system_prompt_mode: state.spMode,
       system_prompt: state.spMode === 'CUSTOM' ? state.spCustom : null,
-      // TTS-Hints: Server startet nach Done-Event eine Pre-Generation,
-      // sodass der nächste 🔊-Tap Cache-Hit ist.
       tts_voice: state.ttsVoice,
       tts_rate: state.ttsSpeed,
+      image_mode: !!imageMode,
     }),
     signal: ctrl.signal,
   });
   if (!resp.ok) {
     const txt = await resp.text().catch(() => '');
     console.log('PC_SSE: streamReply HTTP-FAIL status=%s body=%s', resp.status, txt.slice(0, 200));
-    throw new Error(`HTTP ${resp.status}: ${txt}`);
+    throw new ApiError(resp.status, txt);
   }
-  console.log('PC_SSE: streamReply HTTP-OK status=%s headers=%o',
-    resp.status, Object.fromEntries(resp.headers.entries()));
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let chunkCount = 0;
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        console.log('PC_SSE: streamReply READER-DONE chunks=%d bytes=%d buffer_remainder_len=%d gotDone=%s',
-          chunkCount, totalBytes, buffer.length, state._sseGotDone);
-        if (buffer.length > 0) {
-          console.warn('PC_SSE: streamReply UNFLUSHED-BUFFER (no trailing \\n\\n):', buffer.slice(0, 400));
-        }
-        break;
-      }
-      chunkCount += 1;
-      totalBytes += value?.byteLength || 0;
-      buffer += decoder.decode(value, { stream: true });
-      let idx;
-      while ((idx = buffer.indexOf('\n\n')) >= 0) {
-        const raw = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
-        handleSseEvent(raw);
-      }
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      if (buffer.length) console.warn('PC_SSE: streamReply UNFLUSHED-BUFFER:', buffer.slice(0, 400));
+      break;
     }
-  } catch (e) {
-    console.log('PC_SSE: streamReply READER-EXC', e?.name, e?.message,
-      'chunks=', chunkCount, 'bytes=', totalBytes);
-    throw e;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf('\n\n')) >= 0) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      handleSseEvent(raw);
+    }
   }
 }
 
@@ -2132,64 +2518,77 @@ function handleSseEvent(raw) {
   }
   let payload = {};
   if (data) { try { payload = JSON.parse(data); } catch {} }
-  // PC_SSE diagnostic
   if (event === 'delta') {
     state._sseDeltaCount = (state._sseDeltaCount || 0) + 1;
     if (state._sseDeltaCount <= 3 || state._sseDeltaCount % 25 === 0) {
       console.log('PC_SSE: recv delta #%d len=%d', state._sseDeltaCount, (payload.text || '').length);
     }
-  } else {
+  } else if (event !== 'thinking_delta') {
     console.log('PC_SSE: recv event=%s payload=%o', event, payload);
   }
   switch (event) {
-    case 'title':
+    case 'title': {
       state.title = payload.title || state.title;
-      els.topbarTitle.textContent = state.title;
-      const item = document.querySelector(`.chat-item[data-cid="${state.cid}"] .title`);
+      const chat = state.chats.find((c) => c.id === state.cid);
+      if (chat) chat.title = state.title;
+      const item = document.querySelector(`.chat-item[data-cid="${CSS.escape(state.cid || '')}"] .title`);
       if (item) item.textContent = state.title;
+      updateTopbar();
       break;
-    case 'user_saved':
-      const lastUser = [...state.messages].reverse().find(m => m.role === 'user');
+    }
+    case 'user_saved': {
+      const lastUser = [...state.messages].reverse().find((m) => m.role === 'user' && m.id < 0);
       if (lastUser) lastUser.id = payload.user_message_id;
       break;
+    }
     case 'delta':
       state.streamingText += payload.text || '';
       updateStreaming();
-      scrollToBottom();
+      break;
+    case 'thinking_delta':
+      state.streamingThinking += payload.text || '';
+      updateStreaming();
       break;
     case 'image':
-      // Das Modell hat mitten in der Antwort Bilder erzeugt. Sie haengen beim
-      // `done` auch an der DB-Nachricht; hier sammeln wir sie, damit sie sofort
-      // an der fertigen Bubble stehen.
-      (payload.attachments || []).forEach(a => {
-        if (a && a.id && !state._streamAttachments.some(x => x.id === a.id)) {
-          state._streamAttachments.push(a);
-        }
+      // Das Modell hat mitten in der Antwort Bilder erzeugt: sofort zeigen.
+      (payload.attachments || []).forEach((a) => {
+        if (a && a.id && !state._streamAttachments.some((x) => x.id === a.id)) state._streamAttachments.push(a);
       });
+      updateStreaming();
       break;
-    case 'done':
+    case 'done': {
       state._sseGotDone = true;
+      const msgId = payload.assistant_message_id || payload.message_id;
       state.messages.push({
-        id: payload.assistant_message_id || payload.message_id,
+        id: msgId,
         role: 'assistant',
         content: state.streamingText,
         attachments: state._streamAttachments.slice(),
+        _thinking: state.streamingThinking,
         tokens: (payload.tokens_in || 0) + (payload.tokens_out || 0),
         created_at: new Date().toISOString(),
       });
       state._streamAttachments = [];
       state.streamingText = '';
+      state.streamingThinking = '';
       state.isStreaming = false;
       renderMessages();
-      updateTopbar(payload.tokens_total || 0);
+      updateComposerState();
       refreshChatList();
+      // Vorlesen: im Sprachgespraech immer, sonst nach Chat- bzw. Standardwahl.
+      const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
+      if (msgId && (voiceLoop || autoSpeakFor(state.cid))) speak(msgId);
       break;
+    }
     case 'error':
       state._sseGotError = true;
       state._streamAttachments = [];
       toast(t('toast_server_error', payload.message || ''), { error: true });
       state.isStreaming = false;
+      state.streamingText = '';
+      state.streamingThinking = '';
       renderMessages();
+      updateComposerState();
       break;
     case 'compaction_started':
       toast(t('toast_compacting'));
@@ -2198,1732 +2597,91 @@ function handleSseEvent(raw) {
 }
 
 // =========================================================
-// TTS
+// Vorlesen
 // =========================================================
-els.audio.addEventListener('ended', () => {
-  state.audio = { msgId: null, playing: false };
-  document.querySelectorAll('.msg-tools [data-tool="tts"]').forEach(b => b.classList.remove('active'));
+function renderTtsSlots() {
+  document.querySelectorAll('.msg[data-mid] .tts-slot').forEach((slot) => {
+    const id = Number(slot.closest('.msg').dataset.mid);
+    slot.innerHTML = ttsButtonsHtml({ id });
+  });
+}
+function setAudioState(msgId, status) {
+  state.audio = { msgId: status === 'idle' ? null : msgId, status };
+  renderTtsSlots();
+}
+function speak(messageId) {
+  els.audio.pause();
+  const params = new URLSearchParams({ voice: state.ttsVoice, rate: String(state.ttsSpeed), token: state.token });
+  els.audio.src = `${state.serverUrl}/messages/${messageId}/audio?${params}`;
+  setAudioState(messageId, 'loading');
+  els.audio.play().catch((err) => {
+    if (err.name === 'AbortError') return;
+    setAudioState(messageId, 'idle');
+    toast(t('toast_playback', err.message), { error: true });
+  });
+}
+function pauseAudio() { els.audio.pause(); }
+function resumeAudio() { els.audio.play().catch(() => {}); }
+function stopAudio() {
+  try { els.audio.pause(); els.audio.removeAttribute('src'); els.audio.load(); } catch (_) {}
+  if (state.audio.status !== 'idle') setAudioState(null, 'idle');
+}
+els.audio.addEventListener('playing', () => { if (state.audio.msgId) setAudioState(state.audio.msgId, 'playing'); });
+els.audio.addEventListener('pause', () => {
+  if (state.audio.msgId && state.audio.status === 'playing' && !els.audio.ended) setAudioState(state.audio.msgId, 'paused');
 });
+els.audio.addEventListener('ended', () => setAudioState(null, 'idle'));
+els.audio.addEventListener('error', () => {
+  if (!state.audio.msgId) return;
+  setAudioState(null, 'idle');
+  toast(t('toast_tts_error', t('tts_unavailable')), { error: true });
+});
+function isAudioBusy() { return state.audio.status === 'loading' || state.audio.status === 'playing'; }
 
-function toggleTts(messageId, btn) {
-  if (state.audio.msgId === messageId && state.audio.playing) {
-    els.audio.pause();
-    state.audio.playing = false;
-    btn.classList.remove('active');
+// =========================================================
+// Tastatur
+// =========================================================
+document.addEventListener('keydown', (e) => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'k') {
+    if (els.app.classList.contains('hidden')) return;
+    e.preventDefault();
+    if (els.searchModal.classList.contains('hidden')) openSearch(); else closeSearch();
     return;
   }
-  els.audio.pause();
-  document.querySelectorAll('.msg-tools [data-tool="tts"]').forEach(b => b.classList.remove('active'));
-  const params = new URLSearchParams({
-    voice: state.ttsVoice,
-    rate: state.ttsSpeed.toString(),
-    token: state.token,
-  });
-  els.audio.src = `${state.serverUrl}/messages/${messageId}/audio?${params}`;
-  els.audio.play().then(() => {
-    state.audio = { msgId: messageId, playing: true };
-    btn.classList.add('active');
-  }).catch(err => toast(t('toast_playback', err.message), { error: true }));
-}
-
-// =========================================================
-// Settings-Modal
-// =========================================================
-// Late-bind so the addEventListener picks up the openSettings reassignment
-// further down the file (which extends the modal-open with user-list +
-// image-key + auth + usage loaders).
-els.settingsBtn.addEventListener('click', () => openSettings());
-els.settingsClose.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
-els.settingsModal.addEventListener('click', (e) => {
-  if (e.target === els.settingsModal) els.settingsModal.classList.add('hidden');
-});
-
-function _renderTtsProviderHint(status) {
-  if (!els.ttsProviderHint) return;
-  const p = status.provider || 'gemini_web';
-  const lines = [];
-  let hintOk;
-  if (p === 'gemini_web') {
-    // `configured` heisst hier: Dienst laeuft UND Google-Sitzung traegt noch.
-    hintOk = !!status.configured;
-    lines.push(status.configured ? t('tts_hint_web_ok') : t('tts_hint_web_down'));
-  } else if (p === 'edge_tts') {
-    hintOk = true;
-    lines.push(t('tts_hint_edge_ok'));
-  } else if (p === 'gemini_api') {
-    hintOk = !!status.gemini_api_configured;
-    if (status.gemini_api_configured) {
-      lines.push(t('tts_hint_gemini_ok'));
-    } else {
-      lines.push(t('tts_hint_gemini_missing'));
-    }
-  } else {
-    hintOk = !!status.cloud_tts_configured;
-    if (status.cloud_tts_configured) {
-      lines.push(t('tts_hint_cloud_ok', status.client_email || '?'));
-    } else {
-      lines.push(t('tts_hint_cloud_missing'));
-    }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'o') {
+    if (els.app.classList.contains('hidden')) return;
+    e.preventDefault();
+    newChat();
+    return;
   }
-  els.ttsProviderHint.textContent = lines.join(' ');
-  els.ttsProviderHint.classList.toggle('status-ok', hintOk === true);
-  els.ttsProviderHint.classList.toggle('status-warn', hintOk === false);
-}
-
-async function openSettings() {
-  document.querySelectorAll('input[name="sp-mode"]').forEach(r => {
-    r.checked = (r.value === state.spMode);
-  });
-  els.spCustom.value = state.spCustom;
-  els.ttsSpeed.value = state.ttsSpeed;
-  els.ttsSpeedLabel.textContent = state.ttsSpeed.toFixed(2) + '×';
-  els.settingsModal.classList.remove('hidden');
-  try {
-    const s = await api('GET', '/tts/status');
-    // Provider-Select setzen (server ist Source-of-Truth)
-    if (els.ttsProvider && s.provider) {
-      els.ttsProvider.value = s.provider;
-      state.ttsProvider = s.provider;
-    }
-    _renderTtsProviderHint(s);
-    if (!state._ttsLoaded) {
-      els.ttsVoice.innerHTML = '';
-      // Tier-Reihenfolge wie in der App: erst gratis/AI, dann Premium-Tiers.
-      // edge + chirp3hd fehlten lange — Server liefert sie via /tts/status,
-      // wir haben sie hier aber rausgefiltert und stille im Dropdown
-      // verschwinden lassen. Default-Voice für frisch eingerichtete Server
-      // ist `edge-de-DE-KatjaNeural` — die war damit gar nicht wählbar.
-      const tiers = ['geminiweb','edge','gemini','chirp3hd','studio','neural2','wavenet','standard'];
-      const labels = {
-        geminiweb:'Gemini Web (gratis, keine Auswahl)',
-        edge:'Edge (gratis)',
-        gemini:'Gemini 3.1 Flash',
-        chirp3hd:'Chirp 3 HD (1 Mio Zeichen/Monat gratis)',
-        studio:'Studio',
-        neural2:'Neural2',
-        wavenet:'Wavenet',
-        standard:'Standard',
-      };
-      const grouped = {};
-      for (const v of (s.voices || [])) (grouped[v.tier]=grouped[v.tier]||[]).push(v);
-      for (const t of tiers) {
-        if (!grouped[t]) continue;
-        const og = document.createElement('optgroup');
-        og.label = labels[t] || t;
-        for (const v of grouped[t]) {
-          const opt = document.createElement('option');
-          opt.value = v.id; opt.textContent = v.label;
-          if (v.id === state.ttsVoice) opt.selected = true;
-          og.appendChild(opt);
-        }
-        els.ttsVoice.appendChild(og);
-      }
-      state._ttsLoaded = true;
-    } else {
-      els.ttsVoice.value = state.ttsVoice;
-    }
-  } catch (e) { toast(t('toast_tts_error', e.message), { error: true }); }
-}
-
-document.querySelectorAll('input[name="sp-mode"]').forEach(r => {
-  r.addEventListener('change', () => {
-    if (r.checked) {
-      state.spMode = r.value;
-      localStorage.setItem(LS.spMode, r.value);
-      queueSettingsPush();
-    }
-  });
-});
-els.spCustom.addEventListener('input', () => {
-  state.spCustom = els.spCustom.value;
-  localStorage.setItem(LS.spCustom, state.spCustom);
-  queueSettingsPush();
-});
-
-// "Lange eigene Nachrichten einklappen" — Toggle aus dem Settings-Modal.
-// Klassisch in localStorage gespeichert. Beim Toggle alle bereits gerenderten
-// User-Bubbles refreshen, damit der Effekt sofort sichtbar wird (statt erst
-// nach dem nächsten Send).
-const collapseCheckbox = document.getElementById('setting-collapse-user-msgs');
-if (collapseCheckbox) {
-  collapseCheckbox.checked = state.collapseUserMsgs;
-  collapseCheckbox.addEventListener('change', () => {
-    state.collapseUserMsgs = collapseCheckbox.checked;
-    localStorage.setItem(LS.collapseUserMsgs, String(state.collapseUserMsgs));
-    // Re-render alle User-Bubbles: am einfachsten via renderMessages()
-    if (typeof renderMessages === 'function') renderMessages();
-  });
-}
-els.ttsVoice.addEventListener('change', () => {
-  state.ttsVoice = els.ttsVoice.value;
-  localStorage.setItem(LS.ttsVoice, state.ttsVoice);
-  queueSettingsPush();
-});
-
-if (els.ttsProvider) {
-  els.ttsProvider.addEventListener('change', async () => {
-    const newProvider = els.ttsProvider.value;
-    try {
-      const s = await api('PUT', '/tts/provider', { provider: newProvider });
-      state.ttsProvider = newProvider;
-      _renderTtsProviderHint(s);
-      const providerNamen = {
-        gemini_web: 'Gemini Web',
-        edge_tts: 'Microsoft Edge',
-        gemini_api: t('tts_provider_label_gemini'),
-        cloud_tts: t('tts_provider_label_cloud'),
-      };
-      toast(t('toast_provider_changed', providerNamen[newProvider] || newProvider), { ok: true });
-    } catch (e) {
-      toast(t('toast_provider_switch_failed', e.message), { error: true });
-    }
-  });
-}
-els.ttsSpeed.addEventListener('input', () => {
-  state.ttsSpeed = parseFloat(els.ttsSpeed.value);
-  els.ttsSpeedLabel.textContent = state.ttsSpeed.toFixed(2) + '×';
-  localStorage.setItem(LS.ttsSpeed, state.ttsSpeed.toString());
-  queueSettingsPush();
-});
-
-// =========================================================
-// Backup
-// =========================================================
-els.backupExport.addEventListener('click', async () => {
-  const pw = await showPrompt({
-    title: t('backup_encrypt_title'),
-    text: t('backup_encrypt_text'),
-    placeholder: t('backup_password_placeholder'), type: 'password', okLabel: t('backup_export_button'),
-  });
-  if (pw === null) return;
-  setBackupStatus(t('backup_loading'));
-  try {
-    const params = new URLSearchParams();
-    if (pw) params.set('password', pw);
-    const resp = await fetch(`${state.serverUrl}/backup${params.toString() ? '?' + params : ''}`, {
-      headers: { 'Authorization': 'Bearer ' + state.token },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const blob = await resp.blob();
-    const cd = resp.headers.get('Content-Disposition') || '';
-    const m = cd.match(/filename="([^"]+)"/);
-    const filename = m ? m[1] : `pocket-claude-backup${pw ? '.enc' : ''}.zip`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(a.href);
-    setBackupStatus(t('backup_export_done', filename, (blob.size/1024/1024).toFixed(1)), 'ok');
-  } catch (e) {
-    setBackupStatus(t('backup_export_failed', e.message), 'error');
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'f' && state.view === 'chat' && state.messages.length
+      && els.settingsModal.classList.contains('hidden') && els.searchModal.classList.contains('hidden')) {
+    e.preventDefault();
+    openChatSearch();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (openPopup) { closePopup(); return; }
+    if (!els.searchModal.classList.contains('hidden')) { closeSearch(); return; }
+    if (searchState.open) { closeChatSearch(); return; }
+    if (isMobile() && els.sidebar.classList.contains('open')) { closeSidebar(); return; }
+    if (state.isStreaming && document.activeElement === els.input) stopGenerating();
   }
 });
 
-els.backupImport.addEventListener('click', () => els.backupFileInput.click());
-els.backupFileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  setBackupStatus(t('backup_checking'));
-  try {
-    const bytes = await file.arrayBuffer();
-    let password = null, manifest;
-    while (true) {
-      try { manifest = await peekBackup(bytes, password); break; }
-      catch (err) {
-        if (err.status === 423) {
-          const pw = await showPrompt({
-            title: t('backup_encrypted_title'),
-            text: password ? t('backup_password_wrong') : t('backup_password_enter'),
-            placeholder: t('backup_password_placeholder_short'), type: 'password', okLabel: t('backup_unlock'),
-          });
-          if (!pw) { setBackupStatus(''); return; }
-          password = pw;
-        } else throw err;
-      }
-    }
-    const mode = await showImportConfirm(manifest);
-    if (!mode) { setBackupStatus(''); return; }
-    setBackupStatus(t('backup_importing', mode));
-    const result = await importBackup(bytes, mode, password);
-    setBackupStatus(
-      t('backup_import_result', result.conversations_added, result.conversations_skipped, result.messages_imported),
-      'ok',
-    );
-    refreshChatList();
-  } catch (err) {
-    setBackupStatus(t('backup_import_failed', err.message), 'error');
-  }
+// Start, sobald alle Teile (voice.js, gems.js, images.js, settings.js) geladen sind.
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PocketI18n) window.PocketI18n.applyI18n();
+  setImageMode(false);
+  updateComposerState();
+  if (state.serverUrl && state.token) showApp(); else showLogin();
 });
-
-async function peekBackup(buf, password) {
-  const fd = new FormData();
-  fd.append('file', new Blob([buf]), 'backup.zip');
-  const q = password ? `?password=${encodeURIComponent(password)}` : '';
-  return api('POST', '/backup/peek' + q, fd);
-}
-async function importBackup(buf, mode, password) {
-  const fd = new FormData();
-  fd.append('file', new Blob([buf]), 'backup.zip');
-  const params = new URLSearchParams({ mode });
-  if (password) params.set('password', password);
-  return api('POST', '/backup/import?' + params, fd);
-}
-
-function showImportConfirm(m) {
-  return new Promise(resolve => {
-    const o = document.createElement('div');
-    o.className = 'modal';
-    o.innerHTML = `
-      <div class="modal-card small">
-        <div class="modal-header"><h2>${escapeHtml(t('backup_import_title'))}</h2></div>
-        <div class="modal-body">
-          <p style="margin:0 0 4px">${t('backup_import_summary', m.conversation_count, m.message_count, m.attachment_count)}</p>
-          <p style="margin:0 0 14px;color:var(--text-muted);font-size:12px">${escapeHtml(t('backup_import_meta', m.created_at.replace('T',' ').substring(0,19), m.server_version))}</p>
-          <p style="margin:0;font-size:13px">${t('backup_import_modes')}</p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-ghost" data-act="cancel">${escapeHtml(t('cancel'))}</button>
-          <button class="btn-secondary" data-act="merge">${escapeHtml(t('backup_merge'))}</button>
-          <button class="btn-primary" data-act="replace" style="background:var(--danger)">${escapeHtml(t('backup_replace'))}</button>
-        </div>
-      </div>`;
-    document.body.appendChild(o);
-    o.addEventListener('click', (e) => {
-      const a = e.target.closest('[data-act]')?.dataset.act;
-      if (!a) return;
-      o.remove();
-      resolve(a === 'cancel' ? null : a);
-    });
-  });
-}
-
-function setBackupStatus(text, cls = '') {
-  els.backupStatus.textContent = text;
-  els.backupStatus.className = 'backup-status ' + cls;
-}
-
-// =========================================================
-// Prompt-Modal (Passwort/Confirm)
-// =========================================================
-function showPrompt({ title, text, placeholder = '', type = 'password', okLabel = 'OK' }) {
-  return new Promise(resolve => {
-    els.promptTitle.textContent = title;
-    els.promptText.textContent = text;
-    els.promptInput.type = type;
-    els.promptInput.placeholder = placeholder;
-    els.promptInput.value = '';
-    els.promptOk.textContent = okLabel;
-    els.promptModal.classList.remove('hidden');
-    els.promptInput.focus();
-    const close = (val) => {
-      els.promptModal.classList.add('hidden');
-      els.promptOk.onclick = null;
-      els.promptCancel.onclick = null;
-      els.promptInput.onkeydown = null;
-      resolve(val);
-    };
-    els.promptOk.onclick = () => close(els.promptInput.value);
-    els.promptCancel.onclick = () => close(null);
-    els.promptInput.onkeydown = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); close(els.promptInput.value); }
-      if (e.key === 'Escape') { e.preventDefault(); close(null); }
-    };
-  });
-}
-
-// =========================================================
-// /me + User-Verwaltung
-// =========================================================
-function renderFooterUser() {
-  const el = document.getElementById('footer-user');
-  if (!el) return;
-  if (!state.me) { el.innerHTML = ''; return; }
-  const initials = (state.me.name || '?').trim().slice(0, 1).toUpperCase();
-  el.innerHTML = `
-    <div class="avatar">${escapeHtml(initials)}</div>
-    <div class="name">${escapeHtml(state.me.name)}</div>
-    ${state.me.is_admin ? `<span class="badge">${escapeHtml(t('admin_label'))}</span>` : ''}`;
-}
-
-function applyAdminVisibility() {
-  const isAdmin = !!(state.me && state.me.is_admin);
-  document.querySelectorAll('.admin-only').forEach(el => {
-    el.classList.toggle('hidden', !isAdmin);
-  });
-  // Backup-Hint anpassen
-  const hint = document.getElementById('backup-hint');
-  if (hint) {
-    hint.textContent = isAdmin
-      ? t('backup_hint_admin')
-      : t('backup_hint_user');
-  }
-  // Import-Button nur für Admin
-  const importBtn = document.getElementById('backup-import-btn');
-  if (importBtn) importBtn.style.display = isAdmin ? '' : 'none';
-}
-
-async function loadUsersList() {
-  if (!(state.me && state.me.is_admin)) return;
-  try {
-    const r = await api('GET', '/users');
-    const wrap = document.getElementById('users-list');
-    wrap.innerHTML = '';
-    for (const u of r.users) {
-      const row = document.createElement('div');
-      row.className = 'user-row';
-      const statusLabel = u.must_change_password
-        ? `<span class="badge warn" title="${escapeHtml(t('user_pw_reset_due_title'))}">${escapeHtml(t('user_pw_reset_due'))}</span>`
-        : '';
-      row.innerHTML = `
-        <span class="name">${escapeHtml(u.name)}</span>
-        ${u.is_admin ? `<span class="badge">${escapeHtml(t('admin_label'))}</span>` : ''}
-        ${statusLabel}
-        <span class="user-spacer"></span>
-        <span class="actions">
-          <button class="icon-btn" data-act="reset" title="${escapeHtml(t('reset_password_title'))}"><svg class="icon"><use href="#icon-settings"/></svg></button>
-          ${u.id === state.me.id ? '' : `<button class="icon-btn" data-act="delete" title="${escapeHtml(t('delete'))}"><svg class="icon"><use href="#icon-trash"/></svg></button>`}
-        </span>`;
-      const resetBtn = row.querySelector('[data-act="reset"]');
-      if (resetBtn) resetBtn.onclick = async () => {
-        const custom = prompt(t('user_reset_pw_prompt', u.name), '');
-        if (custom === null) return;
-        const body = custom.trim() ? { password: custom.trim() } : {};
-        try {
-          const resp = await api('POST', '/users/' + u.id + '/reset-password', body);
-          await loadUsersList();
-          // Neues Passwort 1× im UI zeigen + in Zwischenablage
-          const pw = resp.new_password;
-          try { await navigator.clipboard.writeText(pw); } catch {}
-          alert(t('user_reset_pw_alert', u.name, pw));
-        } catch (e) { toast(t('toast_reset_failed', e.message), { error: true }); }
-      };
-      const delBtn = row.querySelector('[data-act="delete"]');
-      if (delBtn) delBtn.onclick = async () => {
-        if (!confirm(t('confirm_delete_user', u.name))) return;
-        try { await api('DELETE', '/users/' + u.id); await loadUsersList(); toast(t('toast_deleted')); }
-        catch (e) { toast(t('toast_delete_failed', e.message), { error: true }); }
-      };
-      wrap.appendChild(row);
-    }
-  } catch (e) {
-    toast(t('toast_user_list_failed', e.message), { error: true });
-  }
-}
-
-const newUserBtn = document.getElementById('new-user-btn');
-if (newUserBtn) {
-  newUserBtn.addEventListener('click', async () => {
-    const nameInp  = document.getElementById('new-user-name');
-    const pwInp    = document.getElementById('new-user-password');
-    const adminChk = document.getElementById('new-user-admin');
-    const resultEl = document.getElementById('new-user-result');
-    const name = nameInp.value.trim();
-    const pw   = pwInp.value.trim();
-    if (!name) return;
-    if (pw && pw.length < 8) {
-      toast(t('toast_password_min_chars'), { error: true });
-      return;
-    }
-    try {
-      const body = { name, is_admin: adminChk.checked };
-      if (pw) body.password = pw;
-      const u = await api('POST', '/users', body);
-      nameInp.value = ''; pwInp.value = ''; adminChk.checked = false;
-      await loadUsersList();
-      const initial = u.initial_password;
-      if (initial) {
-        try { await navigator.clipboard.writeText(initial); } catch {}
-        resultEl.className = 'backup-status ok';
-        resultEl.innerHTML = t('user_create_success', escapeHtml(name), escapeHtml(initial));
-      } else {
-        resultEl.className = 'backup-status ok';
-        resultEl.textContent = t('user_create_success_no_pw', name);
-      }
-    } catch (e) {
-      resultEl.className = 'backup-status error';
-      resultEl.textContent = t('user_create_failed', e.message);
-    }
-  });
-}
-
-// "Mein Konto" — Passwort ändern + Aus allen Geräten ausloggen
-const changePwBtn = document.getElementById('change-pw-btn');
-if (changePwBtn) changePwBtn.addEventListener('click', () => openPasswordChange({ forced: false }));
-const logoutAllBtn = document.getElementById('logout-all-btn');
-if (logoutAllBtn) logoutAllBtn.addEventListener('click', async () => {
-  if (!confirm(t('confirm_logout_all'))) return;
-  try {
-    await api('POST', '/auth/logout-all');
-    localStorage.removeItem(LS.token);
-    wissenVergessen();
-    state.token = '';
-    location.reload();
-  } catch (e) { toast(t('toast_logout_all_failed', e.message), { error: true }); }
+document.addEventListener('pc:locale-changed', () => {
+  setImageMode(state.imageMode);
+  renderFooterUser();
+  renderChatList();
+  renderModelMenu();
+  updateModelButton();
+  if (state.view === 'chat') renderMessages();
 });
-
-// Beim Öffnen der Settings: Username, User-Liste, Image-Key-Status
-const oldOpenSettings = openSettings;
-openSettings = async function() {
-  await oldOpenSettings();
-  const nameEl = document.getElementById('my-account-name');
-  if (nameEl && state.me) nameEl.textContent = state.me.name;
-  if (state.me && state.me.is_admin) await loadUsersList();
-  await loadImageKeyStatus();
-  await loadChatLockStatus();
-  loadMemoryKeyStatus();
-};
-
-// =========================================================
-// Settings → Gedaechtnis-Schluessel
-// =========================================================
-function loadMemoryKeyStatus(msg = '', cls = '') {
-  const gesetzt = !!wissenSchluessel();
-  const el = document.getElementById('memory-key-status');
-  if (el) {
-    el.textContent = msg || t(gesetzt ? 'memory_key_set' : 'memory_key_unset');
-    el.className = 'backup-status ' + (cls || (gesetzt ? 'ok' : ''));
-  }
-  document.getElementById('memory-key-remove')?.classList.toggle('hidden', !gesetzt);
-}
-
-document.getElementById('memory-key-save')?.addEventListener('click', () => {
-  const input = document.getElementById('memory-key-input');
-  const k = (input.value || '').trim();
-  if (!WISSEN_FORMAT.test(k)) { loadMemoryKeyStatus(t('memory_key_invalid'), 'error'); return; }
-  const origin = serverOrigin();
-  if (!sichereHerkunft(origin)) { loadMemoryKeyStatus(t('memory_key_https'), 'error'); return; }
-  if (!state.me || !state.me.id) return;
-  localStorage.setItem(WISSEN_PREFIX + state.me.id, JSON.stringify({ k, o: origin }));
-  input.value = '';
-  loadMemoryKeyStatus();
-});
-
-document.getElementById('memory-key-remove')?.addEventListener('click', () => {
-  if (state.me && state.me.id) localStorage.removeItem(WISSEN_PREFIX + state.me.id);
-  loadMemoryKeyStatus();
-});
-
-// =========================================================
-// Settings → Chat-Sperre (globale PIN setzen/ändern/entfernen)
-// =========================================================
-function setChatLockStatus(text, cls = '') {
-  const el = document.getElementById('chat-lock-status');
-  if (!el) return;
-  el.textContent = text || '';
-  el.className = 'backup-status ' + cls;
-}
-
-// Nur Ziffern in die PIN-Felder lassen (inputmode=numeric reicht auf Desktop nicht).
-document.querySelectorAll('#chat-lock-section input[inputmode="numeric"]').forEach((inp) => {
-  inp.addEventListener('input', () => {
-    inp.value = inp.value.replace(/\D/g, '').slice(0, 5);
-  });
-});
-
-async function loadChatLockStatus() {
-  const setForm = document.getElementById('chat-lock-set-form');
-  const changeForm = document.getElementById('chat-lock-change-form');
-  if (!setForm || !changeForm) return;
-  try {
-    const r = await api('GET', '/me/chat-lock');
-    const isSet = !!r.is_set;
-    setForm.classList.toggle('hidden', isSet);
-    changeForm.classList.toggle('hidden', !isSet);
-    // Felder leeren, damit keine PIN im Klartext-DOM hängen bleibt.
-    ['chat-lock-pin', 'chat-lock-pin-confirm', 'chat-lock-current',
-     'chat-lock-new', 'chat-lock-new-confirm'].forEach((id) => {
-      const el = document.getElementById(id); if (el) el.value = '';
-    });
-    setChatLockStatus(isSet ? t('chat_lock_is_set') : t('chat_lock_not_set'), '');
-  } catch (e) {
-    // Server evtl. älter → Section still lassen.
-    setForm.classList.add('hidden');
-    changeForm.classList.add('hidden');
-  }
-}
-
-(function initChatLock() {
-  const val = (id) => (document.getElementById(id)?.value || '').replace(/\D/g, '');
-
-  // PIN erstmalig setzen
-  const saveBtn = document.getElementById('chat-lock-save');
-  if (saveBtn) saveBtn.addEventListener('click', async () => {
-    const pin = val('chat-lock-pin');
-    const confirm = val('chat-lock-pin-confirm');
-    if (pin.length !== 5) { setChatLockStatus(t('chat_lock_pin_5_digits'), 'error'); return; }
-    if (pin !== confirm) { setChatLockStatus(t('chat_lock_pin_mismatch'), 'error'); return; }
-    try {
-      await api('PUT', '/me/chat-lock', { pin });
-      setChatLockStatus(t('chat_lock_saved'), 'ok');
-      await loadChatLockStatus();
-    } catch (e) {
-      setChatLockStatus(t('toast_error_prefix', e.message), 'error');
-    }
-  });
-
-  // PIN ändern
-  const changeBtn = document.getElementById('chat-lock-change');
-  if (changeBtn) changeBtn.addEventListener('click', async () => {
-    const current = val('chat-lock-current');
-    const pin = val('chat-lock-new');
-    const confirm = val('chat-lock-new-confirm');
-    if (pin.length !== 5) { setChatLockStatus(t('chat_lock_pin_5_digits'), 'error'); return; }
-    if (pin !== confirm) { setChatLockStatus(t('chat_lock_pin_mismatch'), 'error'); return; }
-    try {
-      await api('PUT', '/me/chat-lock', { pin, current_pin: current });
-      setChatLockStatus(t('chat_lock_saved'), 'ok');
-      await loadChatLockStatus();
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        setChatLockStatus(t('chat_lock_wrong_pin'), 'error');
-      } else {
-        setChatLockStatus(t('toast_error_prefix', e.message), 'error');
-      }
-    }
-  });
-
-  // PIN entfernen (löscht serverseitig auch alle locked-Flags)
-  const removeBtn = document.getElementById('chat-lock-remove');
-  if (removeBtn) removeBtn.addEventListener('click', async () => {
-    const current = val('chat-lock-current');
-    if (current.length !== 5) { setChatLockStatus(t('chat_lock_pin_5_digits'), 'error'); return; }
-    try {
-      await api('POST', '/me/chat-lock/clear', { current_pin: current });
-      // Alle Chats sind serverseitig entsperrt → lokalen Zustand angleichen.
-      state.unlockedCids.clear();
-      state.chatLocked = false;
-      setChatLockStatus(t('chat_lock_removed'), 'ok');
-      await loadChatLockStatus();
-      await refreshChatList();
-      if (state.cid) renderMessages();
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        setChatLockStatus(t('chat_lock_wrong_pin'), 'error');
-      } else {
-        setChatLockStatus(t('toast_error_prefix', e.message), 'error');
-      }
-    }
-  });
-})();
-
-// =========================================================
-// Settings → Bilder: API-Key verwalten
-// =========================================================
-async function loadImageKeyStatus() {
-  try {
-    const cfg = await api('GET', '/images/config');
-    imageState.config = cfg;
-    imageState.configLoaded = true;
-    const st = document.getElementById('image-api-key-status');
-    if (cfg.configured) {
-      st.className = 'backup-status ok';
-      st.innerHTML = t('image_key_set', `<code>${escapeHtml(cfg.api_key_masked || '')}</code>`);
-    } else {
-      st.className = 'backup-status';
-      st.textContent = t('image_key_not_set');
-    }
-  } catch (e) {
-    // tolerieren — Server vielleicht älter
-  }
-}
-
-const imgKeyInput  = document.getElementById('image-api-key-input');
-const imgKeySave   = document.getElementById('image-api-key-save');
-const imgKeyDelete = document.getElementById('image-api-key-delete');
-if (imgKeySave) imgKeySave.addEventListener('click', async () => {
-  const key = (imgKeyInput.value || '').trim();
-  if (!key) return;
-  try {
-    await api('PUT', '/images/credentials', { api_key: key });
-    imgKeyInput.value = '';
-    toast(t('toast_api_key_saved'));
-    await loadImageKeyStatus();
-    // Wenn aktuell Image-Mode an ist: Status nachschieben
-    if (imageState.enabled) setImageStatus(t('image_key_saved_hint'), '');
-  } catch (e) {
-    toast(t('toast_save_failed', e.message), { error: true });
-  }
-});
-if (imgKeyDelete) imgKeyDelete.addEventListener('click', async () => {
-  if (!confirm(t('confirm_remove_api_key'))) return;
-  try {
-    await api('DELETE', '/images/credentials');
-    imgKeyInput.value = '';
-    toast(t('toast_removed'));
-    await loadImageKeyStatus();
-  } catch (e) {
-    toast(t('toast_error_prefix', e.message), { error: true });
-  }
-});
-
-// ───────────────────────────────────────────────────────────────
-// i18n bootstrap
-// ───────────────────────────────────────────────────────────────
-(function initI18n() {
-  if (!window.PocketI18n) return;
-  // Apply current locale to all data-i18n* nodes already in the DOM.
-  window.PocketI18n.applyI18n();
-  // Wire the language picker in the settings modal.
-  const sel = document.getElementById('ui-locale-select');
-  if (sel) {
-    const stored = window.localStorage.getItem('pc_locale') || '';
-    sel.value = stored;
-    sel.addEventListener('change', () => {
-      window.PocketI18n.setLocale(sel.value);
-    });
-  }
-})();
-
-// ───────────────────────────────────────────────────────────────
-// Claude auth-mode picker + usage widget
-// ───────────────────────────────────────────────────────────────
-(function initClaudeAuthAndUsage() {
-  const $ = (id) => document.getElementById(id);
-  const t = (k, ...args) => (window.PocketI18n ? window.PocketI18n.t(k, ...args) : k);
-
-  async function loadClaudeAuth() {
-    try {
-      const r = await fetch('/me/claude-auth', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('pc.serverToken') || '') } });
-      if (!r.ok) return;
-      const data = await r.json();
-      const mode = data.mode || 'pro_max';
-
-      // Radio buttons
-      document.querySelectorAll('input[name="claude-auth-mode"]').forEach((el) => {
-        el.checked = (el.value === mode);
-      });
-      // Hint
-      const hintMap = {
-        pro_max: 'claude_mode_pro_max_hint',
-        api_key: 'claude_mode_api_key_hint',
-        bedrock: 'claude_mode_bedrock_hint',
-      };
-      $('claude-auth-mode-hint').textContent = t(hintMap[mode] || hintMap.pro_max);
-
-      // Show/hide forms
-      $('claude-auth-apikey-form').classList.toggle('hidden', mode !== 'api_key');
-      $('claude-auth-bedrock-form').classList.toggle('hidden', mode !== 'bedrock');
-
-      // Populate API-key "current"
-      const apikeyCurrent = data.api_key_set
-        ? t('current_value_label', data.api_key_masked)
-        : t('not_configured');
-      $('claude-auth-apikey-current').textContent = apikeyCurrent;
-
-      // Populate Bedrock fields
-      $('bedrock-region').value = data.aws_region || '';
-      $('bedrock-akid').value = '';  // never prefill secrets — show masked next to label
-      $('bedrock-secret').value = '';
-      $('bedrock-session').value = '';
-      $('bedrock-opus').value = data.bedrock_opus_model || '';
-      $('bedrock-sonnet').value = data.bedrock_sonnet_model || '';
-      $('bedrock-haiku').value = data.bedrock_haiku_model || '';
-      document.querySelectorAll('input[name="bedrock-alias"]').forEach((el) => {
-        el.checked = (el.value === (data.bedrock_model_alias || 'opus'));
-      });
-
-      // Globales Standard-Modell (Pro/Max + API-Key). Im Bedrock-Modus
-      // ausgeblendet, weil dort der Alias/die Modell-IDs greifen.
-      const dmSel = $('claude-default-model');
-      const dmField = $('claude-default-model-field');
-      if (dmSel) {
-        const cur = data.default_model || '';
-        dmSel.innerHTML = '';
-        const optAuto = document.createElement('option');
-        optAuto.value = '';
-        optAuto.textContent = t('model_automatic');
-        dmSel.appendChild(optAuto);
-        (window.PC_CLAUDE_MODELS || []).forEach((m) => {
-          const o = document.createElement('option');
-          o.value = m.id;
-          o.textContent = m.label;
-          dmSel.appendChild(o);
-        });
-        dmSel.value = cur;
-      }
-      if (dmField) dmField.style.display = (mode === 'bedrock') ? 'none' : '';
-    } catch (e) { /* not signed in yet */ }
-  }
-
-  async function putClaudeAuth(payload) {
-    const r = await fetch('/me/claude-auth', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + (localStorage.getItem('pc.serverToken') || ''),
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      const msg = await r.text();
-      throw new Error(`HTTP ${r.status}: ${msg}`);
-    }
-    return r.json();
-  }
-
-  // Wire radio buttons → switch mode
-  document.querySelectorAll('input[name="claude-auth-mode"]').forEach((el) => {
-    el.addEventListener('change', async () => {
-      try {
-        await putClaudeAuth({ mode: el.value });
-        await loadClaudeAuth();
-      } catch (e) {
-        $('claude-auth-status').textContent = t('toast_error_prefix', e.message);
-      }
-    });
-  });
-
-  // Anthropic API key save/clear
-  if ($('claude-anthropic-save')) {
-    $('claude-anthropic-save').addEventListener('click', async () => {
-      const key = $('claude-anthropic-key').value.trim();
-      if (!key) return;
-      try {
-        await putClaudeAuth({ api_key: key });
-        $('claude-anthropic-key').value = '';
-        $('claude-auth-status').textContent = t('saved');
-        await loadClaudeAuth();
-      } catch (e) {
-        $('claude-auth-status').textContent = t('toast_error_prefix', e.message);
-      }
-    });
-  }
-  if ($('claude-anthropic-clear')) {
-    $('claude-anthropic-clear').addEventListener('click', async () => {
-      if (!confirm(t('confirm_remove_api_key'))) return;
-      try {
-        await putClaudeAuth({ api_key: '' });
-        await loadClaudeAuth();
-      } catch (e) {
-        $('claude-auth-status').textContent = t('toast_error_prefix', e.message);
-      }
-    });
-  }
-
-  // Bedrock apply
-  if ($('bedrock-apply')) {
-    $('bedrock-apply').addEventListener('click', async () => {
-      const alias = (document.querySelector('input[name="bedrock-alias"]:checked') || {}).value;
-      const body = {
-        aws_region: $('bedrock-region').value.trim() || null,
-        aws_access_key_id: $('bedrock-akid').value.trim() || null,
-        aws_secret_access_key: $('bedrock-secret').value || null,
-        aws_session_token: $('bedrock-session').value || null,
-        bedrock_opus_model: $('bedrock-opus').value.trim() || null,
-        bedrock_sonnet_model: $('bedrock-sonnet').value.trim() || null,
-        bedrock_haiku_model: $('bedrock-haiku').value.trim() || null,
-        bedrock_model_alias: alias || null,
-      };
-      // Remove null keys
-      Object.keys(body).forEach((k) => body[k] === null && delete body[k]);
-      try {
-        await putClaudeAuth(body);
-        $('bedrock-akid').value = '';
-        $('bedrock-secret').value = '';
-        $('bedrock-session').value = '';
-        $('claude-auth-status').textContent = t('saved');
-        await loadClaudeAuth();
-      } catch (e) {
-        $('claude-auth-status').textContent = t('toast_error_prefix', e.message);
-      }
-    });
-  }
-  document.querySelectorAll('input[name="bedrock-alias"]').forEach((el) => {
-    el.addEventListener('change', async () => {
-      try { await putClaudeAuth({ bedrock_model_alias: el.value }); await loadClaudeAuth(); }
-      catch (e) { $('claude-auth-status').textContent = t('toast_error_prefix', e.message); }
-    });
-  });
-
-  // Standard-Modell ändern → sofort speichern.
-  const dmSel = $('claude-default-model');
-  if (dmSel) {
-    dmSel.addEventListener('change', async () => {
-      try {
-        await putClaudeAuth({ default_model: dmSel.value });
-        $('claude-auth-status').textContent = t('saved');
-      } catch (e) {
-        $('claude-auth-status').textContent = t('toast_error_prefix', e.message);
-      }
-    });
-  }
-
-  async function loadUsage() {
-    try {
-      const r = await fetch('/me/usage?period=month', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('pc.serverToken') || '') } });
-      if (!r.ok) return;
-      const u = await r.json();
-      const grid = $('usage-grid');
-      grid.innerHTML = '';
-      const fmt = (n) => {
-        if (n < 1000) return String(n);
-        if (n < 1_000_000) return (n / 1000).toFixed(1) + 'K';
-        return (n / 1_000_000).toFixed(2) + 'M';
-      };
-      const rows = [
-        [t('usage_input'), fmt(u.input_tokens)],
-        [t('usage_output'), fmt(u.output_tokens)],
-        [t('usage_cache_create'), fmt(u.cache_create_tokens)],
-        [t('usage_cache_read'), fmt(u.cache_read_tokens)],
-        [t('usage_requests'), fmt(u.request_count)],
-      ];
-      if (u.provider) rows.push([t('usage_provider'), u.provider]);
-      rows.forEach(([label, val]) => {
-        const l = document.createElement('div'); l.textContent = label; l.style.color = 'var(--text-soft)';
-        const v = document.createElement('div'); v.textContent = val; v.style.fontWeight = '500'; v.style.textAlign = 'right';
-        grid.appendChild(l); grid.appendChild(v);
-      });
-      const proMaxNote = $('usage-pro-max-note');
-      if (proMaxNote) proMaxNote.style.display = (u.provider === 'pro_max' || u.provider === '') ? '' : 'none';
-    } catch (e) { /* ignore */ }
-  }
-
-  if ($('usage-refresh')) {
-    $('usage-refresh').addEventListener('click', loadUsage);
-  }
-
-  // Trigger initial loads when the settings modal is opened. No setTimeout
-  // needed — the modal is already in the DOM, openSettings just toggles
-  // the .hidden class, so we can fetch immediately.
-  const settingsBtn = $('settings-btn');
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
-      loadClaudeAuth();
-      loadUsage();
-    });
-  }
-
-  // Also clear stale status text whenever the modal closes — keeps users
-  // from seeing yesterday's "Error: …" the next time they reopen settings.
-  const settingsClose = $('settings-close');
-  if (settingsClose) {
-    settingsClose.addEventListener('click', () => {
-      const s = $('claude-auth-status');
-      if (s) s.textContent = '';
-    });
-  }
-})();
-
-// =========================================================
-// Voice-Input (Groq Whisper Large v3 Turbo)
-// =========================================================
-//
-// Spiegelt die App-Logik 1:1 (Recording → Upload → Transcript ins Input;
-// optional Auto-Mode-Loop). Aufnahme über MediaRecorder + getUserMedia
-// (im Browser meist webm/opus); der Server akzeptiert beliebige Audio-
-// Container, Groq erkennt das Format selbst.
-window.PocketVoice = (() => {
-  const $ = (id) => document.getElementById(id);
-  const t = (k, ...args) => (window.PocketI18n ? window.PocketI18n.t(k, ...args) : k);
-
-  const micBtn    = $('mic-btn');
-  const autoPill  = $('auto-mode-pill');
-  const autoLabel = $('auto-mode-label');
-  const input     = $('input');
-
-  let mediaRecorder = null;
-  let mediaStream = null;
-  let chunks = [];
-  let micState = 'idle'; // idle | recording | busy
-  let autoMode = false;
-  let autoAbortController = null;
-
-  // ── LLM-Busy-Check ──
-  // `state` ist der globale Chat-State aus app.js (selber File-Scope).
-  // Wir greifen direkt drauf zu. isStreaming = Stream läuft;
-  // state.audio.playing = TTS spielt grade.
-  function isLlmBusy() {
-    return !!(state && (state.isStreaming || (state.audio && state.audio.playing)));
-  }
-
-  function setMicState(newState) {
-    micState = newState;
-    if (!micBtn) return;
-    micBtn.classList.remove('idle', 'recording', 'busy');
-    micBtn.classList.add(newState);
-    micBtn.title = newState === 'recording'
-        ? t('voice_mic_recording_title')
-        : t('voice_mic_title');
-    updateMicEnabled();
-  }
-
-  /** Mic-Button visuell + funktional disablen wenn LLM busy. Recording
-   *  läuft DARF weiter klickbar bleiben (User muss stoppen können). */
-  function updateMicEnabled() {
-    if (!micBtn) return;
-    const shouldDisable = isLlmBusy() && micState !== 'recording';
-    micBtn.disabled = shouldDisable;
-    micBtn.classList.toggle('mic-disabled', shouldDisable);
-  }
-
-  function setAutoModeUi(on) {
-    autoMode = on;
-    if (autoPill) autoPill.classList.toggle('hidden', !on);
-    if (autoLabel) autoLabel.textContent = on ? t('auto_mode_stop') : t('auto_mode_start');
-  }
-
-  async function startRecording() {
-    if (micState !== 'idle') return false;
-    if (isLlmBusy()) {
-      toast(t('voice_error_llm_busy'), { error: true });
-      return false;
-    }
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      toast(t('voice_error_no_permission'), { error: true });
-      return false;
-    }
-    chunks = [];
-    const opts = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? { mimeType: 'audio/webm;codecs=opus' }
-        : {};
-    try {
-      mediaRecorder = new MediaRecorder(mediaStream, opts);
-    } catch (e) {
-      stopStream();
-      toast(t('voice_error_start_failed', e.message), { error: true });
-      return false;
-    }
-    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-    mediaRecorder.onstop = () => { /* upload triggert die Caller-Logik */ };
-    mediaRecorder.start();
-    setMicState('recording');
-    return true;
-  }
-
-  function stopStream() {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((tr) => tr.stop());
-      mediaStream = null;
-    }
-    mediaRecorder = null;
-  }
-
-  /** Stoppt die Aufnahme und lädt das Audio hoch. Liefert den Transkript-Text
-   *  zurück (oder leeren String bei zu kurzer Aufnahme / Fehler). */
-  async function stopAndTranscribe() {
-    if (micState !== 'recording' || !mediaRecorder) return '';
-    const rec = mediaRecorder;
-    const done = new Promise((resolve) => {
-      rec.addEventListener('stop', resolve, { once: true });
-    });
-    rec.stop();
-    await done;
-    const mime = rec.mimeType || 'audio/webm';
-    const blob = new Blob(chunks, { type: mime });
-    stopStream();
-    chunks = [];
-    if (blob.size < 1000) {
-      setMicState('idle');
-      return '';
-    }
-    setMicState('busy');
-    try {
-      const locale = (window.localStorage.getItem('pc_locale') || '').trim() ||
-                     (navigator.language || 'en');
-      const fd = new FormData();
-      const ext = mime.includes('webm') ? 'webm' : (mime.includes('mp4') ? 'm4a' : 'wav');
-      fd.append('file', blob, `voice-${Date.now()}.${ext}`);
-      fd.append('language', locale);
-      const r = await fetch('/voice/transcribe', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + (localStorage.getItem('pc.serverToken') || '') },
-        body: fd,
-      });
-      if (!r.ok) {
-        const text = await r.text().catch(() => '');
-        throw new Error(text || ('HTTP ' + r.status));
-      }
-      const data = await r.json();
-      setMicState('idle');
-      return (data.text || '').trim();
-    } catch (e) {
-      setMicState('idle');
-      toast(t('voice_error_transcribe_failed', e.message), { error: true });
-      return '';
-    }
-  }
-
-  function cancelRecording() {
-    if (micState !== 'recording' && micState !== 'busy') return;
-    try { if (mediaRecorder) mediaRecorder.stop(); } catch (_) {}
-    stopStream();
-    chunks = [];
-    setMicState('idle');
-  }
-
-  function insertTranscript(text) {
-    if (!text || !input) return;
-    if ((input.value || '').trim().length === 0) input.value = text;
-    else input.value = input.value + ' ' + text;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.focus();
-  }
-
-  /** Vom openChat-Aufrufer beim Chat-Wechsel: AUFNAHME ABBRECHEN + Auto-Mode
-   *  ausschalten + jedes laufende Upload-Promise auflösen. Sonst hängt der
-   *  Singleton-Recorder weiter im alten Chat. */
-  function resetForChatSwitch() {
-    if (autoMode) {
-      setAutoModeUi(false);
-      if (autoAbortController) autoAbortController.abort();
-    }
-    if (micState === 'recording' || micState === 'busy') cancelRecording();
-    setMicState('idle');
-  }
-
-  // ── Auto-Mode ──
-  // Phasen analog zur App: 0) waitUntilSettled (kein Stream / kein TTS)
-  //   1) Recording starten 2) auf User-Stop warten 3) auf Transcribe-Idle
-  //   4) Buffer 5) auf Stream-Ende 6) auf TTS-Ende → loop.
-  // Wichtig: NIE während LLM-Busy starten — sonst landet die TTS-Ausgabe
-  // im nächsten Recording.
-  async function toggleAutoMode() {
-    if (autoMode) {
-      setAutoModeUi(false);
-      if (autoAbortController) autoAbortController.abort();
-      if (micState === 'recording' || micState === 'busy') cancelRecording();
-      return;
-    }
-    setAutoModeUi(true);
-    autoAbortController = new AbortController();
-    const signal = autoAbortController.signal;
-    try {
-      while (autoMode && !signal.aborted) {
-        // Phase 0: alles ruhig kriegen
-        await waitUntilSettled(signal);
-        if (signal.aborted) break;
-
-        // Phase 1: Recording starten
-        const ok = await startRecording();
-        if (!ok || signal.aborted) break;
-
-        // Phase 2: User-Stop abwarten (er klickt Mic erneut → busy → idle)
-        await pollUntil(() => micState !== 'recording' || signal.aborted, 150);
-        if (signal.aborted) break;
-
-        // Phase 3: Transcribe-Ende abwarten
-        await pollUntil(() => micState !== 'busy' || signal.aborted, 150);
-        if (signal.aborted) break;
-
-        // Phase 4: Buffer — der Mic-Click-Handler ruft form.requestSubmit()
-        // erst NACH stopAndTranscribe. Wir warten kurz dass submitForm()
-        // seinen Stream gestartet hat (state.isStreaming = true).
-        await sleep(400);
-
-        // Phase 5: Stream-Ende
-        await pollUntil(() => !state.isStreaming || signal.aborted, 200);
-        if (signal.aborted) break;
-
-        // Phase 6: TTS-Wiedergabe abwarten (auto-speak via Done-Event)
-        await sleep(400);
-        await pollUntil(() => {
-          if (signal.aborted) return true;
-          const audios = Array.from(document.querySelectorAll('audio'));
-          const anyPlaying = audios.some((a) => !a.paused && !a.ended);
-          return !anyPlaying && !(state.audio && state.audio.playing);
-        }, 300);
-      }
-    } catch (_) { /* abort */ }
-    finally { setAutoModeUi(false); }
-  }
-
-  function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms));
-  }
-
-  function pollUntil(predicate, intervalMs) {
-    return new Promise((resolve) => {
-      const check = () => {
-        try { if (predicate()) return resolve(); } catch (_) { return resolve(); }
-        setTimeout(check, intervalMs);
-      };
-      check();
-    });
-  }
-
-  async function waitUntilSettled(signal) {
-    return pollUntil(() => {
-      if (signal && signal.aborted) return true;
-      if (micState !== 'idle') return false;
-      if (state.isStreaming) return false;
-      if (state.audio && state.audio.playing) return false;
-      // Auch HTML-<audio>-Elemente checken, falls TTS via DOM-Audio läuft
-      const audios = Array.from(document.querySelectorAll('audio'));
-      if (audios.some((a) => !a.paused && !a.ended)) return false;
-      return true;
-    }, 200);
-  }
-
-  // Mic-Click-Handler: tap toggelt Recording↔Upload. Long-Press (>700 ms)
-  // während Recording bricht ab statt zu transkribieren.
-  if (micBtn) {
-    let pressTimer = null;
-    let longPressed = false;
-    micBtn.addEventListener('mousedown', () => {
-      longPressed = false;
-      pressTimer = setTimeout(() => {
-        longPressed = true;
-        if (micState === 'recording') cancelRecording();
-      }, 700);
-    });
-    micBtn.addEventListener('mouseup', () => {
-      clearTimeout(pressTimer); pressTimer = null;
-    });
-    micBtn.addEventListener('mouseleave', () => {
-      clearTimeout(pressTimer); pressTimer = null;
-    });
-    micBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      if (longPressed) { longPressed = false; return; }
-      if (micState === 'idle') {
-        if (isLlmBusy()) {
-          toast(t('voice_error_llm_busy'), { error: true });
-          return;
-        }
-        await startRecording();
-      } else if (micState === 'recording') {
-        const text = await stopAndTranscribe();
-        if (text) {
-          insertTranscript(text);
-          // submit nur wenn nicht grade ein Stream läuft (Race-Schutz)
-          if (!state.isStreaming) {
-            const form = document.getElementById('input-form');
-            if (form) form.requestSubmit();
-          }
-        }
-      }
-    });
-  }
-
-  // Auto-Mode-Pill: Klick = Loop stoppen.
-  if (autoPill) {
-    autoPill.addEventListener('click', () => toggleAutoMode());
-  }
-
-  // Polling-Watcher: alle 400 ms updateMicEnabled aufrufen, damit der Button
-  // bei Stream-Ende / TTS-Ende wieder freigeschaltet wird ohne dass wir
-  // jeden State-Setter patchen muessen.
-  setInterval(updateMicEnabled, 400);
-
-  // Voice-API-Key Save/Delete + Language-Picker + Translate-Status
-  const voiceKeyInput  = document.getElementById('voice-api-key-input');
-  const voiceKeySave   = document.getElementById('voice-api-key-save');
-  const voiceKeyDelete = document.getElementById('voice-api-key-delete');
-  const voiceKeyStatus = document.getElementById('voice-api-key-status');
-
-  const langModeAuto      = document.getElementById('voice-lang-mode-auto');
-  const langModeOverride  = document.getElementById('voice-lang-mode-override');
-  const langOverrideBlock = document.getElementById('voice-lang-override-block');
-  const langSelect        = document.getElementById('voice-lang-select');
-  const langCustomInput   = document.getElementById('voice-lang-custom');
-  const langApplyBtn      = document.getElementById('voice-lang-apply');
-  const translateStatus   = document.getElementById('voice-translate-status');
-  const promptText        = document.getElementById('voice-prompt-text');
-  const promptLabel       = document.getElementById('voice-prompt-label');
-  const promptSource      = document.getElementById('voice-prompt-source');
-  const promptActions     = document.getElementById('voice-prompt-actions');
-  const retranslateBtn    = document.getElementById('voice-retranslate-btn');
-  const resetCacheBtn     = document.getElementById('voice-reset-cache-btn');
-
-  const CUSTOM_SENTINEL = '__custom__';
-  let lastCfg = null;
-
-  function renderVoiceCfg(cfg) {
-    lastCfg = cfg;
-    if (voiceKeyStatus) {
-      if (cfg.configured) {
-        voiceKeyStatus.className = 'backup-status ok';
-        voiceKeyStatus.textContent = `${cfg.api_key_masked || ''} · ${cfg.model || ''}`;
-      } else {
-        voiceKeyStatus.className = 'backup-status';
-        voiceKeyStatus.textContent = t('voice_key_not_set');
-      }
-    }
-    // Mode-Radios
-    const isOverride = cfg.lang_mode === 'override';
-    if (langModeAuto) langModeAuto.checked = !isOverride;
-    if (langModeOverride) langModeOverride.checked = isOverride;
-    if (langOverrideBlock) langOverrideBlock.classList.toggle('hidden', !isOverride);
-
-    // Dropdown populieren (einmalig pro Render)
-    if (langSelect) {
-      langSelect.innerHTML = '';
-      const langs = (cfg.bundled_languages || []).slice().sort((a, b) => {
-        const an = (cfg.language_names || {})[a] || a;
-        const bn = (cfg.language_names || {})[b] || b;
-        return an.localeCompare(bn);
-      });
-      for (const code of langs) {
-        const name = (cfg.language_names || {})[code] || code;
-        const opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = `${name} (${code})`;
-        langSelect.appendChild(opt);
-      }
-      // Cached aber nicht-bundled Sprachen mit "translated"-Marker auflisten
-      for (const code of (cfg.cached_languages || [])) {
-        if (!(cfg.bundled_languages || []).includes(code)) {
-          const opt = document.createElement('option');
-          opt.value = code;
-          opt.textContent = `${code} — ${t('voice_lang_tag_translated')}`;
-          langSelect.appendChild(opt);
-        }
-      }
-      const customOpt = document.createElement('option');
-      customOpt.value = CUSTOM_SENTINEL;
-      customOpt.textContent = t('voice_lang_custom');
-      langSelect.appendChild(customOpt);
-
-      // Auswahl setzen
-      const current = cfg.lang_override || cfg.current_lang || 'en';
-      const isCustom = isOverride && !langs.includes(current) && !(cfg.cached_languages || []).includes(current);
-      if (isCustom) {
-        langSelect.value = CUSTOM_SENTINEL;
-        if (langCustomInput) { langCustomInput.value = current || ''; langCustomInput.classList.remove('hidden'); }
-        if (langApplyBtn) langApplyBtn.classList.remove('hidden');
-      } else {
-        langSelect.value = current;
-        if (langCustomInput) { langCustomInput.classList.add('hidden'); }
-        if (langApplyBtn) langApplyBtn.classList.add('hidden');
-      }
-    }
-
-    // Prompt-Preview
-    if (promptText) promptText.textContent = cfg.current_prompt || '';
-    if (promptLabel) promptLabel.textContent = t('voice_prompt_preview_label', cfg.current_lang || 'en');
-    if (promptSource) {
-      const map = {
-        bundled: t('voice_lang_tag_bundled'),
-        cache: t('voice_lang_tag_translated'),
-        fallback: t('voice_lang_tag_fallback'),
-      };
-      promptSource.textContent = map[cfg.current_prompt_source] || cfg.current_prompt_source || '';
-    }
-    if (promptActions) promptActions.classList.toggle('hidden', cfg.current_prompt_source !== 'cache');
-  }
-
-  async function loadVoiceConfig() {
-    try {
-      const cfg = await api('GET', '/voice/config');
-      renderVoiceCfg(cfg);
-    } catch (_) { /* tolerieren */ }
-  }
-
-  async function setLangConfig(mode, locale) {
-    try {
-      const cfg = await api('PUT', '/voice/lang-config', { mode, locale: locale || null });
-      renderVoiceCfg(cfg);
-      // Wenn override + nicht-bundled + nicht-cached → automatisch übersetzen
-      if (mode === 'override' && cfg.current_prompt_source === 'fallback') {
-        await translatePrompt(cfg.current_lang, false);
-      } else if (translateStatus) {
-        translateStatus.textContent = '';
-      }
-    } catch (e) {
-      if (translateStatus) {
-        translateStatus.className = 'backup-status error';
-        translateStatus.textContent = t('voice_translate_error', e.message);
-      }
-    }
-  }
-
-  async function translatePrompt(locale, force) {
-    if (!locale) return;
-    if (translateStatus) {
-      translateStatus.className = 'backup-status';
-      translateStatus.textContent = t('voice_translate_running');
-    }
-    try {
-      await api('POST', '/voice/prompt/translate', { locale, force: !!force });
-      if (translateStatus) {
-        translateStatus.className = 'backup-status ok';
-        translateStatus.textContent = t('voice_translate_success');
-      }
-      await loadVoiceConfig();
-    } catch (e) {
-      if (translateStatus) {
-        translateStatus.className = 'backup-status error';
-        translateStatus.textContent = t('voice_translate_error', e.message);
-      }
-    }
-  }
-
-  // ── Events ──
-  if (langModeAuto) langModeAuto.addEventListener('change', () => {
-    if (langModeAuto.checked) setLangConfig('auto', null);
-  });
-  if (langModeOverride) langModeOverride.addEventListener('change', () => {
-    if (langModeOverride.checked) {
-      // Beim ersten Wechsel auf Override gleich die ausgewählte Locale aus dem
-      // Dropdown anwenden (oder Default zur App-Sprache)
-      const v = (langSelect && langSelect.value && langSelect.value !== CUSTOM_SENTINEL)
-                  ? langSelect.value
-                  : (lastCfg && lastCfg.current_lang) || 'en';
-      setLangConfig('override', v);
-    }
-  });
-  if (langSelect) langSelect.addEventListener('change', () => {
-    const v = langSelect.value;
-    if (v === CUSTOM_SENTINEL) {
-      langCustomInput && langCustomInput.classList.remove('hidden');
-      langApplyBtn && langApplyBtn.classList.remove('hidden');
-      return;
-    }
-    langCustomInput && langCustomInput.classList.add('hidden');
-    langApplyBtn && langApplyBtn.classList.add('hidden');
-    setLangConfig('override', v);
-  });
-  if (langApplyBtn) langApplyBtn.addEventListener('click', () => {
-    const v = (langCustomInput && langCustomInput.value || '').trim().toLowerCase();
-    if (v.length < 2) return;
-    setLangConfig('override', v);
-  });
-  if (retranslateBtn) retranslateBtn.addEventListener('click', () => {
-    if (lastCfg) translatePrompt(lastCfg.current_lang, true);
-  });
-  if (resetCacheBtn) resetCacheBtn.addEventListener('click', async () => {
-    if (!lastCfg) return;
-    try {
-      await api('DELETE', '/voice/prompt/cache/' + encodeURIComponent(lastCfg.current_lang));
-      await loadVoiceConfig();
-      if (translateStatus) translateStatus.textContent = '';
-    } catch (e) {
-      toast(t('toast_error_prefix', e.message), { error: true });
-    }
-  });
-
-  if (voiceKeySave) voiceKeySave.addEventListener('click', async () => {
-    const key = (voiceKeyInput.value || '').trim();
-    if (!key) return;
-    try {
-      await api('PUT', '/voice/credentials', { api_key: key });
-      voiceKeyInput.value = '';
-      toast(t('toast_api_key_saved'));
-      await loadVoiceConfig();
-    } catch (e) {
-      toast(t('toast_save_failed', e.message), { error: true });
-    }
-  });
-  if (voiceKeyDelete) voiceKeyDelete.addEventListener('click', async () => {
-    if (!confirm(t('confirm_remove_api_key'))) return;
-    try {
-      await api('DELETE', '/voice/credentials');
-      voiceKeyInput.value = '';
-      toast(t('toast_removed'));
-      await loadVoiceConfig();
-    } catch (e) {
-      toast(t('toast_error_prefix', e.message), { error: true });
-    }
-  });
-  // beim Öffnen der Settings nachladen
-  const settingsBtn = document.getElementById('settings-btn');
-  if (settingsBtn) settingsBtn.addEventListener('click', loadVoiceConfig);
-  // initial einmal
-  loadVoiceConfig();
-
-  setMicState('idle');
-  return { toggleAutoMode, resetForChatSwitch };
-})();
-
-// =========================================================
-// Gems (Custom Agents) — wie ChatGPT-GPTs / Gemini-Gems
-// =========================================================
-
-// Familien statt Versionsnummern, wie SELECTABLE_MODELS in claude_engine.py:
-// der Server loest `opus` immer auf die neueste Generation auf (Modell-Register
-// im Projekt AI Worker). Alte IDs wie claude-opus-5 akzeptiert er weiter und
-// hebt sie dabei an.
-const CLAUDE_MODELS = [
-  { id: 'opus',    label: 'Opus (neueste Generation)' },
-  { id: 'fable',   label: 'Fable (neueste Generation)' },
-  { id: 'sonnet',  label: 'Sonnet (neueste Generation)' },
-  { id: 'haiku',   label: 'Haiku (neueste Generation)' },
-];
-window.PC_CLAUDE_MODELS = CLAUDE_MODELS;
-const GEM_EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
-
-// Top-Level (hoisted), weil von openChat()/renderMessages() aufgerufen.
-function gemFetch(id) { return api('GET', '/me/gems/' + id); }
-
-/** Empty-State eines Gem-Chats: Emoji + Name + Beschreibung + Starter-Chips. */
-function gemWelcomeEl(gem) {
-  const wrap = document.createElement('div');
-  wrap.className = 'gem-welcome';
-  const emoji = document.createElement('div');
-  emoji.className = 'gem-welcome-emoji';
-  emoji.textContent = gem.emoji || '🤖';
-  wrap.appendChild(emoji);
-  const h = document.createElement('h3');
-  h.textContent = gem.name || '';
-  wrap.appendChild(h);
-  if (gem.description) {
-    const p = document.createElement('p');
-    p.textContent = gem.description;
-    wrap.appendChild(p);
-  }
-  const starters = gem.conversation_starters || [];
-  if (starters.length) {
-    const row = document.createElement('div');
-    row.className = 'gem-starter-chips';
-    starters.forEach((s) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'gem-starter-chip';
-      chip.textContent = s;
-      chip.addEventListener('click', () => {
-        els.input.value = s;
-        els.inputForm.requestSubmit();
-      });
-      row.appendChild(chip);
-    });
-    wrap.appendChild(row);
-  }
-  return wrap;
-}
-
-(function initGems() {
-  const $ = (id) => document.getElementById(id);
-
-  async function loadGems() {
-    try { state.gems = await api('GET', '/me/gems'); }
-    catch (e) { state.gems = []; }
-    renderGemsSidebar();
-    renderGemsSettingsList();
-  }
-
-  function renderGemsSidebar() {
-    const nav = $('gems-nav');
-    const block = $('gems-block');
-    if (!nav) return;
-    nav.innerHTML = '';
-    if (!state.gems.length) { if (block) block.style.display = 'none'; return; }
-    if (block) block.style.display = '';
-    state.gems.forEach((g) => {
-      const item = document.createElement('div');
-      item.className = 'chat-item gem-item';
-      item.innerHTML =
-        `<span class="gem-emoji">${escapeHtml(g.emoji || '🤖')}</span>` +
-        `<span class="chat-item-title">${escapeHtml(g.name)}</span>`;
-      item.addEventListener('click', () => startGemChat(g));
-      nav.appendChild(item);
-    });
-  }
-
-  function renderGemsSettingsList() {
-    const list = $('gems-list');
-    if (!list) return;
-    list.innerHTML = '';
-    if (!state.gems.length) {
-      const p = document.createElement('p');
-      p.className = 'hint';
-      p.textContent = t('gems_empty');
-      list.appendChild(p);
-      return;
-    }
-    state.gems.forEach((g) => {
-      const row = document.createElement('div');
-      row.className = 'gem-row';
-      const main = document.createElement('div');
-      main.className = 'gem-row-main';
-      const badge = g.is_builtin
-        ? ` <em class="gem-badge">${escapeHtml(t('gem_builtin_badge'))}</em>` : '';
-      main.innerHTML =
-        `<span class="gem-emoji">${escapeHtml(g.emoji || '🤖')}</span>` +
-        `<span class="gem-row-text"><span class="gem-row-name">${escapeHtml(g.name)}${badge}</span>` +
-        `<span class="gem-row-desc">${escapeHtml(g.description || '')}</span></span>`;
-      if (!g.is_builtin) main.addEventListener('click', () => openGemEditor(g, {}));
-      row.appendChild(main);
-
-      const dup = document.createElement('button');
-      dup.type = 'button'; dup.className = 'icon-btn'; dup.title = t('gem_duplicate');
-      dup.innerHTML = '<svg class="icon"><use href="#icon-copy"/></svg>';
-      dup.addEventListener('click', () => openGemEditor(g, { duplicate: true }));
-      row.appendChild(dup);
-
-      if (!g.is_builtin) {
-        const del = document.createElement('button');
-        del.type = 'button'; del.className = 'icon-btn'; del.title = t('delete');
-        del.innerHTML = '<svg class="icon"><use href="#icon-trash"/></svg>';
-        del.addEventListener('click', async () => {
-          if (!confirm(t('gem_delete_confirm', g.name))) return;
-          try { await api('DELETE', '/me/gems/' + g.id); await loadGems(); }
-          catch (err) { toast(t('toast_error_prefix', err.message), { error: true }); }
-        });
-        row.appendChild(del);
-      }
-      list.appendChild(row);
-    });
-  }
-
-  async function startGemChat(gem) {
-    try {
-      abortStream();
-      const c = await api('POST', '/conversations', { gem_id: gem.id });
-      state.cid = c.id;
-      state.title = c.title;
-      state.pinned = false;
-      state.gem = gem;
-      state.messages = [];
-      state.streamingText = '';
-      state.isStreaming = false;
-      updateTopbar(0);
-      renderMessages();
-      await refreshChatList();
-      localStorage.setItem(LS.lastCid, c.id);
-      history.replaceState(null, '', '#/chat/' + c.id);
-      els.sidebar.classList.remove('open');
-      els.input.focus();
-    } catch (e) {
-      toast(t('toast_new_chat_failed', e.message), { error: true });
-    }
-  }
-
-  // ---- Editor ----
-  let editorGemId = null;   // null = neues Gem
-  let editorFiles = [];     // bereits gespeicherte Dateien (Edit-Modus)
-
-  function setSel(sel, options, value) {
-    sel.innerHTML = '';
-    options.forEach((o) => {
-      const opt = document.createElement('option');
-      opt.value = o.value; opt.textContent = o.label;
-      sel.appendChild(opt);
-    });
-    sel.value = value;
-  }
-
-  function openGemEditor(gem, opts) {
-    opts = opts || {};
-    const dup = !!opts.duplicate;
-    editorGemId = (gem && !dup) ? gem.id : null;
-    editorFiles = (gem && !dup) ? (gem.files || []) : [];
-    $('gem-editor-title').textContent = editorGemId ? t('gem_editor_title_edit') : t('gem_editor_title_new');
-    $('gem-emoji').value = gem ? (gem.emoji || '') : '';
-    $('gem-name').value = gem ? (dup ? gem.name + ' (Kopie)' : gem.name) : '';
-    $('gem-description').value = gem ? (gem.description || '') : '';
-    $('gem-instructions').value = gem ? (gem.instructions || '') : '';
-    $('gem-starters').innerHTML = '';
-    ((gem && gem.conversation_starters) || []).forEach((s) => addStarterRow(s));
-    setSel($('gem-model'),
-      [{ value: '', label: t('gem_model_global_default') }]
-        .concat(CLAUDE_MODELS.map((m) => ({ value: m.id, label: m.label }))),
-      (gem && gem.model) ? gem.model : '');
-    setSel($('gem-effort'),
-      [{ value: '', label: t('gem_effort_chat_default') }]
-        .concat(GEM_EFFORTS.map((e) => ({ value: e, label: e }))),
-      (gem && gem.effort) ? gem.effort : '');
-    const sk = (gem && gem.skills) ? gem.skills : { web_search: true, web_fetch: true, code_execution: false };
-    $('gem-skill-web-search').checked = sk.web_search !== false;
-    $('gem-skill-web-fetch').checked = sk.web_fetch !== false;
-    $('gem-skill-code').checked = !!sk.code_execution;
-    renderEditorFiles();
-    $('gem-files-savefirst').style.display = editorGemId ? 'none' : '';
-    $('gem-add-file').style.display = editorGemId ? '' : 'none';
-    $('gem-editor-status').textContent = '';
-    $('gem-editor-modal').classList.remove('hidden');
-  }
-
-  function addStarterRow(value) {
-    const row = document.createElement('div');
-    row.className = 'gem-starter-row';
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.value = value || '';
-    const rm = document.createElement('button');
-    rm.type = 'button'; rm.className = 'icon-btn';
-    rm.innerHTML = '<svg class="icon"><use href="#icon-close"/></svg>';
-    rm.addEventListener('click', () => row.remove());
-    row.appendChild(inp); row.appendChild(rm);
-    $('gem-starters').appendChild(row);
-  }
-
-  function collectStarters() {
-    return Array.from($('gem-starters').querySelectorAll('input'))
-      .map((i) => i.value.trim()).filter((v) => v);
-  }
-
-  function renderEditorFiles() {
-    const wrap = $('gem-files');
-    wrap.innerHTML = '';
-    editorFiles.forEach((f) => {
-      const row = document.createElement('div');
-      row.className = 'gem-file-row';
-      row.innerHTML = `<svg class="icon"><use href="#icon-file"/></svg><span>${escapeHtml(f.filename)}</span>`;
-      const rm = document.createElement('button');
-      rm.type = 'button'; rm.className = 'icon-btn';
-      rm.innerHTML = '<svg class="icon"><use href="#icon-close"/></svg>';
-      rm.addEventListener('click', async () => {
-        try {
-          await api('DELETE', '/me/gems/' + editorGemId + '/files/' + f.id);
-          editorFiles = editorFiles.filter((x) => x.id !== f.id);
-          renderEditorFiles();
-        } catch (e) { $('gem-editor-status').textContent = t('toast_error_prefix', e.message); }
-      });
-      row.appendChild(rm);
-      wrap.appendChild(row);
-    });
-  }
-
-  async function saveGem() {
-    const name = $('gem-name').value.trim();
-    const instructions = $('gem-instructions').value.trim();
-    if (!name || !instructions) { $('gem-editor-status').textContent = t('gem_validation'); return; }
-    const payload = {
-      name,
-      emoji: $('gem-emoji').value.trim(),
-      description: $('gem-description').value.trim(),
-      instructions,
-      conversation_starters: collectStarters(),
-      model: $('gem-model').value || null,
-      effort: $('gem-effort').value || null,
-      skills: {
-        web_search: $('gem-skill-web-search').checked,
-        web_fetch: $('gem-skill-web-fetch').checked,
-        code_execution: $('gem-skill-code').checked,
-      },
-    };
-    try {
-      if (editorGemId) await api('PUT', '/me/gems/' + editorGemId, payload);
-      else await api('POST', '/me/gems', payload);
-      $('gem-editor-modal').classList.add('hidden');
-      await loadGems();
-    } catch (e) {
-      $('gem-editor-status').textContent = t('toast_error_prefix', e.message);
-    }
-  }
-
-  // ---- wiring ----
-  if ($('gems-new-btn')) $('gems-new-btn').addEventListener('click', () => openGemEditor(null, {}));
-  if ($('gems-new-sidebar')) $('gems-new-sidebar').addEventListener('click', () => openGemEditor(null, {}));
-  if ($('gem-editor-close')) $('gem-editor-close').addEventListener('click', () => $('gem-editor-modal').classList.add('hidden'));
-  if ($('gem-editor-cancel')) $('gem-editor-cancel').addEventListener('click', () => $('gem-editor-modal').classList.add('hidden'));
-  if ($('gem-editor-save')) $('gem-editor-save').addEventListener('click', saveGem);
-  if ($('gem-add-starter')) $('gem-add-starter').addEventListener('click', () => addStarterRow(''));
-  const gemModal = $('gem-editor-modal');
-  if (gemModal) gemModal.addEventListener('click', (e) => { if (e.target === gemModal) gemModal.classList.add('hidden'); });
-  if ($('gem-add-file')) $('gem-add-file').addEventListener('click', () => $('gem-file-input').click());
-  if ($('gem-file-input')) $('gem-file-input').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file || !editorGemId) return;
-    $('gem-editor-status').textContent = t('gem_uploading');
-    try {
-      const fd = new FormData();
-      fd.append('file', file, file.name);
-      const f = await api('POST', '/me/gems/' + editorGemId + '/files', fd);
-      editorFiles.push(f);
-      renderEditorFiles();
-      $('gem-editor-status').textContent = '';
-    } catch (err) {
-      $('gem-editor-status').textContent = t('toast_error_prefix', err.message);
-    }
-  });
-
-  const settingsBtn = $('settings-btn');
-  if (settingsBtn) settingsBtn.addEventListener('click', loadGems);
-
-  window.PocketGems = { load: loadGems };
-  if (state.token) loadGems();
-})();

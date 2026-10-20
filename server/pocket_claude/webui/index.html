@@ -365,11 +365,19 @@
         </form>
 
         <!-- Sprachgespraech (Auto-Modus): ersetzt waehrend der Schleife das Eingabefeld -->
-        <div id="voice-bar" class="voice-bar hidden" role="status">
+        <div id="voice-bar" class="voice-bar hidden" role="status" data-phase="idle">
           <div class="voice-orb" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-          <span id="voice-bar-text" class="voice-bar-text" data-i18n="voice_listening">Ich höre zu…</span>
-          <button id="voice-bar-send" type="button" class="btn-secondary btn-sm" data-i18n="voice_send_now">Jetzt senden</button>
+          <div class="voice-bar-text">
+            <span id="voice-bar-text" class="voice-bar-title">Ich höre zu…</span>
+            <span id="voice-bar-hint" class="voice-bar-hint"></span>
+          </div>
+          <label class="voice-auto" title="Nach kurzer Stille automatisch senden" data-i18n-title="voice_auto_send_hint">
+            <input id="voice-auto-send" type="checkbox" class="switch">
+            <span data-i18n="voice_auto_send">Automatisch senden</span>
+          </label>
+          <button id="voice-bar-send" type="button" class="btn-primary btn-sm" data-i18n="voice_send_now">Senden</button>
           <button id="voice-bar-stop" type="button" class="btn-ghost btn-sm" data-i18n="voice_end">Beenden</button>
+          <div id="voice-silence" class="voice-silence" aria-hidden="true"></div>
         </div>
 
         <p class="composer-hint" id="composer-hint" data-i18n="composer_disclaimer">PocketClot kann Fehler machen. Wichtiges bitte prüfen.</p>
@@ -1058,5 +1066,9 @@
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden" role="status"></div>
 <script src="app.js?v=20261021a"></script>
+<script src="voice.js?v=20261021a"></script>
+<script src="gems.js?v=20261021a"></script>
+<script src="images.js?v=20261021a"></script>
+<script src="settings.js?v=20261021a"></script>
 </body>
 </html>
