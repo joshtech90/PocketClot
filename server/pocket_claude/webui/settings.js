@@ -349,7 +349,9 @@
   $('tts-test-btn').addEventListener('click', async () => {
     const status = $('tts-test-status');
     status.textContent = '';
-    let msgId = [...state.messages].reverse().find((m) => m.role === 'assistant' && m.id > 0 && m.content)?.id;
+    // Ein gesperrter Chat liefert keinen Beispieltext, weder der offene noch einer aus der Liste.
+    let msgId = isCurrentChatLocked() ? null
+      : [...state.messages].reverse().find((m) => m.role === 'assistant' && m.id > 0 && m.content)?.id;
     const recent = state.chats.slice().sort((a, b) => chatSortKey(b).localeCompare(chatSortKey(a))).filter((c) => !c.locked);
     for (const c of recent.slice(0, 8)) {
       if (msgId) break;
@@ -483,6 +485,7 @@
   async function saveImageDefault(field, value) {
     try {
       renderImageDefaults(await api('PUT', '/images/defaults', { [field]: value }));
+      if (window.PocketImages) window.PocketImages.invalidate();
       flashSaved('img-defaults-status');
     } catch (e) { setStatus('img-defaults-status', t('toast_error_prefix', apiErrorText(e)), 'error'); }
   }
@@ -812,11 +815,25 @@
       localStorage.setItem(LS.collapseUserMsgs, String(state.collapseUserMsgs));
     }
     if (typeof app.chat_model_key === 'string') { state.chatModel = app.chat_model_key; localStorage.setItem(LS.chatModel, state.chatModel); }
-    if (app.effort_by_family && typeof app.effort_by_family === 'object') {
-      state.effortByFamily = Object.assign({}, EFFORT_DEFAULTS, app.effort_by_family);
+    const byFamily = app.effort_by_family && typeof app.effort_by_family === 'object' ? app.effort_by_family : {};
+    if (Object.keys(byFamily).length || app.effort) {
+      // Aeltere Exporte kennen nur eine Denktiefe; sie gilt dann fuer Claude.
+      state.effortByFamily = Object.assign({}, EFFORT_DEFAULTS, app.effort ? { claude: app.effort } : {}, byFamily);
       localStorage.setItem(LS.effortByFamily, JSON.stringify(state.effortByFamily));
     }
     localStorage.setItem(LS_APP_PASSTHROUGH, JSON.stringify(app));
+  }
+  /** Bild-Vorgaben aus dem App-Teil liegen serverseitig; einzeln setzen, damit
+   *  ein unbekannter Wert nicht den ganzen Import scheitern laesst. */
+  async function applyAppImageDefaults(app) {
+    const failed = [];
+    for (const [field, value] of [['size', app && app.image_default_size], ['aspect_ratio', app && app.image_default_aspect]]) {
+      if (!value) continue;
+      try { await api('PUT', '/images/defaults', { [field]: value }); }
+      catch { failed.push(field); }
+    }
+    if (window.PocketImages) window.PocketImages.invalidate();
+    return failed;
   }
   $('settings-export-btn').addEventListener('click', async () => {
     try {
@@ -852,13 +869,19 @@
       }
       const r = await api('POST', '/settings/import', req);
       await loadServerSettings();
-      if (bundle.app) applyAppSettings(bundle.app);
+      let imageFailed = [];
+      if (bundle.app) {
+        applyAppSettings(bundle.app);
+        imageFailed = await applyAppImageDefaults(bundle.app);
+      }
       await pushSettingsToServer();
       applyTheme();
       updateModelButton();
       renderModelMenu();
       const applied = typeof r.applied_keys === 'number' ? r.applied_keys : (r.applied_keys || []).length;
-      setStatus('settings-backup-status', t('settings_import_done', applied, r.tts_keys_imported || 0), 'ok');
+      const msg = t('settings_import_done', applied, r.tts_keys_imported || 0)
+        + (imageFailed.length ? ' ' + t('settings_import_partial', imageFailed.join(', ')) : '');
+      setStatus('settings-backup-status', msg, imageFailed.length ? 'error' : 'ok');
     } catch (err) {
       setStatus('settings-backup-status', t('settings_import_failed', err instanceof SyntaxError ? t('settings_import_bad_json') : apiErrorText(err)), 'error');
     }

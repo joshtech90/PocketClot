@@ -7,7 +7,7 @@
 //   settings.js Einstellungen
 // =====================================================================
 // PC_SSE LOAD MARKER — bump this any time you change PC_SSE logging.
-console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop');
+console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop-b');
 // Kurzform fuer die Uebersetzung.
 const t = (k, ...args) => (window.PocketI18n ? window.PocketI18n.t(k, ...args) : k);
 
@@ -113,6 +113,8 @@ const state = {
   _streamAttachments: [],
   abort: null,
   turn: 0,                 // Kennzeichen des laufenden Turns (0 = keiner)
+  chatLoading: false,      // Details des geoeffneten Chats werden noch geladen
+  chatLoadFailed: false,
   stoppedByUser: false,
 
   pending: [],             // Anhaenge im Eingabefeld
@@ -979,6 +981,10 @@ els.profileMenu.addEventListener('click', (e) => {
 function applyAdminVisibility() {
   const isAdmin = !!(state.me && state.me.is_admin);
   document.querySelectorAll('.admin-only').forEach((el) => el.classList.toggle('hidden', !isAdmin));
+  // Backup einspielen darf nur der Admin (der Server lehnt sonst mit 403 ab).
+  $('backup-import-btn')?.classList.toggle('hidden', !isAdmin);
+  const hint = $('backup-hint');
+  if (hint) hint.textContent = isAdmin ? t('backup_hint_admin') : t('backup_hint_user');
 }
 
 // =========================================================
@@ -1119,7 +1125,7 @@ async function fullTextSearch(q) {
 // =========================================================
 async function openChat(cid, opts = {}) {
   if (state.view !== 'chat') showChatView();
-  if (state.cid === cid && !opts.reload) {
+  if (state.cid === cid && !opts.reload && !state.chatLoadFailed) {
     closeSidebar();
     return;
   }
@@ -1141,6 +1147,10 @@ async function openChat(cid, opts = {}) {
   state.title = known ? known.title : '';
   state.chatLocked = !!(known && known.locked);
   state.gem = null;
+  // Bis die Details da sind, wird nicht gesendet: Modell und Verlauf waeren
+  // sonst noch die des vorigen Chats.
+  state.chatLoading = true;
+  const loadGen = ++_loadSeq;
   resetComposerFor(cid);
   if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
   else { els.messages.innerHTML = ''; els.chatView.classList.remove('is-empty'); }
@@ -1148,7 +1158,9 @@ async function openChat(cid, opts = {}) {
   closeSidebar();
   try {
     const detail = await api('GET', '/conversations/' + cid);
-    if (state.cid !== cid) return;   // inzwischen anderer Chat
+    if (loadGen !== _loadSeq || state.cid !== cid) return;   // inzwischen anderer Chat
+    state.chatLoading = false;
+    state.chatLoadFailed = false;
     applyDetail(detail);
     resetComposerFor(cid);
     if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
@@ -1158,10 +1170,15 @@ async function openChat(cid, opts = {}) {
     if (state.convModel && !state.chatModels.some((m) => m.key === state.convModel)) loadChatModels(false);
     if (!opts.keepFocus && !isMobile()) els.input.focus();
   } catch (e) {
+    if (loadGen !== _loadSeq) return;
+    state.chatLoading = false;
+    // Ohne Details kein Senden in diesen Chat; ein erneuter Klick laedt neu.
+    state.chatLoadFailed = true;
     if (e instanceof ApiError && e.status === 404) { newChat(); return; }
     toast(t('toast_load_chat_failed', apiErrorText(e)), { error: true });
   }
 }
+let _loadSeq = 0;
 function applyDetail(detail) {
   state.title = detail.title;
   state.pinned = !!detail.pinned;
@@ -1173,12 +1190,19 @@ function applyDetail(detail) {
   // Der Server weiss, was zuletzt in diesem Chat lief. Kennt er nichts, lief
   // ein Chat mit Nachrichten mit Claude (Bestandschats und ausdruecklich ""):
   // der darf nicht still zur Vorauswahl wechseln. Nur ein leerer Chat folgt ihr.
+  // Ein Gem bringt sein Modell mit wie ein GPT; das gilt, solange der Chat
+  // kein eigenes hat (der Server zieht ein mitgeschicktes Modell vor).
   const stored = (detail.chat_model || '').trim();
-  state.convModel = stored || ((detail.messages || []).length ? '' : null);
+  const gemMeta = detail.gem_id ? state.gems.find((g) => g.id === detail.gem_id) : null;
+  state.convModel = stored || (gemMeta && gemMeta.model) || ((detail.messages || []).length ? '' : null);
   state.gem = null;
   if (detail.gem_id) {
     gemFetch(detail.gem_id).then((g) => {
-      if (state.cid === detail.id) { state.gem = g; updateTopbar(); if (!state.messages.length) renderMessages(); }
+      if (state.cid !== detail.id) return;
+      state.gem = g;
+      if (!stored && g.model) { state.convModel = g.model; updateModelButton(); renderModelMenu(); }
+      updateTopbar();
+      if (!state.messages.length) renderMessages();
     }).catch(() => {});
   }
   updateTopbar();
@@ -1194,13 +1218,17 @@ async function newChat(opts = {}) {
   closeChatSearch();
   try {
     const c = await api('POST', '/conversations', opts.gemId ? { gem_id: opts.gemId } : {});
+    _loadSeq++;   // ein noch laufendes openChat darf diesen Chat nicht mehr ueberschreiben
+    state.chatLoading = false;
+    state.chatLoadFailed = false;
     state.cid = c.id;
     state.title = c.title;
     state.pinned = false;
     state.chatLocked = false;
     state.gem = opts.gem || null;
     state.messages = [];
-    state.convModel = null;
+    // Gem-Chats starten mit dem Modell des Gems, alle anderen mit der Vorauswahl.
+    state.convModel = (opts.gem && opts.gem.model) || null;
     state.skills = null;
     state.skillsIsOverride = false;
     resetComposerFor(c.id);
@@ -1750,6 +1778,11 @@ function updateStreaming() {
 // Gesperrte Chats: PIN statt Inhalt
 // =========================================================
 function renderLockGate(cid) {
+  // Hinter der Sperre bleibt nichts vom Inhalt stehen: keine Anhang-Vorschauen,
+  // keine laufende Wiedergabe, kein Sprachgespraech.
+  resetComposerFor(cid);
+  stopAudio();
+  if (window.PocketVoice) { try { window.PocketVoice.resetForChatSwitch(); } catch (_) {} }
   els.chatView.classList.remove('is-empty');
   els.messages.innerHTML = '';
   const inner = document.createElement('div');
@@ -1897,6 +1930,7 @@ function scrollToVeryBottom() {
 // =========================================================
 async function openRewindDialog(m) {
   if (state.isStreaming) return;
+  const cid = state.cid;
   const idx = state.messages.findIndex((x) => x.id === m.id);
   if (idx < 0) return;
   const dropped = state.messages.length - idx - 1;
@@ -1932,25 +1966,34 @@ async function openRewindDialog(m) {
     title: t('rewind_dialog_title'), icon: 'history', body,
     actions: [{ label: t('cancel'), value: false }, { label: t('rewind_dialog_confirm'), kind: 'btn-primary', value: true }],
   });
-  if (!ok) return;
-  const cid = state.cid;
+  // Die Chat-ID gilt ab dem Klick: wer waehrend des Aufrufs den Chat wechselt,
+  // darf dort nichts von diesem Ruecksprung abbekommen.
+  if (!ok || state.cid !== cid) return;
   try {
     // Nur mitschicken, was sich wirklich aendert: sonst gilt es serverseitig als Wechsel.
     const payload = { message_id: m.id };
     if (chosen !== current) payload.chat_model = chosen;
     const res = await api('POST', `/conversations/${cid}/rewind`, payload);
-    if (res.chat_model != null && chosen !== current) {
-      const fam = familyForKey(res.chat_model);
-      selectModel(res.chat_model);
+    if (res.chat_model != null && chosen !== current && state.cid === cid) {
+      // Der Server hat das Modell am Chat schon gesetzt; hier nur die Anzeige
+      // und die Vorauswahl nachziehen, kein zweiter PATCH.
+      state.convModel = res.chat_model;
+      state.chatModel = res.chat_model;
+      localStorage.setItem(LS.chatModel, state.chatModel);
+      queueSettingsPush();
+      updateModelButton();
+      renderModelMenu();
       // Nach einem echten Wechsel mit hoher Denktiefe weiter, wie in der App.
+      const fam = familyForKey(res.chat_model);
       if (state.effortByFamily[fam] !== 'high') setEffort('high', fam);
     }
-    toast(t('toast_rewind_done'));
+    if (state.cid === cid) toast(t('toast_rewind_done'));
   } catch (e) {
     toast(t('toast_error_prefix', apiErrorText(e)), { error: true });
   }
   // In jedem Fall den Serverstand uebernehmen: der Ruecksprung kann gelungen
   // und nur die Antwort verloren gegangen sein.
+  if (state.cid !== cid) return;
   await reloadChatMessages(cid);
   scrollToVeryBottom();
 }
@@ -2427,6 +2470,7 @@ async function sendMessage(rawText, opts = {}) {
   const imageMode = state.imageMode;
   if (!content && !uploaded.length) return false;
   if (state.isStreaming) { toast(t('toast_reply_running')); return false; }
+  if (state.chatLoading || state.chatLoadFailed) { toast(t('toast_chat_not_ready')); return false; }
   // Ein noch laufender Upload ginge sonst stumm verloren.
   if (state.pending.some((p) => p.uploading)) { toast(t('chat_wait_for_uploads')); return false; }
   if (state.cid && state.chatLocked && !state.unlockedCids.has(state.cid)) return false;
@@ -2717,7 +2761,12 @@ function ttsRates() {
   const web = state.ttsProvider === 'gemini_web';
   return { server: web ? 1.0 : state.ttsSpeed, player: web ? state.ttsSpeed : 1.0 };
 }
+function isCurrentChatLocked() {
+  return !!(state.cid && state.chatLocked && !state.unlockedCids.has(state.cid));
+}
 function speak(messageId) {
+  // Antworten eines gesperrten Chats werden ohne PIN auch nicht vorgelesen.
+  if (isCurrentChatLocked() && state.messages.some((m) => m.id === messageId)) return;
   els.audio.pause();
   const rates = ttsRates();
   const params = new URLSearchParams({ voice: state.ttsVoice, rate: String(rates.server), token: state.token });
@@ -2798,6 +2847,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('pc:locale-changed', () => {
   setImageMode(state.imageMode);
   renderFooterUser();
+  applyAdminVisibility();
   renderChatList();
   renderModelMenu();
   updateModelButton();

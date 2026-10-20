@@ -361,15 +361,35 @@
     }
   }
 
+  // Bei jedem Oeffnen neu laden: ein Gateway kann inzwischen wieder laufen,
+  // und geaenderte Vorgaben aus den Einstellungen sollen ankommen. Die
+  // aktuelle Auswahl bleibt, solange es sie noch gibt.
+  var defaultsDirty = true;
+  function keepOr(value, items, fallback) {
+    return (items || []).some(function (x) { return x.id === value; }) ? value : fallback;
+  }
   function loadConfig() {
-    if (config && !configLoadFailed) return Promise.resolve(config);
     if (configLoadingPromise) return configLoadingPromise;
 
     configLoadingPromise = api('GET', '/images/config')
       .then(function (res) {
+        var first = !config || defaultsDirty;
         config = res;
         configLoadFailed = false;
-        applyConfigDefaults();
+        if (first) {
+          applyConfigDefaults();
+          defaultsDirty = false;
+        } else {
+          var defs = config.defaults || {};
+          selectedProvider = keepOr(selectedProvider, config.providers, defs.provider || selectedProvider);
+          selectedSize = keepOr(selectedSize, config.image_sizes, defs.size || selectedSize);
+          selectedAspect = keepOr(selectedAspect, config.aspect_ratios, defs.aspect_ratio || selectedAspect);
+          selectedCount = Math.min(selectedCount, Math.max(1, Math.min(config.max_candidates || 1, 4)));
+        }
+        if (statusEl && statusEl.classList.contains('error') && !isGenerating) {
+          statusEl.className = 'img-status';
+          statusEl.textContent = '';
+        }
         renderOptions();
         updateUI();
         return config;
@@ -601,6 +621,11 @@
     var isUploading = references.some(function (r) { return r.status === 'uploading'; });
     if (isUploading) {
       toast(t('chat_wait_for_uploads'));
+      return;
+    }
+    // Eine gescheiterte Vorlage darf nicht still zu einem Bild ohne Vorlage werden.
+    if (references.some(function (r) { return r.status === 'error'; })) {
+      toast(t('images_ref_failed'), { error: true });
       return;
     }
 
@@ -852,6 +877,8 @@
   window.PocketImages = {
     show: show,
     hide: hide,
-    addReference: addReference
+    addReference: addReference,
+    // Nach geaenderten Vorgaben in den Einstellungen beim naechsten Oeffnen uebernehmen.
+    invalidate: function () { defaultsDirty = true; }
   };
 })();

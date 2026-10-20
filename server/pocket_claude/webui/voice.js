@@ -30,6 +30,11 @@ window.PocketVoice = (() => {
   let listenResolve = null;       // beendet das Zuhoeren im Sprachgespraech
   let vad = null;                 // { ctx, timer }
   let autoSend = localStorage.getItem(LS_AUTO_SEND) === 'true';
+  // Jede Aufnahme hat eine Generation. Abbrechen zaehlt hoch: eine spaet
+  // eintreffende Mikrofon-Freigabe oder Transkription gehoert dann zu einer
+  // verworfenen Aufnahme und wird nicht mehr verwendet.
+  let recGen = 0;
+  let transcribeAbort = null;
 
   function isLlmBusy() { return state.isStreaming || isAudioBusy(); }
 
@@ -50,15 +55,24 @@ window.PocketVoice = (() => {
     micBtn.classList.toggle('mic-disabled', off);
   }
 
-  async function startRecording({ withVad = false } = {}) {
+  async function startRecording({ withVad = false, signal = null } = {}) {
     if (micState !== 'idle') return false;
     if (isLlmBusy()) { toast(t('voice_error_llm_busy'), { error: true }); return false; }
+    const gen = ++recGen;
+    let stream;
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch {
-      toast(t('voice_error_no_permission'), { error: true });
+      if (gen === recGen) toast(t('voice_error_no_permission'), { error: true });
       return false;
     }
+    // Waehrend der Freigabe abgebrochen (Sprachgespraech beendet, Chat
+    // gewechselt): das Mikrofon sofort wieder schliessen.
+    if (gen !== recGen || (signal && signal.aborted) || micState !== 'idle') {
+      stream.getTracks().forEach((tr) => tr.stop());
+      return false;
+    }
+    mediaStream = stream;
     chunks = [];
     const opts = window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? { mimeType: 'audio/webm;codecs=opus' } : {};
     try {
@@ -85,6 +99,8 @@ window.PocketVoice = (() => {
    *  (leer bei zu kurzer Aufnahme oder Fehler). */
   async function stopAndTranscribe() {
     if (micState !== 'recording' || !mediaRecorder) return '';
+    const gen = recGen;
+    const cid = state.cid;
     const rec = mediaRecorder;
     const done = new Promise((resolve) => rec.addEventListener('stop', resolve, { once: true }));
     rec.stop();
@@ -93,30 +109,41 @@ window.PocketVoice = (() => {
     const blob = new Blob(chunks, { type: mime });
     stopStream();
     chunks = [];
+    if (gen !== recGen) return '';
     if (blob.size < 1000) { setMicState('idle'); return ''; }
     setMicState('busy');
+    const ctrl = new AbortController();
+    transcribeAbort = ctrl;
     try {
       const locale = (localStorage.getItem('pc_locale') || '').trim() || navigator.language || 'en';
       const fd = new FormData();
       const ext = mime.includes('webm') ? 'webm' : mime.includes('mp4') ? 'm4a' : 'wav';
       fd.append('file', blob, `voice-${Date.now()}.${ext}`);
       fd.append('language', locale);
-      const data = await api('POST', '/voice/transcribe', fd);
+      const data = await api('POST', '/voice/transcribe', fd, { signal: ctrl.signal });
+      // Inzwischen abgebrochen oder anderer Chat: der Text gehoert nicht hierher.
+      if (gen !== recGen || state.cid !== cid) return '';
       setMicState('idle');
       return ((data && data.text) || '').trim();
     } catch (e) {
+      if (gen !== recGen || (e && e.name === 'AbortError')) return '';
       setMicState('idle');
       toast(t('voice_error_transcribe_failed', apiErrorText(e)), { error: true });
       return '';
+    } finally {
+      if (transcribeAbort === ctrl) transcribeAbort = null;
     }
   }
 
   function cancelRecording() {
-    if (micState !== 'recording' && micState !== 'busy') return;
+    // Immer hochzaehlen, auch ohne laufende Aufnahme: so verfaellt auch eine
+    // Mikrofon-Freigabe, auf die gerade noch gewartet wird.
+    recGen++;
+    if (transcribeAbort) { try { transcribeAbort.abort(); } catch (_) {} transcribeAbort = null; }
     try { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); } catch (_) {}
     stopStream();
     chunks = [];
-    setMicState('idle');
+    if (micState !== 'idle') setMicState('idle');
   }
 
   function insertTranscript(text) {
@@ -212,13 +239,20 @@ window.PocketVoice = (() => {
 
   /** Einmal zuhoeren: endet per "Senden", Mikrofon-Klick oder Stille. */
   async function listenOnce(signal) {
-    const ok = await startRecording({ withVad: true });
-    if (!ok) return null;
-    await new Promise((resolve) => {
-      listenResolve = resolve;
-      signal.addEventListener('abort', resolve, { once: true });
-    });
-    listenResolve = null;
+    const ok = await startRecording({ withVad: true, signal });
+    if (!ok || signal.aborted) { if (ok) cancelRecording(); return null; }
+    let onAbort = null;
+    try {
+      await new Promise((resolve) => {
+        listenResolve = resolve;
+        onAbort = resolve;
+        signal.addEventListener('abort', onAbort, { once: true });
+      });
+    } finally {
+      // Je Runde ein Listener; nach der Runde wieder weg, sonst sammeln sie sich.
+      signal.removeEventListener('abort', onAbort);
+      listenResolve = null;
+    }
     if (signal.aborted) { cancelRecording(); return null; }
     setPhase('transcribing');
     return stopAndTranscribe();
@@ -260,7 +294,7 @@ window.PocketVoice = (() => {
     if (!autoMode && bar.classList.contains('hidden')) return;
     autoMode = false;
     if (autoAbort) { autoAbort.abort(); autoAbort = null; }
-    if (micState === 'recording' || micState === 'busy') cancelRecording();
+    cancelRecording();
     finishListening();
     showBar(false);
     setSilence(0);
@@ -271,8 +305,7 @@ window.PocketVoice = (() => {
   }
   function resetForChatSwitch() {
     if (autoMode) stopAutoMode();
-    if (micState === 'recording' || micState === 'busy') cancelRecording();
-    setMicState('idle');
+    cancelRecording();
   }
 
   // ---- Bedienung ----
