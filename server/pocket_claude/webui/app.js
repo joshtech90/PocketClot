@@ -1930,7 +1930,11 @@ async function reloadChatMessages(cid) {
 els.inputForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const content = els.input.value.trim();
-  if (!content || state.isStreaming) return;
+  if (!content) return;
+  // Waehrend eine Antwort laeuft, wird nicht gesendet. Ohne Hinweis sah das so
+  // aus, als ginge die Eingabe manchmal verloren (lange Denkphasen zeigen nur
+  // Punkte, der Text blieb einfach im Feld stehen).
+  if (state.isStreaming) { toast(t('toast_reply_running')); return; }
   // Gesperrter, nicht entsperrter Chat → kein Senden (das Gate liegt zwar über
   // der Nachrichtenliste, aber der Composer ist ein Geschwister-Element; ohne
   // diesen Riegel könnte man in einen gesperrten Chat schreiben).
