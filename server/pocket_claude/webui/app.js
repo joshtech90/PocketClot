@@ -2224,11 +2224,20 @@ els.imageChip.addEventListener('click', (e) => { e.stopPropagation(); setImageMo
 function hasSendableContent() {
   return !!els.input.value.trim() || state.pending.some((p) => p.uploaded);
 }
-/** Karte aufklappen (Fokus, Text, Anhaenge, Bildmodus) und den runden Knopf
- *  passend schalten: Sprachgespraech, Senden oder Stoppen. */
+/** Karte aufklappen und den runden Knopf passend schalten: Sprachgespraech,
+ *  Senden oder Stoppen. Auf dem Desktop bleibt das Feld wie bei chatgpt.com
+ *  eine Pille, bis der Text umbricht oder Anhaenge bzw. der Bildmodus dazukommen.
+ *  Am Handy klappt es wie in der App schon beim Antippen auf. */
+let composerGrew = false;
 function updateComposerState() {
-  const focused = document.activeElement === els.input;
-  const expanded = focused || !!els.input.value || state.pending.length > 0 || state.imageMode;
+  const input = els.input;
+  if (!input.value) composerGrew = false;
+  else if (!composerGrew && !els.inputForm.classList.contains('expanded')
+           && (input.value.includes('\n') || input.scrollHeight > input.clientHeight + 4)) {
+    composerGrew = true;
+  }
+  const focusedMobile = isMobile() && document.activeElement === input;
+  const expanded = composerGrew || focusedMobile || state.pending.length > 0 || state.imageMode;
   els.inputForm.classList.toggle('expanded', expanded);
   const btn = els.sendBtn;
   const uploading = state.pending.some((p) => p.uploading);
@@ -2247,7 +2256,7 @@ function autoResize() {
   els.input.style.height = 'auto';
   els.input.style.height = Math.min(els.input.scrollHeight, Math.round(window.innerHeight * 0.4)) + 'px';
 }
-els.input.addEventListener('input', () => { autoResize(); updateComposerState(); });
+els.input.addEventListener('input', () => { updateComposerState(); autoResize(); });
 els.input.addEventListener('focus', updateComposerState);
 els.input.addEventListener('blur', () => setTimeout(updateComposerState, 120));
 els.input.addEventListener('keydown', (e) => {
