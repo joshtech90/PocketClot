@@ -7,7 +7,7 @@
 //   settings.js Einstellungen
 // =====================================================================
 // PC_SSE LOAD MARKER — bump this any time you change PC_SSE logging.
-console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop-b');
+console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop-c');
 // Kurzform fuer die Uebersetzung.
 const t = (k, ...args) => (window.PocketI18n ? window.PocketI18n.t(k, ...args) : k);
 
@@ -2639,6 +2639,11 @@ async function streamReply(content, attachmentIds, imageMode, turn) {
       break;
     }
     buffer += decoder.decode(value, { stream: true });
+    // sse-starlette beendet Zeilen mit \r\n. Ohne Angleichen findet der Parser
+    // nie eine Ereignisgrenze, und die Antwort erscheint erst am Ende ueber das
+    // Neuladen statt live. Nur Paare ersetzen: ein \r am Ende des Puffers
+    // wartet so auf sein \n aus dem naechsten Block.
+    buffer = buffer.replace(/\r\n/g, '\n');
     let idx;
     while ((idx = buffer.indexOf('\n\n')) >= 0) {
       const raw = buffer.slice(0, idx);
@@ -2777,6 +2782,9 @@ function speak(messageId) {
   setAudioState(messageId, 'loading');
   els.audio.play().catch((err) => {
     if (err.name === 'AbortError') return;
+    // Kaputte oder fehlende Audiodaten meldet das error-Ereignis unten einmal
+    // verstaendlich; hier nur, was es nicht abdeckt (z.B. blockiertes Autoplay).
+    if (err.name === 'NotSupportedError') return;
     setAudioState(messageId, 'idle');
     toast(t('toast_playback', err.message), { error: true });
   });
