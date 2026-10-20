@@ -1,0 +1,366 @@
+/* Farbschemata der Web-UI. GENERIERT von server/scripts/web_palettes.py aus den
+   Paletten der Android-App (ColorSchemes.kt). Nicht von Hand aendern, sondern
+   das Skript erneut laufen lassen. */
+
+:root,
+[data-theme="light"] {
+  --bg: #F3F7FB;
+  --sidebar-bg: #EDF3FA;
+  --surface: #FFFFFF;
+  --surface-2: #E2EAF2;
+  --composer-bg: #FFFFFF;
+  --code-bg: #EDF3FA;
+  --border: #D2DEEA;
+  --border-strong: #B5C3D2;
+  --text: #121B24;
+  --text-soft: #4B5A6A;
+  --bubble-user: #1B649E;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #1B649E;
+  --on-accent: #FFFFFF;
+  --selected-bg: #CBE6EC;
+  --selected-fg: #002024;
+  --link: #1B6870;
+  --danger: #BA1A1A;
+  --success: #187A54;
+  --warning: #2F636E;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #100E14;
+  --sidebar-bg: #151219;
+  --surface: #352F3B;
+  --surface-2: #2D2834;
+  --composer-bg: #352F3B;
+  --code-bg: #151219;
+  --border: #302B35;
+  --border-strong: #463E49;
+  --text: #F7F0E8;
+  --text-soft: #BEB3AE;
+  --bubble-user: #E77755;
+  --bubble-user-fg: #26130D;
+  --accent: #F08361;
+  --on-accent: #29130D;
+  --selected-bg: #214A54;
+  --selected-fg: #BDEAF3;
+  --link: #8BC9D6;
+  --danger: #FFB4AB;
+  --success: #51C99A;
+  --warning: #F1BE72;
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-palette="midnight_atelier"] {
+  --bg: #F7F2EB;
+  --sidebar-bg: #F2ECE4;
+  --surface: #FFFFFF;
+  --surface-2: #EFE7DE;
+  --composer-bg: #FFFFFF;
+  --code-bg: #F2ECE4;
+  --border: #E8DED7;
+  --border-strong: #D8CCC5;
+  --text: #211C20;
+  --text-soft: #6F6361;
+  --bubble-user: #B94F35;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #B64B32;
+  --on-accent: #FFFFFF;
+  --selected-bg: #CFE7EC;
+  --selected-fg: #092A31;
+  --link: #3E6B75;
+  --danger: #B83C32;
+  --success: #247A5C;
+  --warning: #7A5730;
+  color-scheme: light;
+}
+
+[data-theme="dark"][data-palette="midnight_atelier"] {
+  --bg: #100E14;
+  --sidebar-bg: #151219;
+  --surface: #352F3B;
+  --surface-2: #2D2834;
+  --composer-bg: #352F3B;
+  --code-bg: #151219;
+  --border: #302B35;
+  --border-strong: #463E49;
+  --text: #F7F0E8;
+  --text-soft: #BEB3AE;
+  --bubble-user: #E77755;
+  --bubble-user-fg: #26130D;
+  --accent: #F08361;
+  --on-accent: #29130D;
+  --selected-bg: #214A54;
+  --selected-fg: #BDEAF3;
+  --link: #8BC9D6;
+  --danger: #FFB4AB;
+  --success: #51C99A;
+  --warning: #F1BE72;
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-palette="nordic_blue"] {
+  --bg: #F3F7FB;
+  --sidebar-bg: #EDF3FA;
+  --surface: #FFFFFF;
+  --surface-2: #E2EAF2;
+  --composer-bg: #FFFFFF;
+  --code-bg: #EDF3FA;
+  --border: #D2DEEA;
+  --border-strong: #B5C3D2;
+  --text: #121B24;
+  --text-soft: #4B5A6A;
+  --bubble-user: #1B649E;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #1B649E;
+  --on-accent: #FFFFFF;
+  --selected-bg: #CBE6EC;
+  --selected-fg: #002024;
+  --link: #1B6870;
+  --danger: #BA1A1A;
+  --success: #187A54;
+  --warning: #2F636E;
+  color-scheme: light;
+}
+
+[data-theme="dark"][data-palette="nordic_blue"] {
+  --bg: #0E141B;
+  --sidebar-bg: #0A0F14;
+  --surface: #242E3B;
+  --surface-2: #1C242E;
+  --composer-bg: #242E3B;
+  --code-bg: #0A0F14;
+  --border: #2B3744;
+  --border-strong: #3F4E5F;
+  --text: #E6EDF5;
+  --text-soft: #A6B4C4;
+  --bubble-user: #4C93D6;
+  --bubble-user-fg: #002240;
+  --accent: #7CB8EB;
+  --on-accent: #003258;
+  --selected-bg: #1F4E54;
+  --selected-fg: #A6EEF6;
+  --link: #86D2D9;
+  --danger: #FFB4AB;
+  --success: #53D4A4;
+  --warning: #98CAD6;
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-palette="forest_sage"] {
+  --bg: #F3F7F3;
+  --sidebar-bg: #EDF3EE;
+  --surface: #FFFFFF;
+  --surface-2: #DEE7DF;
+  --composer-bg: #FFFFFF;
+  --code-bg: #EDF3EE;
+  --border: #D0DED2;
+  --border-strong: #B4C3B6;
+  --text: #131B15;
+  --text-soft: #4B5A4E;
+  --bubble-user: #236A3E;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #236A3E;
+  --on-accent: #FFFFFF;
+  --selected-bg: #BAE8C8;
+  --selected-fg: #002110;
+  --link: #38664C;
+  --danger: #BA1A1A;
+  --success: #1B7B4F;
+  --warning: #59631E;
+  color-scheme: light;
+}
+
+[data-theme="dark"][data-palette="forest_sage"] {
+  --bg: #0F1511;
+  --sidebar-bg: #0B100C;
+  --surface: #253027;
+  --surface-2: #1D261F;
+  --composer-bg: #253027;
+  --code-bg: #0B100C;
+  --border: #2C372E;
+  --border-strong: #414E43;
+  --text: #E8EFE9;
+  --text-soft: #A8B6AA;
+  --bubble-user: #2E7D4E;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #8CD8A4;
+  --on-accent: #00391A;
+  --selected-bg: #2B4D38;
+  --selected-fg: #C1ECD0;
+  --link: #A6D0B4;
+  --danger: #FFB4AB;
+  --success: #56DCA0;
+  --warning: #C5CB86;
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-palette="plum_dusk"] {
+  --bg: #F8F2F7;
+  --sidebar-bg: #F3EAF2;
+  --surface: #FFFFFF;
+  --surface-2: #ECE0EB;
+  --composer-bg: #FFFFFF;
+  --code-bg: #F3EAF2;
+  --border: #E2D4E3;
+  --border-strong: #C7B7C8;
+  --text: #1E1420;
+  --text-soft: #5D4F60;
+  --bubble-user: #743F84;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #743F84;
+  --on-accent: #FFFFFF;
+  --selected-bg: #FFD8EA;
+  --selected-fg: #2E051C;
+  --link: #75455E;
+  --danger: #BA1A1A;
+  --success: #1C7A54;
+  --warning: #7D4E32;
+  color-scheme: light;
+}
+
+[data-theme="dark"][data-palette="plum_dusk"] {
+  --bg: #140E16;
+  --sidebar-bg: #0E0910;
+  --surface: #2D2332;
+  --surface-2: #241C28;
+  --composer-bg: #2D2332;
+  --code-bg: #0E0910;
+  --border: #372B3B;
+  --border-strong: #504054;
+  --text: #F3EDF5;
+  --text-soft: #C0B3C4;
+  --bubble-user: #834E96;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #DFB6E8;
+  --on-accent: #40214B;
+  --selected-bg: #5A394A;
+  --selected-fg: #FFD8EA;
+  --link: #E1B8CA;
+  --danger: #FFB4AB;
+  --success: #63D6A2;
+  --warning: #F0BD9E;
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-palette="graphite_mono"] {
+  --bg: #F5F5F7;
+  --sidebar-bg: #EDEDF0;
+  --surface: #FFFFFF;
+  --surface-2: #E5E5EA;
+  --composer-bg: #FFFFFF;
+  --code-bg: #EDEDF0;
+  --border: #DCDCE5;
+  --border-strong: #BEBECD;
+  --text: #18181B;
+  --text-soft: #565660;
+  --bubble-user: #2C2C34;
+  --bubble-user-fg: #FFFFFF;
+  --accent: #2C2C34;
+  --on-accent: #FFFFFF;
+  --selected-bg: #D6E2F0;
+  --selected-fg: #0E1924;
+  --link: #4A5664;
+  --danger: #BA1A1A;
+  --success: #1E7E55;
+  --warning: #50555E;
+  color-scheme: light;
+}
+
+[data-theme="dark"][data-palette="graphite_mono"] {
+  --bg: #121214;
+  --sidebar-bg: #0C0C0E;
+  --surface: #2B2B31;
+  --surface-2: #222227;
+  --composer-bg: #2B2B31;
+  --code-bg: #0C0C0E;
+  --border: #303038;
+  --border-strong: #484852;
+  --text: #ECECEF;
+  --text-soft: #B5B5BE;
+  --bubble-user: #484852;
+  --bubble-user-fg: #F5F5F7;
+  --accent: #C8C8D2;
+  --on-accent: #18181E;
+  --selected-bg: #323E4B;
+  --selected-fg: #D2DFEC;
+  --link: #9EABB8;
+  --danger: #FFB4AB;
+  --success: #58D2A0;
+  --warning: #B4B9C2;
+  color-scheme: dark;
+}
+
+[data-theme="light"][data-palette="chatgpt"] {
+  --bg: #FAFAFA;
+  --sidebar-bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface-2: #F0F0F0;
+  --composer-bg: #FFFFFF;
+  --code-bg: #FAFAFA;
+  --border: #E5E5E5;
+  --border-strong: #D9D9D9;
+  --text: #0D0D0D;
+  --text-soft: #5D5D5D;
+  --bubble-user: #EEF3FD;
+  --bubble-user-fg: #0D0D0D;
+  --accent: #4165E8;
+  --on-accent: #FFFFFF;
+  --selected-bg: #ECECEC;
+  --selected-fg: #0D0D0D;
+  --link: #4165E8;
+  --danger: #E02E2A;
+  --success: #10A37F;
+  --warning: #A15C00;
+  color-scheme: light;
+}
+
+[data-theme="dark"][data-palette="chatgpt"] {
+  --bg: #212121;
+  --sidebar-bg: #171717;
+  --surface: #303030;
+  --surface-2: #282828;
+  --composer-bg: #303030;
+  --code-bg: #171717;
+  --border: #383838;
+  --border-strong: #4A4A4A;
+  --text: #ECECEC;
+  --text-soft: #B4B4B4;
+  --bubble-user: #303030;
+  --bubble-user-fg: #ECECEC;
+  --accent: #6B8DF2;
+  --on-accent: #FFFFFF;
+  --selected-bg: #3A3A3A;
+  --selected-fg: #ECECEC;
+  --link: #8AA6F5;
+  --danger: #F87171;
+  --success: #19C37D;
+  --warning: #F0B35A;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #100E14;
+    --sidebar-bg: #151219;
+    --surface: #352F3B;
+    --surface-2: #2D2834;
+    --composer-bg: #352F3B;
+    --code-bg: #151219;
+    --border: #302B35;
+    --border-strong: #463E49;
+    --text: #F7F0E8;
+    --text-soft: #BEB3AE;
+    --bubble-user: #E77755;
+    --bubble-user-fg: #26130D;
+    --accent: #F08361;
+    --on-accent: #29130D;
+    --selected-bg: #214A54;
+    --selected-fg: #BDEAF3;
+    --link: #8BC9D6;
+    --danger: #FFB4AB;
+    --success: #51C99A;
+    --warning: #F1BE72;
+    color-scheme: dark;
+  }
+}
