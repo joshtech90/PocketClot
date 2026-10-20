@@ -327,6 +327,10 @@
     <string name="chat_untitled">(sans titre)</string>
     <string name="chat_attach">Joindre</string>
     <string name="chat_attach_image_menu">Photos</string>
+    <string name="chat_attach_create_image">Créer une image</string>
+    <string name="chat_image_mode_chip">Image</string>
+    <string name="hint_image_mode">Décrivez ou modifiez une image…</string>
+    <string name="chat_image_mode_off">Désactiver le mode image</string>
     <string name="chat_attach_file_menu">Fichiers</string>
     <string name="chat_attach_camera_menu">Appareil photo</string>
     <string name="chat_voice_conversation">Démarrer une conversation vocale</string>

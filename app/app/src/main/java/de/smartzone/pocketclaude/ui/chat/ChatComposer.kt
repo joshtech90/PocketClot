@@ -105,6 +105,8 @@ internal fun ChatComposer(
     voiceEnabled: Boolean,
     onMicTap: () -> Unit,
     onMicCancel: () -> Unit,
+    imageMode: Boolean = false,
+    onImageModeChange: (Boolean) -> Unit = {},
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -119,7 +121,7 @@ internal fun ChatComposer(
     val fieldValue = if (fieldState.text == value) fieldState
         else TextFieldValue(value, TextRange(value.length))
 
-    val expanded = focused || value.isNotEmpty() || pending.isNotEmpty()
+    val expanded = focused || value.isNotEmpty() || pending.isNotEmpty() || imageMode
     val anim = tween<androidx.compose.ui.unit.Dp>(durationMillis = 180)
     // Eingeklappt: Zeile mittig in 48 dp, links Platz fuer Plus, rechts fuer
     // Mikrofon und Rundknopf. Ausgeklappt: 16 dp rundum, unten die Knopfreihe.
@@ -199,7 +201,9 @@ internal fun ChatComposer(
                             Box {
                                 if (value.isEmpty()) {
                                     Text(
-                                        stringResource(R.string.hint_message),
+                                        stringResource(
+                                            if (imageMode) R.string.hint_image_mode else R.string.hint_message
+                                        ),
                                         style = fieldStyle,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                         maxLines = 1,
@@ -223,6 +227,18 @@ internal fun ChatComposer(
                             PocketIcons.AddLarge,
                             contentDescription = stringResource(R.string.chat_attach),
                             tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    // Bildmodus wie bei ChatGPT als Chip neben dem Plus, Antippen
+                    // schaltet ihn wieder aus.
+                    if (imageMode) {
+                        ImageModeChip(
+                            onRemove = { onImageModeChange(false) },
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = BUTTON)
+                                .height(BUTTON),
                         )
                     }
 
@@ -272,10 +288,49 @@ internal fun ChatComposer(
                             onCamera = onCamera,
                             onPhotos = onPhotos,
                             onFiles = onFiles,
+                            onCreateImage = {
+                                onImageModeChange(true)
+                                focusRequester.requestFocus()
+                                keyboard?.show()
+                            },
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+/** Chip „Bild ✕" in der Knopfreihe: zeigt den aktiven Bildmodus, Antippen beendet ihn. */
+@Composable
+private fun ImageModeChip(onRemove: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.chat_image_mode_chip)
+    val off = stringResource(R.string.chat_image_mode_off)
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Row(
+            modifier = Modifier
+                .height(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .clickable(onClick = onRemove)
+                .padding(start = 10.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                PocketIcons.Brush, contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(PocketIconSize.Small),
+            )
+            Text(
+                label, style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Icon(
+                PocketIcons.Close, contentDescription = off,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(PocketIconSize.Small),
+            )
         }
     }
 }
@@ -321,6 +376,7 @@ private fun AttachMenu(
     onCamera: () -> Unit,
     onPhotos: () -> Unit,
     onFiles: () -> Unit,
+    onCreateImage: () -> Unit,
 ) {
     val close = { state.targetState = false }
     Popup(
@@ -346,6 +402,7 @@ private fun AttachMenu(
                     AttachMenuItem(PocketIcons.Camera, stringResource(R.string.chat_attach_camera_menu)) { close(); onCamera() }
                     AttachMenuItem(PocketIcons.Image, stringResource(R.string.chat_attach_image_menu)) { close(); onPhotos() }
                     AttachMenuItem(PocketIcons.AttachFile, stringResource(R.string.chat_attach_file_menu)) { close(); onFiles() }
+                    AttachMenuItem(PocketIcons.Brush, stringResource(R.string.chat_attach_create_image)) { close(); onCreateImage() }
                 }
             }
         }

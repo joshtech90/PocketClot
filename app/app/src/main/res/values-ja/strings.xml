@@ -327,6 +327,10 @@
     <string name="chat_untitled">（タイトルなし）</string>
     <string name="chat_attach">添付</string>
     <string name="chat_attach_image_menu">写真</string>
+    <string name="chat_attach_create_image">画像を作成</string>
+    <string name="chat_image_mode_chip">画像</string>
+    <string name="hint_image_mode">画像を説明または編集…</string>
+    <string name="chat_image_mode_off">画像モードをオフ</string>
     <string name="chat_attach_file_menu">ファイル</string>
     <string name="chat_attach_camera_menu">カメラ</string>
     <string name="chat_voice_conversation">音声会話を開始</string>

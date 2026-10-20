@@ -100,6 +100,8 @@ data class SendMessageRequest(
      *  ausgewählten Voice/Speed. Beim nächsten Vorlesen-Tap ist's Cache-Hit. */
     @SerialName("tts_voice") val ttsVoice: String? = null,
     @SerialName("tts_rate") val ttsRate: Float? = null,
+    /** Plus-Menue „Bild erstellen": diese Nachricht soll ein Bild ergeben. */
+    @SerialName("image_mode") val imageMode: Boolean = false,
 )
 
 @Serializable

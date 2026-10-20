@@ -167,6 +167,7 @@ class ChatRepository(
         systemPrompt: String? = null,
         ttsVoice: String? = null,
         ttsRate: Float? = null,
+        imageMode: Boolean = false,
     ): Flow<StreamEvent> =
         api.streamMessage(id, SendMessageRequest(
             content = content,
@@ -178,6 +179,7 @@ class ChatRepository(
             systemPrompt = systemPrompt,
             ttsVoice = ttsVoice,
             ttsRate = ttsRate,
+            imageMode = imageMode,
         ))
 
     suspend fun setImageDefaults(

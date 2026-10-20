@@ -569,7 +569,8 @@ class ChatViewModel(
         _state.update { st -> st.copy(pending = st.pending.filter { it.uri != uri }) }
     }
 
-    fun send(content: String) {
+    /** @param imageMode Plus-Menue „Bild erstellen" war fuer diese Nachricht aktiv. */
+    fun send(content: String, imageMode: Boolean = false) {
         val text = content.trim()
         val pending = _state.value.pending
         if (text.isEmpty() && pending.none { it.uploaded != null }) return
@@ -640,6 +641,7 @@ class ChatViewModel(
                 // gewählte Voice/Speed. Nächster Vorlesen-Tap = Cache-Hit.
                 ttsVoice = s.ttsVoice,
                 ttsRate = s.ttsSpeed,
+                imageMode = imageMode,
             )
                 // Ein Verbindungsabbruch kommt schon als ErrorEvent an; die
                 // Ausnahme dahinter darf die App nicht mehr abstuerzen lassen.

@@ -330,6 +330,10 @@
     <string name="chat_untitled">(ohne Titel)</string>
     <string name="chat_attach">Anhängen</string>
     <string name="chat_attach_image_menu">Fotos</string>
+    <string name="chat_attach_create_image">Bild erstellen</string>
+    <string name="chat_image_mode_chip">Bild</string>
+    <string name="hint_image_mode">Bild beschreiben oder ändern…</string>
+    <string name="chat_image_mode_off">Bildmodus ausschalten</string>
     <string name="chat_attach_file_menu">Dateien</string>
     <string name="chat_attach_camera_menu">Kamera</string>
     <string name="chat_voice_conversation">Sprachgespräch starten</string>

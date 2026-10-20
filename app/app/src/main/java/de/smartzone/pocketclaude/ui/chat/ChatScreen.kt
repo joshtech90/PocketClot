@@ -144,6 +144,8 @@ fun ChatScreen(
     // App-Hintergrund via ChatLockManager).
     val unlockedChats by container.chatLock.unlocked.collectAsState()
     var input by remember { mutableStateOf("") }
+    // Plus-Menue „Bild erstellen": gilt fuer genau die naechste Nachricht.
+    var imageMode by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -898,8 +900,11 @@ fun ChatScreen(
                     onSend = {
                         val text = input
                         input = ""
-                        vm.send(text)
+                        vm.send(text, imageMode)
+                        imageMode = false
                     },
+                    imageMode = imageMode,
+                    onImageModeChange = { imageMode = it },
                     onStop = { vm.stop() },
                     onCamera = launchCamera,
                     onPhotos = {

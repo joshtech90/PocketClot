@@ -327,6 +327,10 @@
     <string name="chat_untitled">(未命名)</string>
     <string name="chat_attach">附件</string>
     <string name="chat_attach_image_menu">照片</string>
+    <string name="chat_attach_create_image">创建图片</string>
+    <string name="chat_image_mode_chip">图片</string>
+    <string name="hint_image_mode">描述或编辑图片…</string>
+    <string name="chat_image_mode_off">关闭图片模式</string>
     <string name="chat_attach_file_menu">文件</string>
     <string name="chat_attach_camera_menu">相机</string>
     <string name="chat_voice_conversation">开始语音对话</string>
