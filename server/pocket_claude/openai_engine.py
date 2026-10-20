@@ -395,6 +395,7 @@ async def stream_reply(
     image_defaults: dict | None = None,
     skills: dict | None = None,
     wissen_schluessel: str | None = None,
+    image_wish: bool = False,
 ) -> AsyncIterator[dict]:
     """Streamt eine Antwort eines Zusatz-Modells.
 
@@ -457,6 +458,16 @@ async def stream_reply(
                 })
             except ImportError as exc:
                 log.warning("PC_GW: Bild-Werkzeug nicht verfuegbar: %s", exc)
+
+        # "Bild erstellen" aus dem Plus-Menue: Hinweis an die aktuelle Nachricht,
+        # nur fuer diesen Turn. Der Verlauf kommt bei jedem Turn frisch aus der
+        # Datenbank, dort steht er nicht.
+        if image_wish and image_tool is not None and messages and messages[-1]["role"] == "user":
+            letzte = messages[-1]["content"]
+            if isinstance(letzte, str):
+                messages[-1]["content"] = f"{letzte}\n\n{image_tool.WISH_HINT}"
+            else:
+                messages[-1]["content"] = [*letzte, {"type": "text", "text": image_tool.WISH_HINT}]
 
         # Privates Gedaechtnis, nur fuer freigeschaltete Konten
         from pocket_claude import wissen_tool

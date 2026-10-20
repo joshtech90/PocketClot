@@ -730,6 +730,10 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
     skills_dict = effective_skills.model_dump()
 
     # Bild-Werkzeug: Skill-Schalter des Chats plus die Standardwerte des Users.
+    # Wer ausdruecklich "Bild erstellen" waehlt, bekommt es auch bei
+    # abgeschaltetem Skill: sonst liefe der Wunsch ins Leere.
+    if body.image_mode:
+        skills_dict["image_generation"] = True
     allow_image_tool = bool(skills_dict.get("image_generation", True))
     image_defaults = {
         "size": (user_kv.get(_KV_IMAGE_DEFAULT_SIZE) or "").strip() or None,
@@ -811,6 +815,14 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
             yield {"event": "user_saved", "data": json.dumps({"user_message_id": user_msg_id})}
             log.info("PC_SSE: yield user_saved cid=%s user_msg_id=%s", cid, user_msg_id)
 
+            # Fuer "aendere das Bild" ohne neuen Anhang: das zuletzt gezeigte
+            # Bild. Erst hier unter dem Lock, damit es zum Verlauf passt.
+            if allow_image_tool:
+                image_defaults["previous_image_ids"] = await image_tool.previous_image_ids(
+                    cid, before_message_id=user_msg_id)
+            if body.image_mode:
+                log.info("PC_IMG: cid=%s Bild erstellen gewaehlt", cid)
+
             if use_gateway:
                 engine_stream = openai_engine.stream_reply(
                     cid, user_msg_id,
@@ -825,6 +837,7 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
                     # nicht kann (Bash), faellt in der Engine still weg.
                     skills=skills_dict,
                     wissen_schluessel=wissen_schluessel,
+                    image_wish=body.image_mode,
                 )
             else:
                 engine_stream = claude_engine.stream_reply(
@@ -838,6 +851,7 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
                     replay_history=replay_history,
                     image_defaults=image_defaults,
                     wissen_schluessel=wissen_schluessel,
+                    image_wish=body.image_mode,
                 )
 
             async for ev in engine_stream:

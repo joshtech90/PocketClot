@@ -53,15 +53,28 @@ PARAMETERS: dict[str, Any] = {
         "edit_attached_images": {
             "type": "boolean",
             "description": (
-                "Auf true setzen, wenn der Nutzer ein Bild mitgeschickt hat und "
-                "es GEAENDERT haben will, statt ein neues zu bekommen. Dann "
-                "dienen seine Bilder als Vorlage, und die Beschreibung sagt nur, "
-                "was sich aendern soll. Ohne Bild im Gespraech wirkungslos."
+                "Auf true setzen, wenn ein vorhandenes Bild GEAENDERT werden "
+                "soll, statt ein neues zu zeichnen: die Bilder, die der Nutzer "
+                "gerade mitschickt, oder ohne Anhang das zuletzt im Chat "
+                "gezeigte Bild (auch ein eben erzeugtes, etwa bei 'mach den "
+                "Himmel dunkler'). Die Beschreibung sagt dann nur, was sich "
+                "aendern soll. Ohne Bild im Gespraech wirkungslos."
             ),
         },
     },
     "required": ["prompt"],
 }
+
+# Anweisung fuer eine Nachricht, bei der der Nutzer im Plus-Menue "Bild
+# erstellen" gewaehlt hat. Sie haengt nur am laufenden Turn und landet nicht
+# in der Datenbank.
+WISH_HINT = (
+    "[Hinweis der App: Der Nutzer hat fuer diese Nachricht \"Bild erstellen\" "
+    "gewaehlt. Rufe das Werkzeug generate_image auf, auch wenn die Nachricht "
+    "kurz oder mehrdeutig ist, und nutze den bisherigen Verlauf fuer eine "
+    "ausfuehrliche Bildbeschreibung. Bezieht sich die Nachricht auf ein "
+    "vorhandenes Bild, setze edit_attached_images. Frage nicht zurueck.]"
+)
 
 
 async def store_images(images: list[image_engine.GeneratedImage], user_id: str) -> list[dict]:
@@ -143,6 +156,31 @@ async def _load_references(
     return image_engine.usable_references(raw)
 
 
+async def previous_image_ids(cid: str, before_message_id: int | None = None) -> list[str]:
+    """Die Bild-Anhaenge der juengsten Nachricht im Chat, die Bilder traegt.
+
+    Egal ob erzeugt (Antwort) oder hochgeladen (Frage): gemeint ist das Bild,
+    das der Nutzer zuletzt gesehen hat. Fehler liefern eine leere Liste, die
+    Vorlage ist nur ein Komfort und darf den Turn nie kippen.
+    """
+    try:
+        msgs = await db.list_messages(cid)
+        for m in reversed(msgs):
+            if before_message_id is not None and m["id"] >= before_message_id:
+                continue
+            ids = m.get("attachment_ids") or []
+            if not ids:
+                continue
+            atts = await db.get_attachments(ids)
+            bilder = [a["id"] for a in atts
+                      if str(a.get("mime_type") or "").lower().startswith("image/")]
+            if bilder:
+                return bilder
+    except Exception as exc:  # noqa: BLE001 - siehe Docstring
+        log.warning("PC_IMG: letztes Bild nicht ermittelbar: %s: %s", type(exc).__name__, exc)
+    return []
+
+
 async def run(user_id: str, args: dict, defaults: dict | None = None) -> dict:
     """Fuehrt die Bildgenerierung fuer das Tool aus und speichert die Ergebnisse.
 
@@ -196,11 +234,18 @@ async def run(user_id: str, args: dict, defaults: dict | None = None) -> dict:
     # ob die mitgeschickten Bilder Vorlage sein sollen. `_load_references`
     # faengt selbst alles ab und liefert im Zweifel eine leere Liste; dann wird
     # eben neu gezeichnet statt bearbeitet.
+    # Ohne eigenen Bild-Anhang ist das zuletzt im Chat gezeigte Bild gemeint:
+    # "mach den Himmel abendlich" soll das eben erzeugte Bild aendern, nicht
+    # ein neues Motiv zeichnen.
     references: list[image_engine.ReferenceImage] = []
     if args.get("edit_attached_images"):
         references = await _load_references(
             defaults.get("attachment_ids") or [], user_id,
         )
+        if not references and defaults.get("previous_image_ids"):
+            references = await _load_references(defaults["previous_image_ids"], user_id)
+            if references:
+                log.info("PC_IMG: Vorlage ist das letzte Bild im Chat (%d)", len(references))
         if not references:
             log.info("PC_IMG: Bearbeiten gewuenscht, aber kein brauchbares Bild dabei")
 
@@ -244,16 +289,20 @@ async def run(user_id: str, args: dict, defaults: dict | None = None) -> dict:
             "text": f"Die Bilder konnten nicht gespeichert werden: {e}",
         }
 
+    # Kurz halten: der Nutzer sieht das Bild, eine Beschreibung davon oder ein
+    # Absatz mit Varianten-Angeboten ist nur Lesestoff ohne Nutzen.
     count_done = len(attachments)
     if count_done == 1:
         summary = (
             "1 Bild wurde erfolgreich generiert und dem Nutzer bereits im Chat angezeigt. "
-            "Erfinde keinen Markdown-Bild-Link oder Dateipfad im Text."
+            "Erfinde keinen Markdown-Bild-Link oder Dateipfad im Text. Schreib dazu "
+            "hoechstens einen kurzen Satz, beschreibe das Bild nicht."
         )
     else:
         summary = (
             f"{count_done} Bilder wurden erfolgreich generiert und dem Nutzer bereits im Chat angezeigt. "
-            "Erfinde keine Markdown-Bild-Links oder Dateipfade im Text."
+            "Erfinde keine Markdown-Bild-Links oder Dateipfade im Text. Schreib dazu "
+            "hoechstens einen kurzen Satz, beschreibe die Bilder nicht."
         )
 
     return {

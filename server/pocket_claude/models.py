@@ -94,6 +94,10 @@ class SendMessageRequest(BaseModel):
     # im Cache ab — der nächste /messages/{id}/audio-Aufruf ist dann Cache-Hit.
     tts_voice: str | None = None
     tts_rate: float | None = None
+    # Plus-Menue "Bild erstellen": diese eine Nachricht soll ein Bild ergeben.
+    # Das Modell schreibt die Bildbeschreibung aus dem Verlauf, das Bild-
+    # Werkzeug ist dafuer auch dann an, wenn der Skill-Schalter es abstellt.
+    image_mode: bool = False
 
 
 class AttachmentOut(BaseModel):

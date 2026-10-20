@@ -528,6 +528,7 @@ async def stream_reply(
     replay_history: bool = False,
     image_defaults: dict | None = None,
     wissen_schluessel: str | None = None,
+    image_wish: bool = False,
 ) -> AsyncIterator[dict]:
     """Yieldet SSE-kompatible Events:
       - {"type": "delta", "text": "..."}
@@ -642,6 +643,12 @@ async def stream_reply(
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server
             allowed_tools.extend(werkzeug_namen)
+
+        # "Bild erstellen" aus dem Plus-Menue: der Hinweis haengt nur an diesem
+        # Turn. Ohne verfuegbares Werkzeug waere er eine leere Aufforderung.
+        from pocket_claude import image_tool as _image_tool
+        if image_wish and f"mcp__pocket__{_image_tool.TOOL_NAME}" in werkzeug_namen:
+            prompt = f"{prompt}\n\n{_image_tool.WISH_HINT}"
 
         log.info("Skills enabled → allowed_tools: %s", allowed_tools)
 
