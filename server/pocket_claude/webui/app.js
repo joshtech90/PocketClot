@@ -1823,7 +1823,7 @@ function scrollToBottom(force = false) {
   updateScrollUi();
 }
 function updateScrollUi() {
-  els.scrollDown.classList.toggle('hidden', state.view !== 'chat' || distanceFromBottom() < 400);
+  els.scrollDown.classList.toggle('hidden', state.view !== 'chat' || distanceFromBottom() < 160);
   els.topbar.classList.toggle('scrolled', state.view === 'chat' && els.messages.scrollTop > 4);
 }
 els.messages.addEventListener('scroll', updateScrollUi, { passive: true });
@@ -2581,7 +2581,11 @@ function handleSseEvent(raw) {
       state.streamingText = '';
       state.streamingThinking = '';
       state.isStreaming = false;
+      // Wer beim Mitlesen unten war, bleibt unten: das Neuzeichnen der fertigen
+      // Antwort aendert die Hoehe und wuerde den Schluss sonst verdecken.
+      const stick = distanceFromBottom() < 240;
       renderMessages();
+      if (stick) scrollToBottom(true);
       updateComposerState();
       refreshChatList();
       // Vorlesen: im Sprachgespraech immer, sonst nach Chat- bzw. Standardwahl.

@@ -1263,7 +1263,7 @@ kbd {
 .img-status.error { color: var(--danger); }
 .img-history-head { display: flex; align-items: center; justify-content: space-between; margin: 32px 2px 12px; }
 .img-history-head h2 { margin: 0; font-size: var(--fs-xl); font-weight: 600; }
-.img-history { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.img-history { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: start; }
 .img-entry {
   display: flex; flex-direction: column;
   border-radius: var(--radius-lg);
@@ -1359,7 +1359,11 @@ kbd {
 .sr-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .sr-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sr-snippet { font-size: var(--fs-sm); color: var(--text-soft); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.sr-snippet b, .sr-title b { font-weight: 600; color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 3px; padding: 0 2px; }
+.sr-snippet b, .sr-title b { font-weight: 600; color: var(--text); background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 3px; }
+/* Eigener Schliessen-Knopf statt des Browser-Kreuzes in Suchfeldern */
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 .sr-when { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; margin-left: auto; padding-left: 8px; }
 .sr-empty { padding: 28px 12px; text-align: center; color: var(--text-muted); }
 
@@ -1591,6 +1595,8 @@ label.set-row { cursor: pointer; }
   .messages-inner { padding: 8px 16px 24px; }
   .composer-wrap { padding: 0 10px 6px; }
   #share-btn span { display: none; }
+  .model-btn { font-size: var(--fs-lg); padding: 0 8px; }
+  .topbar { padding: 0 6px; }
   .msg.user .bubble { max-width: 85%; }
   .msg-tools { opacity: 1; }
   .empty-hero h3, .gem-welcome h3 { font-size: 24px; }
