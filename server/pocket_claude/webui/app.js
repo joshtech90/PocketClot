@@ -7,7 +7,7 @@
 //   settings.js Einstellungen
 // =====================================================================
 // PC_SSE LOAD MARKER — bump this any time you change PC_SSE logging.
-console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop-c');
+console.log('PC_SSE: app.js LOADED build=2026-10-21-desktop-d');
 // Kurzform fuer die Uebersetzung.
 const t = (k, ...args) => (window.PocketI18n ? window.PocketI18n.t(k, ...args) : k);
 
@@ -253,9 +253,12 @@ function fileExt(name) {
 }
 function isImageMime(m) { return (m || '').startsWith('image/'); }
 
-marked.setOptions({ breaks: true, gfm: true });
+// Fehlen marked oder DOMPurify (blockiertes Skript), zeigen wir den Text
+// escaped statt gar nichts: frueher brach hier die ganze Seite ab.
+if (window.marked) marked.setOptions({ breaks: true, gfm: true });
 function renderMarkdown(text) {
   if (!text) return '';
+  if (!window.marked || !window.DOMPurify) return escapeHtml(text).replace(/\n/g, '<br>');
   return DOMPurify.sanitize(marked.parse(text), { ADD_ATTR: ['target'] });
 }
 
