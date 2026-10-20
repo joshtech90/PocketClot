@@ -204,6 +204,9 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
     att_cols = {row[1] for row in await cur.fetchall()}
     if "user_id" not in att_cols:
         await db.execute("ALTER TABLE attachments ADD COLUMN user_id TEXT")
+    if "transcript" not in att_cols:
+        # Transkript von Audio-Anhaengen (Groq Whisper), siehe attachments.py
+        await db.execute("ALTER TABLE attachments ADD COLUMN transcript TEXT")
     # Users-Tabelle: password_hash + must_change_password
     cur = await db.execute("PRAGMA table_info(users)")
     user_cols = {row[1] for row in await cur.fetchall()}
@@ -743,6 +746,12 @@ async def get_attachment(aid: str, user_id: str | None = None) -> dict | None:
         cur = await db.execute(sql, params)
         row = await cur.fetchone()
     return dict(row) if row else None
+
+
+async def set_attachment_transcript(aid: str, text: str) -> None:
+    async with get_db() as db:
+        await db.execute("UPDATE attachments SET transcript = ? WHERE id = ?", (text, aid))
+        await db.commit()
 
 
 async def get_attachments(ids: list[str]) -> list[dict]:

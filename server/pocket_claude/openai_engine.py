@@ -179,7 +179,9 @@ def _rough_text_tokens(row: dict, attachments_by_id: dict[str, dict],
         if not att:
             continue
         mime = (att.get("mime_type") or "").lower()
-        if att_mod.looks_like_text(att.get("filename") or "", mime):
+        if att_mod.is_audio(att.get("filename") or "", mime):
+            total += len(att_mod.transcript_for_prompt(att)) // 4 + 20
+        elif att_mod.looks_like_text(att.get("filename") or "", mime):
             total += min(att.get("size_bytes") or 0, att_mod.MAX_TEXT_ATTACHMENT_BYTES) // 4
         elif mime.startswith("image/"):
             total += IMAGE_TOKEN_ESTIMATE

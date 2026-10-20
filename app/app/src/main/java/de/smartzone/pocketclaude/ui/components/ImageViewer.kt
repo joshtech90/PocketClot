@@ -94,9 +94,17 @@ fun ImageViewerDialog(
                         })
                     }
                     .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 6f)
-                            offset = if (scale == 1f) Offset.Zero else offset + pan * scale
+                        // Die Gesten kommen in Bildschirm-Koordinaten an (vor der
+                        // graphicsLayer). Gezoomt wird um den Fingermittelpunkt,
+                        // damit die Stelle unter den Fingern stehen bleibt;
+                        // Verschieben geht 1:1 mit dem Finger.
+                        detectTransformGestures { centroid, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 6f)
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val anchor = centroid - center
+                            offset = if (newScale == 1f) Offset.Zero
+                                else (offset - anchor) * (newScale / scale) + anchor + pan
+                            scale = newScale
                         }
                     }
                     .graphicsLayer {

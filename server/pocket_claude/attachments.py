@@ -100,11 +100,17 @@ _TEXT_FILENAMES = {
 
 # Audio-Anhaenge (geteilte Sprachnachrichten, Diktate) kann kein Modell hier
 # selbst hoeren. Sie werden einmal per Groq Whisper transkribiert, das
-# Transkript liegt als Nachbardatei neben dem Audio und geht als Text in jeden
-# spaeteren Prompt, auch wenn der Verlauf neu aufgebaut wird.
-TRANSCRIPT_SUFFIX = ".transkript.txt"
+# Transkript steht in der Spalte `attachments.transcript` und geht als Text in
+# jeden spaeteren Prompt. In der Datenbank statt als Nachbardatei: so loeschen
+# und sichern Konto-Loeschung und Backups es automatisch mit.
 _AUDIO_EXTENSIONS = (".ogg", ".opus", ".oga", ".mp3", ".m4a", ".mp4a", ".aac",
                      ".wav", ".flac", ".webm", ".amr", ".3gp")
+# Grenze je Transkript im Prompt, gut 15.000 Tokens. Eine Stunde Sprache sind
+# rund 50.000 Zeichen; mehr wuerde spaetere Rueckfragen aus dem Kontext druecken.
+MAX_TRANSCRIPT_CHARS = 60_000
+# Gesamtzeit fuer alle Transkriptionen eines Turns. Sie laufen unter dem
+# Konversations-Lock, laenger darf der Chat nicht blockiert sein.
+TRANSCRIBE_BUDGET_SECONDS = 150.0
 
 
 def is_audio(filename: str, mime: str) -> bool:
@@ -113,46 +119,59 @@ def is_audio(filename: str, mime: str) -> bool:
     return (filename or "").lower().endswith(_AUDIO_EXTENSIONS)
 
 
-def transcript_path(path: Path) -> Path:
-    return path.with_name(path.name + TRANSCRIPT_SUFFIX)
+def transcript_for_prompt(att: dict) -> str:
+    """Das Transkript, auf die Prompt-Grenze gekuerzt. Leer, wenn keins da ist."""
+    text = (att.get("transcript") or "").strip()
+    if len(text) > MAX_TRANSCRIPT_CHARS:
+        text = text[:MAX_TRANSCRIPT_CHARS] + "\n…[Transkript gekuerzt]"
+    return text
 
 
 async def ensure_transcripts(attachments: list[dict], *, api_key: str,
-                             whisper_lang: str = "", bias_prompt: str = "") -> list[str]:
+                             whisper_lang: str = "", bias_prompt: str = "",
+                             budget_seconds: float = TRANSCRIBE_BUDGET_SECONDS) -> list[str]:
     """Transkribiert Audio-Anhaenge, die noch kein Transkript haben.
 
-    Liefert Fehlermeldungen fuer den Nutzer zurueck, wirft aber nie: ein
-    fehlgeschlagenes Transkript darf den Chat-Turn nicht kippen, der Prompt
-    sagt dem Modell dann, dass der Inhalt fehlt.
+    Liefert Fehlermeldungen zurueck, wirft aber nie: ein fehlgeschlagenes
+    Transkript darf den Chat-Turn nicht kippen, der Prompt sagt dem Modell
+    dann, dass der Inhalt fehlt. Nach `budget_seconds` ist Schluss, der Turn
+    laeuft mit dem weiter, was bis dahin da ist.
     """
     import asyncio
 
-    from pocket_claude import voice
+    from pocket_claude import db, voice
 
     fehler: list[str] = []
-    for a in attachments:
-        if not is_audio(a.get("filename") or "", a.get("mime_type") or ""):
-            continue
+    offen = [a for a in attachments
+             if is_audio(a.get("filename") or "", a.get("mime_type") or "")
+             and not (a.get("transcript") or "").strip()]
+    if not offen:
+        return fehler
+    if not api_key:
+        return ["Kein Groq-Schluessel gesetzt (Einstellungen, Spracheingabe)."]
+
+    async def eins(a: dict) -> None:
         path = Path(a["path"])
-        ziel = transcript_path(path)
-        if ziel.exists():
-            continue
-        if not api_key:
-            fehler.append("Kein Groq-Schluessel gesetzt (Einstellungen, Spracheingabe).")
-            continue
         try:
             daten = await asyncio.to_thread(path.read_bytes)
             text = await voice.transcribe(
                 audio_bytes=daten, filename=a.get("filename") or path.name,
                 content_type=a.get("mime_type") or "application/octet-stream",
                 api_key=api_key, whisper_lang=whisper_lang, bias_prompt=bias_prompt,
-                timeout_sec=180.0,
+                timeout_sec=budget_seconds,
             )
-            await asyncio.to_thread(ziel.write_text, text, "utf-8")
+            await db.set_attachment_transcript(a["id"], text)
+            a["transcript"] = text
             log.info("PC_AUDIO: %s transkribiert (%d Zeichen)", a.get("id"), len(text))
         except Exception as exc:  # noqa: BLE001 - siehe Docstring
             log.warning("PC_AUDIO: %s nicht transkribiert: %s", a.get("id"), exc)
             fehler.append(f"{a.get('filename')}: {exc}")
+
+    try:
+        await asyncio.wait_for(asyncio.gather(*(eins(a) for a in offen)), budget_seconds)
+    except asyncio.TimeoutError:
+        log.warning("PC_AUDIO: Zeitbudget von %.0f s ueberschritten", budget_seconds)
+        fehler.append("Transkription hat zu lange gedauert.")
     return fehler
 
 
@@ -250,12 +269,7 @@ def build_prompt_text(user_msg: dict, attachments_by_id: dict[str, dict],
             parts.append(f"\n\n[Bild '{filename}' ist dieser Nachricht direkt beigefuegt.]")
             continue
         if is_audio(filename, mime):
-            tp = transcript_path(path)
-            try:
-                transkript = tp.read_text("utf-8") if tp.exists() else ""
-            except Exception as exc:  # noqa: BLE001
-                log.warning("Transkript zu %s nicht lesbar: %s", filename, exc)
-                transkript = ""
+            transkript = transcript_for_prompt(a)
             if transkript:
                 parts.append(
                     f"\n\n--- Audio: **{filename}** (automatisch per Whisper transkribiert, "

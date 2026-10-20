@@ -704,14 +704,15 @@ def _merge_db_and_uploads(zf) -> tuple[int, int, int, int]:  # noqa: ANN001
                         continue
                     a_keys = set(a.keys())
                     att_user_id = a["user_id"] if "user_id" in a_keys else None
+                    att_transcript = a["transcript"] if "transcript" in a_keys else None
                     live_conn.execute(
                         """INSERT INTO attachments
                            (id, filename, mime_type, size_bytes, path,
-                            uploaded_at, user_id)
-                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                            uploaded_at, user_id, transcript)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                         (a["id"], a["filename"], a["mime_type"],
                          a["size_bytes"], a["path"], a["uploaded_at"],
-                         att_user_id),
+                         att_user_id, att_transcript),
                     )
                     atts_imported += 1
 

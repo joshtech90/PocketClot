@@ -45,6 +45,8 @@ from pocket_claude.attachments import (
     build_prompt_text as _build_prompt_text,
     has_binary_attachments as _has_binary_attachments,
     inline_images as _inline_images,
+    is_audio,
+    transcript_for_prompt,
 )
 from pocket_claude.config import settings
 
@@ -381,7 +383,8 @@ async def generate_conversation_title(
 MAX_TRANSCRIPT_CHARS = 120_000
 
 
-def _format_transcript(all_msgs: list[dict], current_user_message_id: int) -> str:
+def _format_transcript(all_msgs: list[dict], current_user_message_id: int,
+                       attachments_by_id: dict[str, dict] | None = None) -> str:
     """Baut aus den DB-Nachrichten einen lesbaren Verlauf fuer den Prompt.
 
     Die aktuelle User-Nachricht bleibt draussen, die steht separat im Prompt.
@@ -392,6 +395,15 @@ def _format_transcript(all_msgs: list[dict], current_user_message_id: int) -> st
         if m["id"] == current_user_message_id:
             break
         text = (m.get("content") or "").strip()
+        # Geteilte Sprachnachrichten: ihr Inhalt steht nur im Transkript,
+        # ohne das wuesste Claude nach einem Modellwechsel nichts davon.
+        for aid in m.get("attachment_ids") or []:
+            att = (attachments_by_id or {}).get(aid)
+            if att and is_audio(att.get("filename") or "", att.get("mime_type") or ""):
+                tr = transcript_for_prompt(att)
+                if tr:
+                    text += f"\n[Audio '{att.get('filename')}', Transkript]: {tr}"
+        text = text.strip()
         if not text:
             continue
         role = m.get("role")
@@ -591,7 +603,10 @@ async def stream_reply(
         # den bisherigen Verlauf als Textblock mitgeliefert, sonst antwortet es
         # ins Leere.
         if replay_history and not session_id:
-            transcript = _format_transcript(all_msgs, user_message_id)
+            frueher_ids = [aid for m in all_msgs if m["id"] != user_message_id
+                           for aid in (m.get("attachment_ids") or [])]
+            frueher = {a["id"]: a for a in await db.get_attachments(frueher_ids)} if frueher_ids else {}
+            transcript = _format_transcript(all_msgs, user_message_id, frueher)
             if transcript:
                 prompt = (
                     "<bisheriger_verlauf>\n"
