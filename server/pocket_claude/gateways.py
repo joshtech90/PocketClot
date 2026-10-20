@@ -151,6 +151,9 @@ class _CacheEntry:
 _cache: dict[str, _CacheEntry] = {}
 _cache_lock = asyncio.Lock()
 
+# Das GPT-Bildmodell, das `image_engine` fest anfordert.
+GPT_IMAGE_MODEL = "gpt-image-2"
+
 
 # ---------- Konfiguration ----------
 
@@ -728,22 +731,23 @@ def _without_unsupported(model: ChatModel) -> ChatModel:
 async def gpt_image_gateway() -> GatewayConfig | None:
     """Das Gateway, das Bilder ueber den OpenAI-Bildpfad erzeugen kann.
 
-    Zwei Erkennungsmerkmale. CodexLB meldet seine Denkstufen als Metadaten,
-    fuehrt das Bildmodell aber in keiner Modell-Liste. Der gemeinsame Pool auf
-    Paradies (CLIProxyAPI mit Codex-Konten) meldet keine Denkstufen, listet
-    dafuer `gpt-image-*` direkt.
+    Zwei Erkennungsmerkmale, in dieser Rangfolge. CodexLB meldet seine
+    Denkstufen als Metadaten, fuehrt das Bildmodell aber in keiner
+    Modell-Liste. Der gemeinsame Pool auf Paradies (CLIProxyAPI mit
+    Codex-Konten) meldet keine Denkstufen, listet dafuer `GPT_IMAGE_MODEL`
+    direkt. Verlangt wird genau dieses Modell, nicht irgendein `gpt-image-*`:
+    es ist das, was danach fest angefordert wird.
     """
     gws = gateway_configs()
     if not gws:
         return None
     await list_models(force=False)
-    for gw in gws:
-        entry = _cache.get(gw.id)
-        if not entry:
-            continue
-        if any(m.native_web_search for m in entry.models):
+    entries = [(gw, _cache.get(gw.id)) for gw in gws]
+    for gw, entry in entries:
+        if entry and any(m.native_web_search for m in entry.models):
             return gw
-        if any(detect_family(m) == "gpt" for m in entry.image_models):
+    for gw, entry in entries:
+        if entry and GPT_IMAGE_MODEL in entry.image_models:
             return gw
     return None
 

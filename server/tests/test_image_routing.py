@@ -8,6 +8,7 @@ erkannte der Server gar nicht, weil der Pool keine Denkstufen meldet.
 import asyncio
 import os
 import tempfile
+import time
 
 os.environ.setdefault("SERVER_TOKEN", "x" * 40)
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="pc-test-data-"))
@@ -64,6 +65,31 @@ def test_ohne_gemini_bildmodell_kein_gemini_weg(pool):
     assert asyncio.run(gateways.gpt_image_gateway()) is pool
 
 
+def test_anderes_gpt_bildmodell_reicht_nicht(pool):
+    # Angefordert wird fest gpt-image-2; ein Gateway ohne dieses Modell darf
+    # nicht als GPT-Bildweg gelten.
+    gateways._cache["pool"].image_models = ["gpt-image-1.5", "gemini-3.1-flash-image"]
+    assert asyncio.run(gateways.gpt_image_gateway()) is None
+
+
+def test_codexlb_hat_vorrang_vor_gelistetem_bildmodell(monkeypatch):
+    gem = gateways.GatewayConfig(id="gemini", label="G", base_url="http://g.test/v1", api_key="k")
+    codex = gateways.GatewayConfig(id="gpt", label="C", base_url="http://c.test/v1", api_key="k")
+    monkeypatch.setattr(gateways, "gateway_configs", lambda: [gem, codex])
+
+    async def _no_refresh(force=False, curated=True):
+        return []
+    monkeypatch.setattr(gateways, "list_models", _no_refresh)
+    codex_payload = {"data": [{"id": "gpt-5.6-sol", "metadata": {
+        "supported_reasoning_levels": [{"effort": "high"}]}}]}
+    monkeypatch.setattr(gateways, "_cache", {
+        "gemini": gateways._CacheEntry([], None, 0.0, "",
+                                       ["gemini-3.1-flash-image", "gpt-image-2"]),
+        "gpt": gateways._CacheEntry(gateways.normalize(codex, codex_payload), None, 0.0, "", []),
+    })
+    assert asyncio.run(gateways.gpt_image_gateway()) is codex
+
+
 # ---------- Modus "beide": Gnadenfrist erst nach dem ersten Bild ----------
 
 def _fake_providers(monkeypatch, verhalten):
@@ -99,6 +125,35 @@ def test_nach_erstem_bild_nur_noch_gnadenfrist(monkeypatch):
     images = asyncio.run(ie.generate(prompt="Fuchs", provider=ie.PROVIDER_BOTH,
                                      timeout=10))
     assert [i.provider for i in images] == ["gemini"]
+
+
+def test_gnadenfrist_endet_am_gesamtzeitlimit(monkeypatch):
+    ie = _fake_providers(monkeypatch, {"gemini": (0.15, None), "gpt": (5.0, None)})
+    monkeypatch.setattr(ie, "BOTH_GRACE_SECONDS", 0.5)
+    t0 = time.monotonic()
+    asyncio.run(ie.generate(prompt="Fuchs", provider=ie.PROVIDER_BOTH, timeout=0.2))
+    assert time.monotonic() - t0 < 0.4
+
+
+def test_abbruch_des_aufrufers_beendet_beide_anbieter(monkeypatch):
+    ie = _fake_providers(monkeypatch, {"gemini": (5.0, None), "gpt": (5.0, None)})
+    gestartet: list[asyncio.Task] = []
+    original = ie._run_provider
+
+    async def merken(kind, **kwargs):
+        gestartet.append(asyncio.current_task())
+        return await original(kind, **kwargs)
+    monkeypatch.setattr(ie, "_run_provider", merken)
+
+    async def main():
+        aufruf = asyncio.create_task(ie.generate(prompt="Fuchs", provider=ie.PROVIDER_BOTH))
+        await asyncio.sleep(0.05)
+        aufruf.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await aufruf
+        assert len(gestartet) == 2
+        assert all(t.done() for t in gestartet)
+    asyncio.run(main())
 
 
 def test_beide_scheitern_ergibt_fehler(monkeypatch):

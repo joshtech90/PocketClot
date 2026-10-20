@@ -82,8 +82,9 @@ def canonical_provider(value: str | None) -> str:
 
 
 # Das Bildmodell von CodexLB steht in keiner Modell-Liste, es gibt dort nur den
-# Endpunkt /v1/images/generations. Deshalb fest verdrahtet.
-GPT_IMAGE_MODEL = "gpt-image-2"
+# Endpunkt /v1/images/generations. Deshalb fest verdrahtet, in `gateways`,
+# weil die Erkennung des GPT-Bildwegs genau dieses Modell verlangt.
+GPT_IMAGE_MODEL = gateways.GPT_IMAGE_MODEL
 
 # Groessen von gpt-image-2. NICHT gerechnet, sondern die nativen Werte aus der
 # Modell-Dokumentation: das Modell kennt feste Stufen, und eine selbst
@@ -287,20 +288,29 @@ async def generate(
         deadline = loop.time() + timeout
         done: set = set()
         pending: set = set(tasks)
-        while pending:
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                break
-            finished, pending = await asyncio.wait(
-                pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED)
-            done |= finished
-            if any(t.exception() is None for t in finished):
-                break
-        if pending and any(t.exception() is None for t in done):
-            more, pending = await asyncio.wait(pending, timeout=BOTH_GRACE_SECONDS)
-            done |= more
+        try:
+            while pending:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    break
+                finished, pending = await asyncio.wait(
+                    pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED)
+                done |= finished
+                if any(t.exception() is None for t in finished):
+                    break
+            if pending and any(t.exception() is None for t in done):
+                # Auch die Gnadenfrist endet spaetestens am Gesamtzeitlimit.
+                grace = max(0.0, min(BOTH_GRACE_SECONDS, deadline - loop.time()))
+                more, pending = await asyncio.wait(pending, timeout=grace)
+                done |= more
+        finally:
+            # Auch wenn der Aufrufer abbricht (Turn-Zeitlimit, Nutzer stoppt):
+            # kein Anbieter darf danach weiterlaufen und Gateway-Plaetze belegen.
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
         for task in pending:
-            task.cancel()
             log.warning("image-gen: %s war zu langsam und wurde abgebrochen",
                         tasks[task])
 
