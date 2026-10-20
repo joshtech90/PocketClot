@@ -728,10 +728,10 @@ def _without_unsupported(model: ChatModel) -> ChatModel:
 async def gpt_image_gateway() -> GatewayConfig | None:
     """Das Gateway, das Bilder ueber den OpenAI-Bildpfad erzeugen kann.
 
-    Erkennungsmerkmal ist dasselbe wie bei der Websuche: nur CodexLB meldet
-    seine Denkstufen als Metadaten, und nur CodexLB bringt
-    `/v1/images/generations` mit. Das Bildmodell selbst steht in keiner
-    Modell-Liste, es laesst sich also nicht daran erkennen.
+    Zwei Erkennungsmerkmale. CodexLB meldet seine Denkstufen als Metadaten,
+    fuehrt das Bildmodell aber in keiner Modell-Liste. Der gemeinsame Pool auf
+    Paradies (CLIProxyAPI mit Codex-Konten) meldet keine Denkstufen, listet
+    dafuer `gpt-image-*` direkt.
     """
     gws = gateway_configs()
     if not gws:
@@ -739,18 +739,26 @@ async def gpt_image_gateway() -> GatewayConfig | None:
     await list_models(force=False)
     for gw in gws:
         entry = _cache.get(gw.id)
-        if entry and any(m.native_web_search for m in entry.models):
+        if not entry:
+            continue
+        if any(m.native_web_search for m in entry.models):
+            return gw
+        if any(detect_family(m) == "gpt" for m in entry.image_models):
             return gw
     return None
 
 
 async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
-    """Das Gateway und das Modell, mit dem Bilder erzeugt werden.
+    """Das Gateway und das Gemini-Bildmodell fuer den nativen Gemini-Pfad.
 
-    Es gewinnt das erste Gateway, das ueberhaupt ein Bildmodell anbietet. Ist
+    Es gewinnt das erste Gateway, das ein Gemini-Bildmodell anbietet. Ist
     `preferred` gesetzt und dort vorhanden, wird das genommen. Gibt None
-    zurueck, wenn kein Gateway ein Bildmodell hat: dann ist Bilderzeugung auf
-    diesem Server schlicht nicht eingerichtet.
+    zurueck, wenn kein Gateway eines hat: dann ist der Gemini-Weg fuer Bilder
+    schlicht nicht eingerichtet.
+
+    `gpt-image-*` faellt bewusst heraus, obwohl es `-image` im Namen traegt:
+    der Pool listet es mit, `generateContent` lehnt es aber mit 503 ab. GPT
+    zeichnet ueber `gpt_image_gateway()`.
     """
     gws = gateway_configs()
     if not gws:
@@ -758,11 +766,14 @@ async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
     await list_models(force=False)
     for gw in gws:
         entry = _cache.get(gw.id)
-        if not entry or not entry.image_models:
+        if not entry:
             continue
-        if preferred and preferred in entry.image_models:
+        gemini_models = [m for m in entry.image_models if detect_family(m) == "gemini"]
+        if not gemini_models:
+            continue
+        if preferred and preferred in gemini_models:
             return gw, preferred
-        return gw, entry.image_models[0]
+        return gw, gemini_models[0]
     return None
 
 
