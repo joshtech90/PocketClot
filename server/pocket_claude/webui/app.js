@@ -112,6 +112,7 @@ const state = {
   streamingThinking: '',
   _streamAttachments: [],
   abort: null,
+  turn: 0,                 // Kennzeichen des laufenden Turns (0 = keiner)
   stoppedByUser: false,
 
   pending: [],             // Anhaenge im Eingabefeld
@@ -2046,12 +2047,12 @@ function attachmentsToHtml(atts) {
   if (images.length) {
     html += `<div class="image-grid${images.length === 1 ? ' single' : ''}">`;
     for (const a of images) {
-      const url = attachmentUrl(a.id);
+      const url = escapeHtml(attachmentUrl(a.id));
       const prov = providerFromFilename(a.filename);
       html += `
         <figure data-att-id="${escapeHtml(a.id)}">
           <img src="${url}" alt="${escapeHtml(a.filename)}" loading="lazy"
-               data-lightbox="${url}" data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}">
+               data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}">
           ${prov ? `<span class="img-provider-tag">${prov}</span>` : ''}
           <div class="img-actions">
             <button type="button" title="${escapeHtml(t('img_action_edit'))}" data-img-action="edit" data-att-id="${escapeHtml(a.id)}" data-filename="${escapeHtml(a.filename)}" data-mime="${escapeHtml(a.mime_type)}"><svg class="icon"><use href="#icon-brush"/></svg></button>
@@ -2064,7 +2065,7 @@ function attachmentsToHtml(atts) {
   if (others.length) {
     html += '<div class="attachments">';
     for (const a of others) {
-      html += `<a class="file-card" href="${attachmentUrl(a.id)}" target="_blank" rel="noopener">
+      html += `<a class="file-card" href="${escapeHtml(attachmentUrl(a.id))}" target="_blank" rel="noopener">
         <span class="file-ico"><svg class="icon"><use href="#icon-file"/></svg></span>
         <span><span class="file-name">${escapeHtml(a.filename)}</span><span class="file-type">${escapeHtml(fileExt(a.filename) || a.mime_type || '')}</span></span>
       </a>`;
@@ -2090,32 +2091,58 @@ function editImageInChat(att) {
   toast(t('toast_image_set_as_edit'));
 }
 
+// Nur echte Anhangsbilder (von attachmentsToHtml, ausserhalb des Antworttextes)
+// sind anklickbar. Markdown im Antworttext kann data-Attribute mitbringen, die
+// DOMPurify stehen laesst; die duerfen nie zu URLs oder Aktionen werden.
+const ATT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+function attFromEl(el) {
+  if (!el || el.closest('.content') || !el.closest('.image-grid')) return null;
+  const id = el.dataset.attId || '';
+  if (!ATT_ID.test(id)) return null;
+  return { id, filename: el.dataset.filename || 'bild', mime_type: el.dataset.mime || 'image/png' };
+}
 document.addEventListener('click', (e) => {
-  const img = e.target.closest && e.target.closest('.msg img[data-lightbox]');
+  if (!e.target.closest) return;
+  const img = e.target.closest('.msg .image-grid img[data-att-id]');
   if (img) {
-    const att = { id: img.dataset.attId, filename: img.dataset.filename, mime_type: img.dataset.mime };
-    openLightbox(img.dataset.lightbox, { filename: att.filename, onUseAsReference: () => editImageInChat(att) });
+    const att = attFromEl(img);
+    if (att) openLightbox(attachmentUrl(att.id), { filename: att.filename, onUseAsReference: () => editImageInChat(att) });
     return;
   }
-  const btn = e.target.closest && e.target.closest('[data-img-action="edit"]');
-  if (btn) editImageInChat({ id: btn.dataset.attId, filename: btn.dataset.filename, mime_type: btn.dataset.mime });
+  const btn = e.target.closest('.msg .image-grid [data-img-action="edit"]');
+  if (btn) {
+    const att = attFromEl(btn);
+    if (att) editImageInChat(att);
+  }
 });
 
 /** Vollbild-Betrachter: Klick zoomt auf Originalgroesse, Leiste mit
- *  Herunterladen und "als Vorlage". */
+ *  Herunterladen, Teilen und "als Vorlage". Alles per DOM-Eigenschaften
+ *  statt HTML-Text, damit eine Adresse nie zu Markup werden kann. */
 function openLightbox(url, opts = {}) {
   document.getElementById('lightbox')?.remove();
   const lb = document.createElement('div');
   lb.id = 'lightbox';
   lb.className = 'lightbox';
-  lb.innerHTML = `
-    <div class="lb-stage"><img alt=""></div>
-    <div class="lb-bar">
-      ${opts.onUseAsReference ? `<button type="button" data-lb="ref" title="${escapeHtml(t('image_use_as_reference'))}"><svg class="icon"><use href="#icon-brush"/></svg></button>` : ''}
-      ${navigator.canShare ? `<button type="button" data-lb="share" title="${escapeHtml(t('image_share'))}"><svg class="icon"><use href="#icon-share"/></svg></button>` : ''}
-      <a href="${url}" download="${escapeHtml(opts.filename || 'bild')}" title="${escapeHtml(t('img_action_download'))}"><svg class="icon"><use href="#icon-download"/></svg></a>
-      <button type="button" data-lb="close" title="${escapeHtml(t('lightbox_close'))}"><svg class="icon"><use href="#icon-close"/></svg></button>
-    </div>`;
+  lb.innerHTML = '<div class="lb-stage"><img alt=""></div><div class="lb-bar"></div>';
+  const bar = lb.querySelector('.lb-bar');
+  const barButton = (action, icon, title) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.lb = action;
+    b.title = title;
+    b.innerHTML = `<svg class="icon"><use href="#icon-${icon}"/></svg>`;
+    bar.appendChild(b);
+  };
+  if (opts.onUseAsReference) barButton('ref', 'brush', t('image_use_as_reference'));
+  if (navigator.canShare) barButton('share', 'share', t('image_share'));
+  const dl = document.createElement('a');
+  dl.href = url;
+  dl.download = opts.filename || 'bild';
+  dl.title = t('img_action_download');
+  dl.innerHTML = '<svg class="icon"><use href="#icon-download"/></svg>';
+  bar.appendChild(dl);
+  barButton('close', 'close', t('lightbox_close'));
   const stage = lb.querySelector('.lb-stage');
   const img = lb.querySelector('img');
   img.src = url;
@@ -2426,39 +2453,48 @@ async function sendMessage(rawText, opts = {}) {
   state._sseGotError = false;
   state._sseDeltaCount = 0;
   const cidAtSubmit = state.cid;
+  // Jeder Turn hat ein eigenes Kennzeichen. Wird er durch einen Chatwechsel
+  // abgeloest, darf sein Aufraeumen den neuen Turn nicht mehr anfassen.
+  const turn = ++_turnSeq;
+  state.turn = turn;
   console.log('PC_SSE: submit START cid=%s content_len=%d image_mode=%s', cidAtSubmit, content.length, imageMode);
   try {
-    await streamReply(content, atts.map((a) => a.id), imageMode);
+    await streamReply(content, atts.map((a) => a.id), imageMode, turn);
   } catch (err) {
     console.log('PC_SSE: submit CATCH', err?.name, err?.message);
-    if (err.name !== 'AbortError') {
+    if (err.name !== 'AbortError' && state.turn === turn) {
       toast(t('toast_reply_failed', apiErrorText(err)), { error: true });
     }
   } finally {
     const dt = (performance.now() - state._sseTurnStart).toFixed(0);
     console.log('PC_SSE: submit FINALLY cid=%s gotDone=%s gotError=%s deltas=%d elapsed=%sms',
       cidAtSubmit, state._sseGotDone, state._sseGotError, state._sseDeltaCount, dt);
-    if (state.cid === cidAtSubmit && state.isStreaming && !state._sseGotDone && !state._sseGotError) {
-      if (state.stoppedByUser) finalizeStopped();
-      else {
-        // Stream zu, aber weder done noch Fehler: der Server hat die Antwort
-        // vermutlich gespeichert. Neu laden statt Punkte stehen zu lassen.
-        console.warn('PC_SSE: submit RESCUE — stream ended without done; reloading messages');
-        state.isStreaming = false;
-        state.streamingText = '';
-        reloadChatMessages(cidAtSubmit);
+    if (state.turn === turn) {
+      if (state.cid === cidAtSubmit && state.isStreaming && !state._sseGotDone && !state._sseGotError) {
+        if (state.stoppedByUser) finalizeStopped();
+        else {
+          // Stream zu, aber weder done noch Fehler: der Server hat die Antwort
+          // vermutlich gespeichert. Neu laden statt Punkte stehen zu lassen.
+          console.warn('PC_SSE: submit RESCUE — stream ended without done; reloading messages');
+          state.isStreaming = false;
+          state.streamingText = '';
+          reloadChatMessages(cidAtSubmit);
+        }
       }
+      state.isStreaming = false;
+      state.abort = null;
+      state.turn = 0;
+      updateComposerState();
     }
-    state.isStreaming = false;
-    state.abort = null;
-    updateComposerState();
   }
   refreshChatList();
   return true;
 }
 
+let _turnSeq = 0;
 function stopStreamLocal() {
   if (state.abort) { try { state.abort.abort(); } catch {} state.abort = null; }
+  state.turn = 0;
   state.isStreaming = false;
   state.streamingText = '';
   state.streamingThinking = '';
@@ -2510,7 +2546,7 @@ function wissenVergessen() {
   Object.keys(localStorage).filter((k) => k.startsWith(WISSEN_PREFIX)).forEach((k) => localStorage.removeItem(k));
 }
 
-async function streamReply(content, attachmentIds, imageMode) {
+async function streamReply(content, attachmentIds, imageMode, turn) {
   if (state.abort) { try { state.abort.abort(); } catch {} }
   const ctrl = new AbortController();
   state.abort = ctrl;
@@ -2563,6 +2599,8 @@ async function streamReply(content, attachmentIds, imageMode) {
     while ((idx = buffer.indexOf('\n\n')) >= 0) {
       const raw = buffer.slice(0, idx);
       buffer = buffer.slice(idx + 2);
+      // Abgeloester Turn (Chatwechsel): nichts mehr in den neuen Chat schreiben.
+      if (state.turn !== turn) return;
       handleSseEvent(raw);
     }
   }
