@@ -80,6 +80,9 @@ data class ChatUiState(
     val lastTurnCachedRead: Int = 0,
     val lastTurnCachedWrite: Int = 0,
     val pending: List<PendingAttachment> = emptyList(),
+    /** Plus-Menue „Bild erstellen": gilt fuer die naechste Nachricht, egal ob
+     *  getippt, per Starter oder per Sprache gesendet. `send()` verbraucht ihn. */
+    val imageMode: Boolean = false,
     val pinned: Boolean = false,
     /** UI-Riegel: dieser Chat ist gesperrt und braucht PIN/Fingerabdruck. */
     val locked: Boolean = false,
@@ -565,12 +568,15 @@ class ChatViewModel(
         }
     }
 
+    fun setImageMode(on: Boolean) {
+        _state.update { it.copy(imageMode = on) }
+    }
+
     fun removePending(uri: Uri) {
         _state.update { st -> st.copy(pending = st.pending.filter { it.uri != uri }) }
     }
 
-    /** @param imageMode Plus-Menue „Bild erstellen" war fuer diese Nachricht aktiv. */
-    fun send(content: String, imageMode: Boolean = false) {
+    fun send(content: String) {
         val text = content.trim()
         val pending = _state.value.pending
         if (text.isEmpty() && pending.none { it.uploaded != null }) return
@@ -582,6 +588,7 @@ class ChatViewModel(
         }
         if (_state.value.isStreaming) return
 
+        val imageMode = _state.value.imageMode
         val attachmentIds = pending.mapNotNull { it.uploaded?.id }
         val attachmentRefs = pending.mapNotNull { p ->
             p.uploaded?.let {
@@ -603,6 +610,7 @@ class ChatViewModel(
             it.copy(
                 messages = it.messages + optimistic,
                 pending = emptyList(),
+                imageMode = false,
                 streamingText = "",
                 streamingAttachments = emptyList(),
                 isStreaming = true,

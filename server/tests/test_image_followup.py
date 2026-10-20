@@ -51,4 +51,15 @@ def test_aenderung_ohne_anhang_nimmt_das_letzte_bild_als_vorlage(monkeypatch, tm
         await image_tool.run(uid, {"prompt": "a new fox"},
                              {"attachment_ids": [], "previous_image_ids": vorher})
         assert gesehen["refs"] == []
+
+        # Ein neues, aber unbrauchbares Bild darf NICHT durch das alte ersetzt
+        # werden: das alte Foto ginge sonst ungewollt an den Anbieter.
+        heic = tmp_path / "neu.heic"
+        heic.write_bytes(b"\x00\x00\x00\x18ftypheic" + b"\x00" * 64)
+        heic_id = await db.add_attachment("neu.heic", "image/heic", 76, Path(heic), user_id=uid)
+        gesehen.clear()
+        res = await image_tool.run(uid, {"prompt": "edit", "edit_attached_images": True},
+                                   {"attachment_ids": [heic_id], "previous_image_ids": vorher})
+        assert not res["ok"]
+        assert "refs" not in gesehen
     asyncio.run(main())

@@ -156,6 +156,18 @@ async def _load_references(
     return image_engine.usable_references(raw)
 
 
+async def _has_image(attachment_ids: list[str]) -> bool:
+    """Traegt die Nachricht ueberhaupt einen Bild-Anhang? Im Zweifel ja: dann
+    bleibt der Rueckgriff auf ein aelteres Bild lieber aus."""
+    if not attachment_ids:
+        return False
+    try:
+        atts = await db.get_attachments(attachment_ids)
+    except Exception:  # noqa: BLE001
+        return True
+    return any(str(a.get("mime_type") or "").lower().startswith("image/") for a in atts)
+
+
 async def previous_image_ids(cid: str, before_message_id: int | None = None) -> list[str]:
     """Die Bild-Anhaenge der juengsten Nachricht im Chat, die Bilder traegt.
 
@@ -237,11 +249,20 @@ async def run(user_id: str, args: dict, defaults: dict | None = None) -> dict:
     # Ohne eigenen Bild-Anhang ist das zuletzt im Chat gezeigte Bild gemeint:
     # "mach den Himmel abendlich" soll das eben erzeugte Bild aendern, nicht
     # ein neues Motiv zeichnen.
+    # Hat die Nachricht selbst ein Bild, das sich nicht verwenden laesst (etwa
+    # HEIC), gibt es KEINEN Rueckgriff: sonst ginge statt des neuen Fotos ein
+    # aelteres aus dem Chat an den Anbieter, ohne dass der Nutzer das wollte.
     references: list[image_engine.ReferenceImage] = []
     if args.get("edit_attached_images"):
-        references = await _load_references(
-            defaults.get("attachment_ids") or [], user_id,
-        )
+        own_ids = defaults.get("attachment_ids") or []
+        references = await _load_references(own_ids, user_id)
+        if not references and await _has_image(own_ids):
+            return {
+                "ok": False,
+                "attachments": [],
+                "text": ("Das mitgeschickte Bild laesst sich nicht als Vorlage verwenden "
+                         "(erlaubt sind PNG, JPEG und WebP bis 8 MB). Sag das dem Nutzer."),
+            }
         if not references and defaults.get("previous_image_ids"):
             references = await _load_references(defaults["previous_image_ids"], user_id)
             if references:
