@@ -827,10 +827,16 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
             # Geteilte Sprachnachrichten: einmal per Groq transkribieren, bevor
             # das Modell die Nachricht sieht. Sprache erkennt Whisper selbst,
             # ausser der Nutzer hat in der Spracheingabe eine feste gewaehlt.
-            if body.attachment_ids:
-                audio_atts = [a for a in await db.get_attachments(body.attachment_ids)
+            # Auch fruehere Audios im Chat ohne Transkript (etwa vor diesem
+            # Feature geteilt oder bei einem Fehlschlag): sonst laeuft
+            # "transkribiere" unter einer alten Sprachnachricht ins Leere.
+            chat_ids = [aid for m in await db.list_messages(cid)
+                        for aid in (m.get("attachment_ids") or [])]
+            if chat_ids:
+                audio_atts = [a for a in await db.get_attachments(chat_ids)
                               if attachments_mod.is_audio(a.get("filename") or "",
-                                                          a.get("mime_type") or "")]
+                                                          a.get("mime_type") or "")
+                              and a.get("user_id") == user["id"]]
                 if audio_atts:
                     sprache = ""
                     if (user_kv.get(voice.KV_LANG_MODE) or "").strip().lower() == "override":
