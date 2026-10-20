@@ -276,13 +276,27 @@ async def generate(
             ): kind
             for kind in order
         }
-        # NICHT auf beide warten, sondern nach dem ersten Ergebnis nur noch eine
+        # NICHT auf beide warten, sondern nach dem ersten BILD nur noch eine
         # kurze Gnadenfrist. Sonst haengt ein fertiges Bild hinter einem
         # Anbieter fest, der in sein Zeitlimit laeuft, und der Nutzer wartet
-        # minutenlang auf etwas, das laengst da ist.
-        done, pending = await asyncio.wait(
-            tasks, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
-        if pending:
+        # minutenlang auf etwas, das laengst da ist. Ein schneller Fehlschlag
+        # (etwa Kontingent erschoepft) startet die Frist nicht: sonst wuerde
+        # der andere Anbieter abgebrochen, obwohl nur er noch ein Bild liefern
+        # kann.
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        done: set = set()
+        pending: set = set(tasks)
+        while pending:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            finished, pending = await asyncio.wait(
+                pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED)
+            done |= finished
+            if any(t.exception() is None for t in finished):
+                break
+        if pending and any(t.exception() is None for t in done):
             more, pending = await asyncio.wait(pending, timeout=BOTH_GRACE_SECONDS)
             done |= more
         for task in pending:

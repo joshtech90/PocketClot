@@ -62,3 +62,46 @@ def test_ohne_gemini_bildmodell_kein_gemini_weg(pool):
     gateways._cache["pool"].image_models = ["gpt-image-2"]
     assert asyncio.run(gateways.image_target()) is None
     assert asyncio.run(gateways.gpt_image_gateway()) is pool
+
+
+# ---------- Modus "beide": Gnadenfrist erst nach dem ersten Bild ----------
+
+def _fake_providers(monkeypatch, verhalten):
+    """`verhalten`: Anbieter -> (Verzoegerung in s, Fehler oder None)."""
+    from pocket_claude import image_engine
+
+    async def order(provider, family_hint, has_refs):
+        return [image_engine.PROVIDER_GEMINI, image_engine.PROVIDER_GPT], None
+
+    async def run(kind, **kwargs):
+        delay, fehler = verhalten[kind]
+        await asyncio.sleep(delay)
+        if fehler:
+            raise image_engine.ImageGenError(fehler)
+        return [image_engine.GeneratedImage(index=0, mime_type="image/png",
+                                            data=b"x", text="", provider=kind)]
+
+    monkeypatch.setattr(image_engine, "_provider_order", order)
+    monkeypatch.setattr(image_engine, "_run_provider", run)
+    monkeypatch.setattr(image_engine, "BOTH_GRACE_SECONDS", 0.05)
+    return image_engine
+
+
+def test_schneller_fehlschlag_bricht_den_anderen_anbieter_nicht_ab(monkeypatch):
+    ie = _fake_providers(monkeypatch, {"gemini": (0.0, "Kontingent erschoepft"),
+                                       "gpt": (0.3, None)})
+    images = asyncio.run(ie.generate(prompt="Fuchs", provider=ie.PROVIDER_BOTH))
+    assert [i.provider for i in images] == ["gpt"]
+
+
+def test_nach_erstem_bild_nur_noch_gnadenfrist(monkeypatch):
+    ie = _fake_providers(monkeypatch, {"gemini": (0.0, None), "gpt": (5.0, None)})
+    images = asyncio.run(ie.generate(prompt="Fuchs", provider=ie.PROVIDER_BOTH,
+                                     timeout=10))
+    assert [i.provider for i in images] == ["gemini"]
+
+
+def test_beide_scheitern_ergibt_fehler(monkeypatch):
+    ie = _fake_providers(monkeypatch, {"gemini": (0.0, "weg"), "gpt": (0.01, "auch weg")})
+    with pytest.raises(ie.ImageGenError):
+        asyncio.run(ie.generate(prompt="Fuchs", provider=ie.PROVIDER_BOTH))
