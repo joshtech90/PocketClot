@@ -568,15 +568,15 @@
     <string name="settings_collapse">Collapse</string>
     <string name="settings_tts_provider_setup_title">Provider &amp; setup</string>
     <string name="settings_tts_provider_label">Provider</string>
-    <string name="settings_tts_provider_info_title">TTS provider — three options</string>
+    <string name="settings_tts_provider_info_title">Vorlesen: drei kostenlose Anbieter</string>
     <string name="settings_tts_provider_web_short">Gemini Web</string>
-    <string name="settings_tts_provider_web_label">Gemini Web (default, no setup):</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (eine Stimme):</string>
     <string name="settings_tts_provider_web_body">The read-aloud voice of gemini.google.com, delivered by a small service on your server that keeps a signed-in Google session. Free, no API key, no service account, and around 40 times faster than real time. The voice cannot be chosen.</string>
     <string name="settings_tts_status_web_active">Gemini Web active — free, no setup, by far the fastest. The voice is fixed.</string>
     <string name="settings_tts_status_web_down">The read-aloud service is not answering, or its Google session has expired. Sign in again on the server, or pick another provider here in the meantime.</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web has exactly one voice. Google\'s read-aloud call simply has no parameter for it.</string>
-    <string name="settings_tts_provider_edge_label">Edge (default, no setup):</string>
-    <string name="settings_tts_provider_edge_body">Microsoft Edge\'s reading voices. Completely free, no API key, no service account. Quality weaker than Gemini/Chirp but fine for fast read-aloud.</string>
+    <string name="settings_tts_provider_edge_label">Microsoft Edge (ohne Anmeldung):</string>
+    <string name="settings_tts_provider_edge_body">Vorlese-Stimmen von Microsoft Edge. Kostenlos und ohne Anmeldung, klingt aber mechanischer als Grok und Gemini.</string>
     <string name="settings_tts_provider_gemini_label">Gemini API:</string>
     <string name="settings_tts_provider_gemini_body">API key from Google AI Studio. Free Tier: 10 calls/day per key — very limited with one key, usable with a multi-key pool. Paid: $0.50/1M input + $10/1M audio output. Best model inference.</string>
     <string name="settings_tts_provider_cloud_label">Cloud TTS:</string>
@@ -591,7 +591,7 @@
     <string name="settings_tts_chunking_info_gemini_label">For Gemini API:</string>
     <string name="settings_tts_chunking_info_gemini_body">Default OFF. Each chunk = one API call. With free-tier keys (10 RPD/key) a chunked answer quickly burns through your daily budget. With a large multi-key pool you can enable it manually — the server will then round-robin chunks across all keys.</string>
     <string name="settings_tts_back_to_default">Back to auto-default</string>
-    <string name="settings_tts_status_edge_active">Edge TTS active — free, no setup. Quality is standard (Microsoft Edge voices). Switch later to Gemini API or Cloud TTS for higher quality.</string>
+    <string name="settings_tts_status_edge_active">Edge aktiv: kostenlos, ohne Anmeldung, Microsoft-Stimmen.</string>
     <string name="settings_tts_status_gemini_pool_chunk_on">%1$d keys in pool, chunking ON. Each reply is split into multiple parallel chunks — they are round-robin routed across all keys. Effective burst: ≈ %2$d parallel TTS calls (3 RPM per key). Fastest stream start but burns your daily budget fast.</string>
     <string name="settings_tts_status_gemini_pool_chunk_off">%1$d keys in pool, chunking OFF. Each reply uses exactly one key (round-robin). No burst load. Gentle on the daily budget. Turn chunking on below if you want faster stream start.</string>
     <string name="settings_tts_status_gemini_1key_tts">Gemini API with 1 TTS key. Free Tier: 3 RPM / 10 RPD per key. With chunking ON (below) a long answer quickly burns the daily budget. Add more keys below for more throughput.</string>
@@ -952,4 +952,9 @@
     <string name="memory_key_save">Save</string>
     <string name="memory_key_remove">Remove</string>
     <string name="memory_key_info">Your private memory lies encrypted on the server. Paste the key you received once; it stays on this device and is sent only along with your own chat messages. The server does not store it.</string>
+    <string name="settings_tts_provider_grok_short">Grok</string>
+    <string name="settings_tts_provider_grok_label">Grok (Standard, 28 Stimmen):</string>
+    <string name="settings_tts_provider_grok_body">Die Vorlesefunktion von Grok, geliefert von einem Dienst auf deinem Server mit angemeldeter Grok-Sitzung. Kostenlos, 28 Stimmen, das Tempo steckt direkt im Audio.</string>
+    <string name="settings_tts_status_grok_active">Grok aktiv: kostenlos, 28 Stimmen zur Auswahl.</string>
+    <string name="settings_tts_status_fallback">%1$s ist gewählt, aber gerade nicht angemeldet. Bis dahin liest %2$s vor.</string>
 </resources>

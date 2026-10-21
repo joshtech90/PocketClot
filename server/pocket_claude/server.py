@@ -1245,7 +1245,9 @@ async def _build_tts_status(user_id: str) -> TtsStatusDto:
         provider=provider,
         chosen_provider=chosen if chosen in tts.VALID_PROVIDERS else provider,
         providers_available=[p for p, ok in avail.items() if ok],
-        default_voice=tts.default_voice_for(provider),
+        # Vorgabe-Stimme des GEWAEHLTEN Anbieters: springt gerade ein anderer
+        # ein, sollen die Clients die Stimme des gewaehlten behalten.
+        default_voice=tts.default_voice_for(chosen if chosen in tts.VALID_PROVIDERS else provider),
         voices=[TtsVoiceDto(**v) for v in tts.CURATED_VOICES],
         chunking_enabled=_resolve_chunking_from_kv(kv, provider),
         chunking_explicit=chunking_raw in ("0", "1"),

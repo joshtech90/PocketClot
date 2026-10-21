@@ -397,59 +397,15 @@ class ApiClient(
 
     suspend fun getTtsStatus(): TtsStatusDto = get("/tts/status")
 
-    suspend fun setTtsCredentials(credentialsJson: String): TtsStatusDto {
-        return execute(
-            Request.Builder()
-                .url("${baseUrl()}/tts/credentials")
-                .header("Authorization", authHeader())
-                .put(
-                    json.encodeToString(TtsCredentialsRequest(credentialsJson))
-                        .toRequestBody("application/json".toMediaType())
-                )
-                .build()
-        )
-    }
 
-    suspend fun deleteTtsCredentials() {
-        delete("/tts/credentials")
-    }
 
-    /** Setzt den TTS-spezifischen Gemini-API-Key (getrennt vom Image-Gen-Key). */
-    suspend fun setTtsApiKey(apiKey: String): TtsStatusDto =
-        putJson("/tts/api-key", TtsApiKeyRequest(apiKey))
 
-    /** Entfernt den TTS-API-Key. Fallback auf Image-Key (falls vorhanden) greift dann. */
-    suspend fun deleteTtsApiKey(): TtsStatusDto {
-        val req = Request.Builder()
-            .url("${baseUrl()}/tts/api-key")
-            .header("Authorization", authHeader())
-            .delete()
-            .build()
-        return execute(req)
-    }
 
     // ---------- Multi-Key-Pool (für Free-Tier-Throughput-Skalierung) ----------
 
-    /** Liste aller Gemini-API-Keys im Pool dieses Users. */
-    suspend fun listTtsApiKeys(): TtsApiKeysDto = get("/tts/api-keys")
 
-    /** Fügt einen Key zum Pool hinzu. Returns die neue Liste. */
-    suspend fun addTtsApiKey(apiKey: String, label: String = ""): TtsApiKeysDto =
-        postJson("/tts/api-keys", TtsApiKeyAddRequest(apiKey, label))
 
-    /** Entfernt einen Key aus dem Pool per Server-vergebener ID. */
-    suspend fun removeTtsApiKey(keyId: String): TtsApiKeysDto {
-        val req = Request.Builder()
-            .url("${baseUrl()}/tts/api-keys/$keyId")
-            .header("Authorization", authHeader())
-            .delete()
-            .build()
-        return execute(req)
-    }
 
-    /** Setzt das Label eines Pool-Keys neu. */
-    suspend fun relabelTtsApiKey(keyId: String, label: String): TtsApiKeysDto =
-        patchJson("/tts/api-keys/$keyId", mapOf("label" to label))
 
     // ---------- Settings Export / Import ----------
 
@@ -532,26 +488,7 @@ class ApiClient(
         )
     }
 
-    /** Cloud-Billing-Status (Spend dieser Monat, Budget, Credit-Restwert).
-     *  Kann ein paar Sekunden dauern beim ersten Call (Service-Account-Token
-     *  + Cloud Billing API). Server cached danach 5 Minuten. */
-    suspend fun getBillingStatus(): BillingStatusDto = get("/billing/status")
 
-    /** Setzt das aktive TTS-Modell (z.B. gemini-2.5-flash-preview-tts).
-     *  Wirkt sich nur auf Gemini-Voices aus — Standard/Studio Cloud-TTS-Voices
-     *  ignorieren das Modell-Feld. */
-    suspend fun setTtsModel(modelId: String): TtsStatusDto {
-        return execute(
-            Request.Builder()
-                .url("${baseUrl()}/tts/model")
-                .header("Authorization", authHeader())
-                .put(
-                    json.encodeToString(TtsModelRequest(modelId))
-                        .toRequestBody("application/json".toMediaType())
-                )
-                .build()
-        )
-    }
 
     /** Setzt die Chunking-Option des Users.
      *  - `enabled=true/false` → explizites KV-Setting (überschreibt Provider-Default)

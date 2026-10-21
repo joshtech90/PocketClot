@@ -87,7 +87,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import android.app.Activity
-import de.smartzone.pocketclaude.data.BillingStatusDto
 import de.smartzone.pocketclaude.data.ClaudeAuthUpdateRequest
 import de.smartzone.pocketclaude.R
 import de.smartzone.pocketclaude.data.ChatModelFamilies
@@ -292,16 +291,16 @@ fun SettingsScreen(
                         stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_intro)
                     )
                     InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_edge_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_edge_body)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_grok_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_grok_body)
                     )
                     InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_gemini_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_gemini_body)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_body)
                     )
                     InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_cloud_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_info_tts_cloud_body)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_body)
                     )
                 },
             ) {
@@ -1594,33 +1593,6 @@ private fun ExpandableSection(
     }
 }
 
-/** Kleines farbiges Badge das den Tier-Hint eines API-Keys anzeigt:
- *  - "free"        → orange „Free" (10 RPD Limit)
- *  - "likely_paid" → grün „Paid?" (hat >15 Erfolge ohne FreeTier-Burn → vermutl. Paid)
- *  - "unknown"     → grau „?" (noch zu wenig Daten) */
-@Composable
-private fun TierBadge(tierHint: String) {
-    data class BadgeStyle(val text: String, val color: androidx.compose.ui.graphics.Color)
-    val style = when (tierHint) {
-        "free" -> BadgeStyle("Free", MaterialTheme.colorScheme.tertiary)
-        "likely_paid" -> BadgeStyle("Paid?", PocketTheme.colors.success)
-        else -> BadgeStyle("?", MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(style.color.copy(alpha = 0.16f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(
-            style.text,
-            style = MaterialTheme.typography.labelSmall,
-            color = style.color,
-        )
-    }
-}
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TtsSection(
@@ -1631,33 +1603,28 @@ private fun TtsSection(
     val ttsBusy by vm.ttsBusy.collectAsState()
     val ttsError by vm.ttsError.collectAsState()
     val ttsTest by vm.ttsTest.collectAsState()
-    var showJsonDialog by remember { mutableStateOf(false) }
     var voiceMenuOpen by remember { mutableStateOf(false) }
-    var jsonText by remember { mutableStateOf("") }
 
-    // Provider-Flags auf TtsSection-Ebene, damit alle drei Cards Zugriff haben.
-    val provider = ttsStatus?.provider ?: "gemini_web"
-    val isGemini = provider == "gemini_api"
-    val isCloud = provider == "cloud_tts"
-    val isEdge = provider == "edge_tts"
-    // Gemini-Web: die Vorlesefunktion von gemini.google.com ueber einen Dienst
-    // auf dem Server. Gratis, ohne Einrichtung, und deutlich schneller als die
-    // anderen — dafuer ohne Stimmauswahl.
-    val isWeb = provider == "gemini_web"
+    // Nur noch kostenlose Anbieter (seit 21.10.2026): Grok, Gemini Web, Edge.
+    // `chosen` ist die Wahl des Nutzers, `active` der, der gerade wirklich
+    // vorliest. Ist der gewaehlte nicht angemeldet, springt der Server auf den
+    // naechsten; die Wahl (und die Stimme) bleibt dabei stehen.
+    val chosen = ttsStatus?.chosenProvider?.takeIf { it.isNotBlank() } ?: ttsStatus?.provider ?: "grok"
+    val active = ttsStatus?.provider ?: chosen
+    val isGrok = chosen == "grok"
+    val isWeb = chosen == "gemini_web"
+    val providerName = mapOf(
+        "grok" to stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_grok_short),
+        "gemini_web" to stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_short),
+        "edge_tts" to "Edge",
+    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
 
-    // ============================================================
-    // Gruppe A — Provider & Setup. Frueher eine eigene Karte mit Titel;
-    // jetzt eine Gruppe im aufklappbaren Abschnitt. Der Gruppentitel
-    // entfaellt, weil direkt darunter „Provider" steht.
-    // ============================================================
     SettingsGroup {
-
-        // Provider-Auswahl: Edge (free, no-setup) / Gemini API (paid key) / Cloud TTS (service account).
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -1665,134 +1632,47 @@ private fun TtsSection(
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.weight(1f),
                 )
-                InfoButton(
-                    title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_info_title),
-                ) {
+                InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_info_title)) {
+                    InfoBulletParagraph(
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_grok_label),
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_grok_body),
+                    )
                     InfoBulletParagraph(
                         stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_body)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_body),
                     )
                     InfoBulletParagraph(
                         stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_body)
-                    )
-                    InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_gemini_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_gemini_body)
-                    )
-                    InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_cloud_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_cloud_body)
+                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_edge_body),
                     )
                 }
             }
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = isWeb,
-                    onClick = {
-                        if (!isWeb && !ttsBusy) vm.setTtsProvider("gemini_web")
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    enabled = !ttsBusy,
-                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_web_short)) }
-                SegmentedButton(
-                    selected = isEdge,
-                    onClick = {
-                        if (!isEdge && !ttsBusy) vm.setTtsProvider("edge_tts")
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    enabled = !ttsBusy,
-                ) { Text("Edge") }
+                listOf("grok", "gemini_web", "edge_tts").forEachIndexed { idx, p ->
+                    SegmentedButton(
+                        selected = chosen == p,
+                        onClick = { if (chosen != p && !ttsBusy) vm.setTtsProvider(p) },
+                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = 3),
+                        enabled = !ttsBusy,
+                    ) { Text(providerName[p] ?: p) }
+                }
             }
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = isGemini,
-                    onClick = {
-                        if (!isGemini && !ttsBusy) vm.setTtsProvider("gemini_api")
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    enabled = !ttsBusy,
-                ) { Text("Gemini API") }
-                SegmentedButton(
-                    selected = isCloud,
-                    onClick = {
-                        if (!isCloud && !ttsBusy) vm.setTtsProvider("cloud_tts")
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    enabled = !ttsBusy,
-                ) { Text("Cloud TTS") }
-            }
-            // Status-Hint mit Farb-Tönung je nach Provider.
-            //
-            // Wichtig: der Hint trennt jetzt SAUBER zwischen Pool-Effekt
-            // (= Round-Robin über aufeinanderfolgende Antworten) und
-            // Chunking-Effekt (= mehrere parallele API-Calls pro Antwort).
-            // Vorher stand „Round-Robin + Rate-Limiter" im selben Satz —
-            // das war irreführend, weil der Rate-Limiter nur greift wenn
-            // Chunking AN ist und parallele Calls rausgehen.
-            data class Hint(val text: String, val kind: StatusKind)
-            val keySource = ttsStatus?.geminiApiKeySource ?: "none"
-            val keyCount = ttsStatus?.geminiApiKeyCount ?: 0
-            val chunkOn = ttsStatus?.chunkingEnabled ?: false
             val hint = when {
-                isWeb && ttsStatus?.configured == false -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_down),
-                    kind = StatusKind.Warning,
-                )
-                isWeb -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_active),
-                    kind = StatusKind.Success,
-                )
-                isEdge -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_edge_active),
-                    kind = StatusKind.Success,
-                )
-                isGemini && keyCount >= 2 && chunkOn -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_on, keyCount, keyCount * 3),
-                    kind = StatusKind.Success,
-                )
-                isGemini && keyCount >= 2 && !chunkOn -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_pool_chunk_off, keyCount),
-                    kind = StatusKind.Success,
-                )
-                isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "tts" -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_1key_tts),
-                    kind = StatusKind.Success,
-                )
-                isGemini && ttsStatus?.geminiApiConfigured == true && keySource == "image" -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_image_shared),
-                    kind = StatusKind.Info,
-                )
-                isGemini -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_gemini_no_key),
-                    kind = StatusKind.Warning,
-                )
-                isCloud && ttsStatus?.cloudTtsConfigured == true && chunkOn -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_chunk_on),
-                    kind = StatusKind.Success,
-                )
-                isCloud && ttsStatus?.cloudTtsConfigured == true -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_ok),
-                    kind = StatusKind.Success,
-                )
-                else -> Hint(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_cloud_no_json),
-                    kind = StatusKind.Warning,
-                )
+                ttsStatus != null && active != chosen -> stringResource(
+                    de.smartzone.pocketclaude.R.string.settings_tts_status_fallback,
+                    providerName[chosen] ?: chosen, providerName[active] ?: active,
+                ) to StatusKind.Warning
+                isGrok -> stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_grok_active) to StatusKind.Success
+                isWeb -> stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_web_active) to StatusKind.Success
+                else -> stringResource(de.smartzone.pocketclaude.R.string.settings_tts_status_edge_active) to StatusKind.Success
             }
-            PocketStatusLine(text = hint.text, kind = hint.kind)
+            PocketStatusLine(text = hint.first, kind = hint.second)
 
-            // === Chunking-Toggle ===
-            // Bewusst HIER in derselben Card wie der Status-Hint, weil
-            // der Hint sich auf den Chunking-Stand bezieht. Bei Edge-TTS
-            // ausgeblendet — die edge-tts-Lib chunkt intern via WebSocket,
-            // ein zusätzliches App-Chunking bringt nichts. Bei Gemini-Web
-            // ebenfalls ausgeblendet, und dort ist es keine Frage des
-            // Nutzens: dessen Audioformat laesst sich nicht stueckweise
-            // aneinanderhaengen, ein eingeschalteter Schalter wuerde stumm
-            // kaputtes Audio erzeugen. Der Server sperrt das zusaetzlich.
-            if (!isEdge && !isWeb) {
+            // Stueckeln nur bei Grok: Edge stueckelt intern selbst, und das Ogg
+            // von Gemini Web laesst sich gar nicht aneinanderhaengen.
+            if (isGrok) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                val chunkOn = ttsStatus?.chunkingEnabled ?: false
                 val chunkingExplicit = ttsStatus?.chunkingExplicit ?: false
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -1800,35 +1680,10 @@ private fun TtsSection(
                             stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_label),
                             style = MaterialTheme.typography.titleSmall,
                         )
-                        val ttsCloudLabel = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_for_cloud_tts)
-                        val ttsGeminiRateHint = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_gemini_rate_hint)
-                        val sub = when {
-                            chunkingExplicit && chunkOn ->
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_manual_on)
-                            chunkingExplicit && !chunkOn ->
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_manual_off)
-                            chunkOn ->
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_auto_default_on, if (isCloud) ttsCloudLabel else provider)
-                            else ->
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_tts_auto_default_off, if (isGemini) ttsGeminiRateHint else provider)
-                        }
                         Text(
-                            sub,
+                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_intro),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_title)) {
-                        InfoParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_intro)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_cloud_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_cloud_body)
-                        )
-                        InfoBulletParagraph(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_gemini_label),
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_gemini_body)
                         )
                     }
                     Switch(
@@ -1838,104 +1693,10 @@ private fun TtsSection(
                     )
                 }
                 if (chunkingExplicit) {
-                    TextButton(
-                        onClick = { vm.setTtsChunking(null) },
-                        enabled = !ttsBusy,
-                    ) {
+                    TextButton(onClick = { vm.setTtsChunking(null) }, enabled = !ttsBusy) {
                         Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_back_to_default))
                     }
                 }
-            }
-        }
-
-        // Trenner nur, wenn darunter noch Zugangsdaten folgen. Bei Edge und
-        // Gemini Web stand er sonst direkt ueber dem Trenner zur naechsten
-        // Gruppe: zwei Linien untereinander.
-        if (isGemini || isCloud) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        }
-
-        // Eigenes API-Key-Feld für TTS — nur wenn Provider = Gemini API.
-        // Bewusst getrennt von der Image-Gen-API-Key-Eingabe, weil:
-        //   - Image-Gen läuft oft über Paid-Account (4K-Output, Pro-Modelle)
-        //   - TTS kann komplett über Free-Tier-Account laufen (Gemini-3.1-
-        //     Flash-TTS ist im Free Tier verfügbar, verifiziert Mai 2026)
-        if (isGemini) {
-            // Hinweis-Banner: Image- und TTS-Key können derselbe sein, müssen
-            // aber nicht — der Server fällt bei fehlendem TTS-Key automatisch
-            // auf den Image-Key zurück. Klärt das verbreitete „warum zwei
-            // Felder?"-Verständnis-Problem.
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(PocketRadius.Small),
-                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
-            ) {
-                // Hinweis-Symbol statt des frueheren 💡 im Text.
-                PocketStatusLine(
-                    text = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_image_shared_key_tip),
-                    kind = StatusKind.Info,
-                    textColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(12.dp),
-                )
-            }
-            TtsGeminiApiKeyField(vm = vm, ttsStatus = ttsStatus, ttsBusy = ttsBusy)
-        }
-
-        // Status — nur informativ wenn nicht Edge (Edge braucht nichts).
-        if (!isEdge) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val configured = ttsStatus?.configured == true
-                Icon(
-                    imageVector = if (configured) PocketIcons.CheckCircle else PocketIcons.Error,
-                    contentDescription = null,
-                    tint = if (configured) de.smartzone.pocketclaude.ui.theme.PocketTheme.colors.success
-                           else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(PocketIconSize.Small),
-                )
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (configured) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_ready)
-                        else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_provider_not_ready),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    if (configured && isCloud) {
-                        val email = ttsStatus?.clientEmail.orEmpty()
-                        if (email.isNotBlank()) {
-                            Text(
-                                email,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                // Lösch-Button für Cloud-TTS-Credentials nur bei Cloud-Provider.
-                if (ttsStatus?.cloudTtsConfigured == true && isCloud) {
-                    IconButton(onClick = { vm.deleteTtsCredentials() }, enabled = !ttsBusy) {
-                        Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_remove_credentials))
-                    }
-                }
-            }
-        }
-
-        // JSON-Upload-Button — nur für Cloud-TTS-Pfad (Edge braucht's nicht, Gemini hat eigenen Key-Slot).
-        if (isCloud) {
-            FilledTonalButton(
-                onClick = {
-                    jsonText = ""
-                    showJsonDialog = true
-                },
-                enabled = !ttsBusy && settings.isConfigured,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (ttsBusy) {
-                    CircularProgressIndicator(modifier = Modifier.size(PocketIconSize.Small), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
-                }
-                Icon(PocketIcons.Upload, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
-                Spacer(Modifier.width(8.dp))
-                Text(if (ttsStatus?.cloudTtsConfigured == true) stringResource(de.smartzone.pocketclaude.R.string.settings_tts_replace_cloud_credentials) else stringResource(de.smartzone.pocketclaude.R.string.settings_tts_paste_cloud_credentials))
             }
         }
 
@@ -1948,114 +1709,54 @@ private fun TtsSection(
         }
 
         ttsError?.let { err ->
-            Text(
-                err,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
+            Text(err, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             TextButton(onClick = vm::clearTtsError) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_ok)) }
-        }
-
-        // Cloud-Billing-Widget: Spend, Budget, AI-Pro-Credit-Restwert.
-        // Nur sichtbar wenn Cloud-TTS konfiguriert ist (vorher gibt's
-        // keinen Service-Account → API-Call ginge ins Leere).
-        if (ttsStatus?.cloudTtsConfigured == true) {
-            CloudBillingWidget(vm = vm)
         }
     }
 
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-    // ============================================================
-    // Gruppe B — Stimme & Wiedergabe
-    // ============================================================
     SettingsGroup {
-
         SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_playback_title))
 
-        // Voice-Auswahl — nach Engine-Tier gruppiert, damit Gemini-Voices
-        // klar von den klassischen Cloud-TTS-Voices getrennt sind.
-        // Filtert auf den aktuell aktiven Provider: bei `gemini_api` sind
-        // nur die `gemini-*`-Voices kompatibel (Direct-API kennt keine
-        // Chirp/Studio/Neural2/etc.), bei `cloud_tts` ist alles möglich.
-        val allVoices = ttsStatus?.voices.orEmpty()
-        val voices = allVoices.filter { provider in it.compatible_providers }
+        // Stimmen des GEWAEHLTEN Anbieters: springt gerade ein anderer ein,
+        // soll die Auswahl (z.B. Grok Leo) trotzdem stehen bleiben.
+        val voices = ttsStatus?.voices.orEmpty().filter { chosen in it.compatible_providers }
         if (isWeb) {
-            // Ehrlicher Hinweis statt einer Auswahl, die keine ist: der
-            // Vorlese-Aufruf von Gemini kennt schlicht keinen Parameter
-            // fuer die Stimme.
             Text(
                 stringResource(de.smartzone.pocketclaude.R.string.settings_tts_voice_web_fixed),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (voices.isNotEmpty()) {
+        if (voices.size > 1) {
             ExposedDropdownMenuBox(
                 expanded = voiceMenuOpen,
                 onExpandedChange = { voiceMenuOpen = !voiceMenuOpen },
             ) {
-                // Aktuelle Voice: Label aus der vollen (un-gefilterten) Liste
-                // lesen, damit der Anzeigename sichtbar bleibt — selbst wenn
-                // die Voice mit dem aktuellen Provider nicht kompatibel ist
-                // (Server fällt dann intern auf einen Default zurück).
-                val currentVoice = allVoices.firstOrNull { it.id == settings.ttsVoice }
-                val currentVoiceIncompatible = currentVoice != null &&
-                    provider !in currentVoice.compatible_providers
+                val currentVoice = voices.firstOrNull { it.id == settings.ttsVoice }
+                    ?: voices.firstOrNull { it.id == ttsStatus?.defaultVoice }
                 OutlinedTextField(
-                    value = if (currentVoiceIncompatible)
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_voice_incompatible, currentVoice.label, provider)
-                    else currentVoice?.label ?: settings.ttsVoice,
+                    value = currentVoice?.label ?: settings.ttsVoice,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_label)) },
-                    leadingIcon = if (currentVoiceIncompatible) {
-                        { Icon(PocketIcons.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
-                    } else null,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = voiceMenuOpen)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = voiceMenuOpen) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
                     shape = MaterialTheme.shapes.small,
                 )
                 DropdownMenu(
                     expanded = voiceMenuOpen,
                     onDismissRequest = { voiceMenuOpen = false },
                 ) {
-                    val tierOrder = listOf("edge", "gemini", "chirp3hd", "studio", "neural2", "wavenet", "standard")
-                    val tierLabels = mapOf(
-                        "edge" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_edge),
-                        "gemini" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_gemini),
-                        "chirp3hd" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_chirp3hd),
-                        "studio" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_studio),
-                        "neural2" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_neural2),
-                        "wavenet" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_wavenet),
-                        "standard" to stringResource(de.smartzone.pocketclaude.R.string.settings_tier_label_standard),
-                    )
-                    val grouped = voices.groupBy { it.tier }
-                    val orderedTiers = tierOrder.filter { grouped.containsKey(it) } +
-                        grouped.keys.filter { it !in tierOrder }
-                    orderedTiers.forEachIndexed { idx, tier ->
-                        if (idx > 0) HorizontalDivider()
-                        Text(
-                            text = tierLabels[tier] ?: tier.replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(
-                                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp,
-                            ),
+                    voices.forEach { v ->
+                        DropdownMenuItem(
+                            text = { Text(v.label) },
+                            onClick = {
+                                vm.setVoice(v.id)
+                                voiceMenuOpen = false
+                            },
                         )
-                        grouped[tier].orEmpty().forEach { v ->
-                            DropdownMenuItem(
-                                text = { Text(v.label) },
-                                onClick = {
-                                    vm.setVoice(v.id)
-                                    voiceMenuOpen = false
-                                },
-                            )
-                        }
                     }
                 }
             }
@@ -2153,144 +1854,7 @@ private fun TtsSection(
         }
     }
 
-    // ============================================================
-    // Card C — TTS-Modell-Wahl (nur sichtbar bei Gemini-Voice)
-    // ============================================================
-    // Chunking wurde 2026-05-19 nach Card A verschoben (gehört konzeptionell
-    // zum Provider-Status, weil sich der Hint-Text dort auf den Chunking-
-    // Stand bezieht). Diese Card hier zeigt nur noch die Modell-Wahl, und
-    // nur wenn überhaupt eine Gemini-Voice aktiv ist — sonst ist die ganze
-    // Card unsichtbar.
-    val allVoicesForModel = ttsStatus?.voices.orEmpty()
-    val voicesForModel = allVoicesForModel.filter { provider in it.compatible_providers }
-    val isGeminiVoice = settings.ttsVoice.startsWith("gemini-") ||
-        voicesForModel.firstOrNull { it.id == settings.ttsVoice }?.tier == "gemini"
-    val availableModels = ttsStatus?.availableModels.orEmpty()
-    if (isGeminiVoice && availableModels.isNotEmpty()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        SettingsGroup {
-            SubsectionLabel(stringResource(de.smartzone.pocketclaude.R.string.settings_gemini_tts_model_title))
-            run {
-            val currentModelId = ttsStatus?.ttsModel
-                ?: availableModels.firstOrNull { it.default }?.id
-                ?: availableModels.first().id
-            val currentModel = availableModels.firstOrNull { it.id == currentModelId }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_label),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_picker_title)) {
-                    InfoParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_picker_intro)
-                    )
-                    InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_flash_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_flash_body)
-                    )
-                    InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_31_flash_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_31_flash_body)
-                    )
-                    InfoBulletParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_pro_label),
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_tts_model_25_pro_body)
-                    )
-                }
-            }
-            var modelMenuOpen by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
-                expanded = modelMenuOpen,
-                onExpandedChange = { if (!ttsBusy) modelMenuOpen = !modelMenuOpen },
-            ) {
-                val priceText = currentModel?.priceHint?.takeIf { it.isNotBlank() }.orEmpty()
-                OutlinedTextField(
-                    value = currentModel?.label ?: currentModelId,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_model_label)) },
-                    supportingText = {
-                        if (priceText.isNotEmpty()) Text(priceText)
-                    },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuOpen)
-                    },
-                    enabled = !ttsBusy,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(),
-                    shape = MaterialTheme.shapes.small,
-                )
-                DropdownMenu(
-                    expanded = modelMenuOpen,
-                    onDismissRequest = { modelMenuOpen = false },
-                ) {
-                    availableModels.forEach { m ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(m.label)
-                                    if (m.priceHint.isNotBlank()) {
-                                        Text(
-                                            m.priceHint,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            },
-                            onClick = {
-                                if (m.id != currentModelId) vm.setTtsModel(m.id)
-                                modelMenuOpen = false
-                            },
-                        )
-                    }
-                }
-            }
-            }  // close run {}
-        }  // close Card
-    }  // close if (isGeminiVoice && ...)
-
-    } // outer Column (Cards A/B/C)
-
-    if (showJsonDialog) {
-        AlertDialog(
-            onDismissRequest = { showJsonDialog = false },
-            title = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_sa_dialog_title)) },
-            text = {
-                Column {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_sa_dialog_body),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = jsonText,
-                        onValueChange = { jsonText = it },
-                        placeholder = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_sa_dialog_placeholder)) },
-                        maxLines = 12,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.small,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (jsonText.isNotBlank()) {
-                            vm.uploadTtsCredentials(jsonText)
-                            showJsonDialog = false
-                        }
-                    },
-                ) { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_sa_upload_btn)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showJsonDialog = false }) { Text(stringResource(de.smartzone.pocketclaude.R.string.action_cancel)) }
-            },
-        )
-    }
+    } // outer Column
 }
 
 @Composable
@@ -3472,158 +3036,6 @@ internal fun SkillToggleRow(
 
 
 // =====================================================================
-// TTS Gemini-API-Key-Pool (Multi-Key + Rate-Limiter im Server)
-// =====================================================================
-@Composable
-private fun TtsGeminiApiKeyField(
-    vm: SettingsViewModel,
-    ttsStatus: de.smartzone.pocketclaude.data.TtsStatusDto?,
-    ttsBusy: Boolean,
-) {
-    val pool by vm.ttsKeyPool.collectAsState()
-    var input by remember { mutableStateOf("") }
-    var labelInput by remember { mutableStateOf("") }
-    var showKey by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_pool_section_title),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f),
-            )
-            InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_pool_info_title)) {
-                InfoParagraph(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_info_intro)
-                )
-                InfoBulletParagraph(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_why_label),
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_why_body)
-                )
-                InfoBulletParagraph(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_how_label),
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_how_body)
-                )
-                InfoBulletParagraph(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_dispatcher_label),
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_dispatcher_body)
-                )
-                InfoBulletParagraph(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_alt_label),
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_pool_alt_body)
-                )
-            }
-        }
-
-        // Aktuelle Pool-Übersicht
-        if (pool.isEmpty()) {
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_pool_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            val plural = if (pool.size == 1) stringResource(de.smartzone.pocketclaude.R.string.settings_pool_plural_none) else stringResource(de.smartzone.pocketclaude.R.string.settings_pool_plural_s)
-            Text(
-                stringResource(de.smartzone.pocketclaude.R.string.settings_pool_status, pool.size, plural, pool.size * 2),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            pool.forEach { entry ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(PocketRadius.Small))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(entry.masked, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.width(8.dp))
-                            TierBadge(entry.tierHint)
-                        }
-                        if (entry.label.isNotBlank()) {
-                            Text(
-                                entry.label,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (entry.successCount > 0) {
-                            Text(
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_pool_call_count, entry.successCount),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = { vm.removeTtsKey(entry.id) },
-                        enabled = !ttsBusy,
-                    ) {
-                        Icon(PocketIcons.Delete, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_pool_remove_key))
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(6.dp))
-
-        // Neuer-Key-Eingabe
-        OutlinedTextField(
-            value = input,
-            onValueChange = { input = it },
-            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pool_new_key_label)) },
-            placeholder = { Text("AIza…") },
-            singleLine = true,
-            visualTransformation = if (showKey) VisualTransformation.None
-                                   else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { showKey = !showKey }) {
-                    Icon(
-                        imageVector = if (showKey) PocketIcons.VisibilityOff
-                                      else PocketIcons.Visibility,
-                        contentDescription = if (showKey) stringResource(de.smartzone.pocketclaude.R.string.settings_label_hide) else stringResource(de.smartzone.pocketclaude.R.string.settings_label_show),
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-        )
-        OutlinedTextField(
-            value = labelInput,
-            onValueChange = { labelInput = it },
-            label = { Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pool_label_label)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-        )
-        FilledTonalButton(
-            onClick = {
-                if (input.isNotBlank()) {
-                    vm.addTtsKey(input.trim(), labelInput.trim())
-                    input = ""
-                    labelInput = ""
-                }
-            },
-            enabled = !ttsBusy && input.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (ttsBusy) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(8.dp))
-            }
-            Icon(PocketIcons.Add, contentDescription = null, modifier = Modifier.size(PocketIconSize.Small))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(de.smartzone.pocketclaude.R.string.settings_pool_add_btn))
-        }
-    }
-}
-
-
-// =====================================================================
 // Bilder: nur noch Aufloesung und Seitenverhaeltnis.
 //
 // Bis August 2026 stand hier zusaetzlich ein Feld fuer den Google-API-Key und
@@ -3950,174 +3362,6 @@ private fun VoiceLanguagePicker(
                         TextButton(onClick = { onResetCache(cfg.currentLang) }) {
                             Text(stringResource(de.smartzone.pocketclaude.R.string.settings_voice_reset_to_default))
                         }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Cloud-Billing-Status-Widget: zeigt aktuellen Monats-Spend (Brutto-Schätzung
- * aus dem Cloud-TTS-Counter × Voice-Preis), den Budget-Hard-Cap und den
- * Restwert des AI-Pro-Credits.
- *
- * Wichtig: der Brutto-Spend ist eine SCHÄTZUNG, kein Live-Wert aus der
- * Cloud-Console. Google's Public-Billing-API liefert den echten Spend nicht
- * ohne BigQuery-Export. Für die UI-Anzeige „komme ich noch im Credit aus"
- * reicht die Schätzung allemal.
- */
-@Composable
-private fun CloudBillingWidget(vm: SettingsViewModel) {
-    val billing by vm.billingStatus.collectAsState()
-    val busy by vm.billingBusy.collectAsState()
-
-    // Beim Composable-Mount einmal laden falls noch nicht da.
-    LaunchedEffect(Unit) {
-        if (vm.billingStatus.value == null) vm.refreshBillingStatus()
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(PocketRadius.Small),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(de.smartzone.pocketclaude.R.string.settings_billing_widget_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
-                InfoButton(title = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_info_widget_title)) {
-                    InfoParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_billing_info_widget_para1)
-                    )
-                    InfoParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_billing_info_widget_para2)
-                    )
-                    InfoParagraph(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_billing_info_widget_para3)
-                    )
-                }
-                if (busy) {
-                    CircularProgressIndicator(
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(PocketIconSize.Small),
-                    )
-                } else {
-                    IconButton(onClick = { vm.refreshBillingStatus() }) {
-                        Icon(PocketIcons.Refresh, contentDescription = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_refresh_cd))
-                    }
-                }
-            }
-
-            val b = billing
-            when {
-                b == null -> {
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_billing_loading),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                !b.available -> {
-                    Text(
-                        b.error ?: stringResource(de.smartzone.pocketclaude.R.string.settings_billing_unavailable_text),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                else -> {
-                    val currency = b.currencyCode
-                    val symbol = if (currency == "EUR") "€" else currency
-                    fun fmt(v: Double): String = "%.2f %s".format(v, symbol)
-                    val budgetTotal = b.budgetAmount ?: 0.0
-                    val creditOrig = b.creditOriginal ?: 0.0
-                    val spendNet = b.spendThisMonth.coerceAtLeast(0.0)
-                    val creditUsed = minOf(spendNet, creditOrig)
-                    val realCost = b.estimatedRealCost.coerceAtLeast(0.0)
-
-                    // Hauptzeile: Brutto-Spend, prominent
-                    Text(
-                        stringResource(de.smartzone.pocketclaude.R.string.settings_billing_this_month_gross, fmt(spendNet)),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-
-                    // Info-Hinweis (z.B. „Budget-API nicht aktiviert") — subtil,
-                    // kein Error, nur kleiner Hinweis-Text in Akzent-Farbe.
-                    b.warning?.takeIf { it.isNotBlank() }?.let { w ->
-                        Text(
-                            "ℹ $w",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    // Credit-Progress: wieviel vom AI-Pro-Credit ist schon „verbraucht"
-                    if (creditOrig > 0.0) {
-                        val pct = (creditUsed / creditOrig).coerceIn(0.0, 1.0).toFloat()
-                        Column {
-                            LinearProgressIndicator(
-                                progress = { pct },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(CircleShape),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            val creditLeft = (b.creditRemaining ?: creditOrig).coerceAtLeast(0.0)
-                            Text(
-                                stringResource(de.smartzone.pocketclaude.R.string.settings_billing_credit_remaining, fmt(creditLeft), fmt(creditOrig)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
-                    // Budget-Info (Hard Cap)
-                    if (budgetTotal > 0.0) {
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_billing_budget_cap, b.budgetName ?: "Budget", fmt(budgetTotal)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    // Real-Cost-Hinweis: wenn über Credit raus → Warnung
-                    if (realCost > 0.01) {
-                        PocketStatusLine(
-                            text = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_real_cost, fmt(realCost)),
-                            kind = StatusKind.Warning,
-                        )
-                    } else if (creditOrig > 0.0) {
-                        PocketStatusLine(
-                            text = stringResource(de.smartzone.pocketclaude.R.string.settings_billing_in_credit),
-                            kind = StatusKind.Success,
-                        )
-                    }
-
-                    // Footer: Projekt-ID + last_updated für Debugging
-                    val proj = b.projectId
-                    val updated = b.lastUpdatedAt
-                    if (proj != null || updated != null) {
-                        val projLine = if (proj != null) stringResource(de.smartzone.pocketclaude.R.string.settings_billing_project_label, proj) else ""
-                        val updLine = if (updated != null) stringResource(de.smartzone.pocketclaude.R.string.settings_billing_updated_label, updated.take(16)) else ""
-                        Text(
-                            buildString {
-                                if (projLine.isNotEmpty()) append(projLine)
-                                if (projLine.isNotEmpty() && updLine.isNotEmpty()) append(" · ")
-                                if (updLine.isNotEmpty()) append(updLine)
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }

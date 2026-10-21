@@ -9,7 +9,6 @@ import de.smartzone.pocketclaude.data.AppContainer
 import de.smartzone.pocketclaude.data.AppSettings
 import de.smartzone.pocketclaude.data.ApiException
 import de.smartzone.pocketclaude.data.AudioController
-import de.smartzone.pocketclaude.data.BillingStatusDto
 import de.smartzone.pocketclaude.data.ChatModelFamilies
 import de.smartzone.pocketclaude.data.ChatRepository
 import de.smartzone.pocketclaude.data.ClaudeAuthDto
@@ -20,7 +19,6 @@ import de.smartzone.pocketclaude.data.MeDto
 import de.smartzone.pocketclaude.data.SettingsRepository
 import de.smartzone.pocketclaude.data.SkillsDto
 import de.smartzone.pocketclaude.data.SystemPromptMode
-import de.smartzone.pocketclaude.data.TtsApiKeyEntryDto
 import de.smartzone.pocketclaude.data.ThemeMode
 import de.smartzone.pocketclaude.data.TtsStatusDto
 import de.smartzone.pocketclaude.data.TtsVoiceDto
@@ -80,28 +78,6 @@ class SettingsViewModel(
 
     private val _ttsTest = MutableStateFlow<TtsTestResult>(TtsTestResult.Idle)
     val ttsTest: StateFlow<TtsTestResult> = _ttsTest.asStateFlow()
-
-    // Cloud-Billing-Status (Spend, Budget, Credit). null = noch nicht geladen.
-    private val _billingStatus = MutableStateFlow<BillingStatusDto?>(null)
-    val billingStatus: StateFlow<BillingStatusDto?> = _billingStatus.asStateFlow()
-    private val _billingBusy = MutableStateFlow(false)
-    val billingBusy: StateFlow<Boolean> = _billingBusy.asStateFlow()
-
-    fun refreshBillingStatus() = viewModelScope.launch {
-        if (!settings.value.isConfigured) return@launch
-        _billingBusy.value = true
-        runCatching { chatRepo.billingStatus() }
-            .onSuccess { _billingStatus.value = it }
-            .onFailure {
-                // Bei Fehler: einen „nicht verfügbar"-Stub erzeugen damit das
-                // UI zumindest weiß dass kein Status da ist.
-                _billingStatus.value = BillingStatusDto(
-                    available = false,
-                    error = it.message ?: "Status nicht ladbar",
-                )
-            }
-        _billingBusy.value = false
-    }
 
     // Claude auth-mode (Pro/Max | API key | Bedrock)
     private val _claudeAuth = MutableStateFlow<ClaudeAuthDto?>(null)
@@ -451,8 +427,11 @@ class SettingsViewModel(
                 // gemerkte Stimme womoeglich nicht mehr dazu.
                 val aktuelleStimme = settings.value.ttsVoice
                 val info = status.voices.firstOrNull { it.id == aktuelleStimme }
+                // Gegen den GEWAEHLTEN Anbieter pruefen: springt gerade ein
+                // anderer ein (Grok nicht angemeldet), bleibt die Stimme.
+                val gewaehlt = status.chosenProvider.ifBlank { status.provider }
                 val passtNicht = info == null ||
-                    status.provider !in info.compatible_providers
+                    gewaehlt !in info.compatible_providers
                 if (passtNicht && status.defaultVoice.isNotBlank() &&
                     status.defaultVoice != aktuelleStimme
                 ) {
@@ -460,108 +439,6 @@ class SettingsViewModel(
                 }
             }
             .onFailure { _ttsError.value = "Status nicht lesbar: ${it.message}" }
-    }
-
-    fun uploadTtsCredentials(json: String) = viewModelScope.launch {
-        _ttsBusy.value = true
-        _ttsError.value = null
-        runCatching { chatRepo.setTtsCredentials(json) }
-            .onSuccess { _ttsStatus.value = it }
-            .onFailure { e ->
-                val msg = when (e) {
-                    is ApiException -> "HTTP ${e.code}: ${e.body.take(160)}"
-                    else -> e.message ?: e::class.java.simpleName
-                }
-                _ttsError.value = msg
-            }
-        _ttsBusy.value = false
-    }
-
-    fun deleteTtsCredentials() = viewModelScope.launch {
-        _ttsBusy.value = true
-        runCatching { chatRepo.deleteTtsCredentials() }
-        refreshTtsStatus()
-        _ttsBusy.value = false
-    }
-
-    /** Setzt den TTS-spezifischen Gemini-API-Key (getrennt vom Image-Gen-Key). */
-    fun setTtsApiKey(apiKey: String) = viewModelScope.launch {
-        val k = apiKey.trim()
-        if (k.isEmpty()) return@launch
-        _ttsBusy.value = true
-        _ttsError.value = null
-        runCatching { chatRepo.setTtsApiKey(k) }
-            .onSuccess { _ttsStatus.value = it }
-            .onFailure { e ->
-                val msg = when (e) {
-                    is ApiException -> "HTTP ${e.code}: ${e.body.take(160)}"
-                    else -> e.message ?: e::class.java.simpleName
-                }
-                _ttsError.value = "TTS-Key speichern fehlgeschlagen: $msg"
-            }
-        _ttsBusy.value = false
-    }
-
-    /** Entfernt den TTS-API-Key. Fallback auf Image-Key greift falls vorhanden. */
-    fun deleteTtsApiKey() = viewModelScope.launch {
-        _ttsBusy.value = true
-        runCatching { chatRepo.deleteTtsApiKey() }
-            .onSuccess { _ttsStatus.value = it }
-        _ttsBusy.value = false
-    }
-
-    // ---------- Multi-Key-Pool ----------
-
-    private val _ttsKeyPool = MutableStateFlow<List<TtsApiKeyEntryDto>>(emptyList())
-    val ttsKeyPool: StateFlow<List<TtsApiKeyEntryDto>> = _ttsKeyPool.asStateFlow()
-
-    fun refreshTtsKeyPool() = viewModelScope.launch {
-        if (!settings.value.isConfigured) return@launch
-        runCatching { chatRepo.listTtsApiKeys() }
-            .onSuccess { _ttsKeyPool.value = it.keys }
-    }
-
-    fun addTtsKey(apiKey: String, label: String = "") = viewModelScope.launch {
-        val k = apiKey.trim()
-        if (k.isEmpty()) return@launch
-        _ttsBusy.value = true
-        _ttsError.value = null
-        runCatching { chatRepo.addTtsApiKey(k, label.trim()) }
-            .onSuccess {
-                _ttsKeyPool.value = it.keys
-                // Status auch refreshen (für gemini_api_key_count + masked-Anzeige)
-                refreshTtsStatus()
-            }
-            .onFailure { e ->
-                val msg = when (e) {
-                    is ApiException -> when (e.code) {
-                        409 -> appContext.getString(R.string.settings_pool_err_duplicate)
-                        400 -> appContext.getString(R.string.settings_pool_err_invalid)
-                        else -> "HTTP ${e.code}: ${e.body.take(160)}"
-                    }
-                    else -> e.message ?: e::class.java.simpleName
-                }
-                _ttsError.value = appContext.getString(R.string.settings_pool_err_add_failed, msg)
-            }
-        _ttsBusy.value = false
-    }
-
-    fun removeTtsKey(keyId: String) = viewModelScope.launch {
-        _ttsBusy.value = true
-        runCatching { chatRepo.removeTtsApiKey(keyId) }
-            .onSuccess {
-                _ttsKeyPool.value = it.keys
-                refreshTtsStatus()
-            }
-            .onFailure { e ->
-                _ttsError.value = "Key entfernen fehlgeschlagen: ${e.message}"
-            }
-        _ttsBusy.value = false
-    }
-
-    fun relabelTtsKey(keyId: String, label: String) = viewModelScope.launch {
-        runCatching { chatRepo.relabelTtsApiKey(keyId, label.trim()) }
-            .onSuccess { _ttsKeyPool.value = it.keys }
     }
 
     /** Wechselt den TTS-Provider per User auf dem Server. Wenn die aktuell
@@ -590,22 +467,6 @@ class SettingsViewModel(
                     else -> e.message ?: e::class.java.simpleName
                 }
                 _ttsError.value = "Provider-Wechsel fehlgeschlagen: $msg"
-            }
-        _ttsBusy.value = false
-    }
-
-    /** Setzt das TTS-Modell auf dem Server (per User). */
-    fun setTtsModel(modelId: String) = viewModelScope.launch {
-        _ttsBusy.value = true
-        _ttsError.value = null
-        runCatching { chatRepo.setTtsModel(modelId) }
-            .onSuccess { _ttsStatus.value = it }
-            .onFailure { e ->
-                val msg = when (e) {
-                    is ApiException -> "HTTP ${e.code}: ${e.body.take(160)}"
-                    else -> e.message ?: e::class.java.simpleName
-                }
-                _ttsError.value = "Modell-Wechsel fehlgeschlagen: $msg"
             }
         _ttsBusy.value = false
     }
@@ -1037,9 +898,7 @@ class SettingsViewModel(
             val req = de.smartzone.pocketclaude.data.ServerSettingsImportRequest(
                 schemaVersion = bundle.schemaVersion,
                 ttsProvider = bundle.server.ttsProvider,
-                ttsModel = bundle.server.ttsModel,
                 ttsChunkingEnabled = bundle.server.ttsChunkingEnabled,
-                ttsApiKeys = bundle.server.ttsApiKeys,
                 imageApiKey = bundle.server.imageApiKey,
                 skillsDefaults = bundle.server.skillsDefaults,
                 extraKv = bundle.server.extraKv.takeIf { it.isNotEmpty() },
@@ -1049,7 +908,6 @@ class SettingsViewModel(
             settingsRepo.applyImport(bundle.app)
             // VM-State refreshen, damit UI die neuen Werte sieht
             refreshTtsStatus()
-            refreshTtsKeyPool()
             refreshImageConfig()
             refreshDefaultSkills()
             _settingsTransfer.value = SettingsTransferState.ImportSuccess(
@@ -1081,8 +939,6 @@ class SettingsViewModel(
             refreshImageConfig()
             refreshVoiceConfig()
             refreshDefaultSkills()
-            refreshTtsKeyPool()
-            refreshBillingStatus()
             refreshClaudeAuth()
             refreshChatModels(force = false)
             refreshUsage()

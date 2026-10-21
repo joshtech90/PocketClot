@@ -568,15 +568,15 @@
     <string name="settings_collapse">Einklappen</string>
     <string name="settings_tts_provider_setup_title">Provider &amp; Setup</string>
     <string name="settings_tts_provider_label">Provider</string>
-    <string name="settings_tts_provider_info_title">TTS-Provider — drei Optionen</string>
+    <string name="settings_tts_provider_info_title">Vorlesen: drei kostenlose Anbieter</string>
     <string name="settings_tts_provider_web_short">Gemini Web</string>
-    <string name="settings_tts_provider_web_label">Gemini Web (Standard, kein Setup):</string>
+    <string name="settings_tts_provider_web_label">Gemini Web (eine Stimme):</string>
     <string name="settings_tts_provider_web_body">Die Vorlese-Stimme von gemini.google.com, geliefert von einem kleinen Dienst auf deinem Server, der eine angemeldete Google-Sitzung hält. Kostenlos, kein API-Key, kein Service-Account, und rund 40-mal schneller als Echtzeit. Die Stimme ist nicht wählbar.</string>
     <string name="settings_tts_status_web_active">Gemini Web aktiv — kostenlos, kein Setup, mit Abstand am schnellsten. Die Stimme ist fest vorgegeben.</string>
     <string name="settings_tts_status_web_down">Der Vorlese-Dienst antwortet nicht, oder seine Google-Sitzung ist abgelaufen. Auf dem Server neu anmelden, oder hier solange einen anderen Anbieter wählen.</string>
     <string name="settings_tts_voice_web_fixed">Gemini Web hat genau eine Stimme. Der Vorlese-Aufruf von Google kennt dafür schlicht keinen Parameter.</string>
-    <string name="settings_tts_provider_edge_label">Edge (Standard, kein Setup):</string>
-    <string name="settings_tts_provider_edge_body">Vorlese-Stimmen von Microsoft Edge. Komplett kostenlos, kein API-Key, kein Service-Account. Qualität schwächer als Gemini/Chirp, aber gut für schnelles Vorlesen.</string>
+    <string name="settings_tts_provider_edge_label">Microsoft Edge (ohne Anmeldung):</string>
+    <string name="settings_tts_provider_edge_body">Vorlese-Stimmen von Microsoft Edge. Kostenlos und ohne Anmeldung, klingt aber mechanischer als Grok und Gemini.</string>
     <string name="settings_tts_provider_gemini_label">Gemini API:</string>
     <string name="settings_tts_provider_gemini_body">API-Key von Google AI Studio. Free Tier: 10 Aufrufe/Tag pro Key — mit einem Key sehr begrenzt, mit Multi-Key-Pool nutzbar. Paid: $0.50/1M Input + $10/1M Audio-Output. Beste Modell-Inferenz.</string>
     <string name="settings_tts_provider_cloud_label">Cloud TTS:</string>
@@ -591,7 +591,7 @@
     <string name="settings_tts_chunking_info_gemini_label">Für Gemini API:</string>
     <string name="settings_tts_chunking_info_gemini_body">Standard AUS. Jeder Chunk = ein API-Aufruf. Mit Free-Tier-Keys (10 RPD/Key) verbrennt eine gechunkte Antwort schnell dein Tagesbudget. Mit einem großen Multi-Key-Pool kannst du es manuell aktivieren — der Server verteilt die Chunks dann round-robin über alle Keys.</string>
     <string name="settings_tts_back_to_default">Zurück zum Auto-Default</string>
-    <string name="settings_tts_status_edge_active">Edge TTS aktiv — kostenlos, kein Setup. Qualität ist Standard (Microsoft-Edge-Stimmen). Später auf Gemini API oder Cloud TTS wechseln für höhere Qualität.</string>
+    <string name="settings_tts_status_edge_active">Edge aktiv: kostenlos, ohne Anmeldung, Microsoft-Stimmen.</string>
     <string name="settings_tts_status_gemini_pool_chunk_on">%1$d Keys im Pool, Chunking AN. Jede Antwort wird in mehrere parallele Chunks zerlegt — sie werden round-robin auf alle Keys verteilt. Effektiver Burst: ≈ %2$d parallele TTS-Aufrufe (3 RPM pro Key). Schnellster Stream-Start, brennt aber das Tagesbudget schnell durch.</string>
     <string name="settings_tts_status_gemini_pool_chunk_off">%1$d Keys im Pool, Chunking AUS. Jede Antwort nutzt genau einen Key (round-robin). Keine Burst-Last. Schonend fürs Tagesbudget. Schalte Chunking unten an, wenn du einen schnelleren Stream-Start willst.</string>
     <string name="settings_tts_status_gemini_1key_tts">Gemini API mit 1 TTS-Key. Free Tier: 3 RPM / 10 RPD pro Key. Mit Chunking AN (unten) brennt eine lange Antwort das Tagesbudget schnell durch. Unten weitere Keys hinzufügen für mehr Durchsatz.</string>
@@ -952,4 +952,9 @@
     <string name="memory_key_save">Speichern</string>
     <string name="memory_key_remove">Entfernen</string>
     <string name="memory_key_info">Dein privates Gedächtnis liegt verschlüsselt auf dem Server. Füge hier einmal den Schlüssel ein. Er bleibt auf diesem Gerät und geht nur mit deinen eigenen Chat-Nachrichten an den Server, der ihn nicht speichert.</string>
+    <string name="settings_tts_provider_grok_short">Grok</string>
+    <string name="settings_tts_provider_grok_label">Grok (Standard, 28 Stimmen):</string>
+    <string name="settings_tts_provider_grok_body">Die Vorlesefunktion von Grok, geliefert von einem Dienst auf deinem Server mit angemeldeter Grok-Sitzung. Kostenlos, 28 Stimmen, das Tempo steckt direkt im Audio.</string>
+    <string name="settings_tts_status_grok_active">Grok aktiv: kostenlos, 28 Stimmen zur Auswahl.</string>
+    <string name="settings_tts_status_fallback">%1$s ist gewählt, aber gerade nicht angemeldet. Bis dahin liest %2$s vor.</string>
 </resources>

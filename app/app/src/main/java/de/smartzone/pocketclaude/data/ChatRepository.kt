@@ -89,9 +89,6 @@ class ChatRepository(
         return api.uploadGemFile(gemId, filename, mime, bytes)
     }
 
-    // Billing (Cloud-Spend + Credit)
-    suspend fun billingStatus(): BillingStatusDto = api.getBillingStatus()
-
     // Claude auth-mode + usage stats
     suspend fun getClaudeAuth(): ClaudeAuthDto = api.getClaudeAuth()
     suspend fun updateClaudeAuth(req: ClaudeAuthUpdateRequest): ClaudeAuthDto = api.updateClaudeAuth(req)
@@ -123,23 +120,11 @@ class ChatRepository(
         }
     }
 
-    suspend fun setTtsCredentials(json: String): TtsStatusDto = api.setTtsCredentials(json)
-    suspend fun deleteTtsCredentials() = api.deleteTtsCredentials()
     suspend fun setTtsProvider(provider: String): TtsStatusDto {
         cachedTtsProvider = null
         return api.setTtsProvider(provider)
     }
-    suspend fun setTtsModel(modelId: String): TtsStatusDto = api.setTtsModel(modelId)
     suspend fun setTtsChunking(enabled: Boolean?): TtsStatusDto = api.setTtsChunking(enabled)
-    suspend fun setTtsApiKey(key: String): TtsStatusDto = api.setTtsApiKey(key)
-    suspend fun deleteTtsApiKey(): TtsStatusDto = api.deleteTtsApiKey()
-    // Multi-Key-Pool
-    suspend fun listTtsApiKeys(): TtsApiKeysDto = api.listTtsApiKeys()
-    suspend fun addTtsApiKey(apiKey: String, label: String = ""): TtsApiKeysDto =
-        api.addTtsApiKey(apiKey, label)
-    suspend fun removeTtsApiKey(keyId: String): TtsApiKeysDto = api.removeTtsApiKey(keyId)
-    suspend fun relabelTtsApiKey(keyId: String, label: String): TtsApiKeysDto =
-        api.relabelTtsApiKey(keyId, label)
 
     // Settings Export / Import (Server-Anteil)
     suspend fun exportServerSettings(): ServerSettingsExportDto =

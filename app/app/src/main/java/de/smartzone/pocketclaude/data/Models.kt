@@ -170,49 +170,23 @@ data class TtsVoiceDto(
 
 @Serializable
 data class TtsStatusDto(
+    /** Der GEWAEHLTE Anbieter laeuft und hat seine Sitzung. */
     val configured: Boolean,
-    val provider: String = "gemini_api",
-    @SerialName("cloud_tts_configured") val cloudTtsConfigured: Boolean = false,
-    @SerialName("gemini_api_configured") val geminiApiConfigured: Boolean = false,
-    /** Masked-Anzeige des aktuellen Gemini-API-Keys (z.B. "AIzaSy…JNrw"). */
-    @SerialName("gemini_api_key_masked") val geminiApiKeyMasked: String? = null,
-    /** "tts" = eigener TTS-Slot, "image" = Fallback auf Image-Key, "none". */
-    @SerialName("gemini_api_key_source") val geminiApiKeySource: String = "none",
-    /** Anzahl Keys im Multi-Key-Pool. >1 = Server verteilt per Round-Robin. */
-    @SerialName("gemini_api_key_count") val geminiApiKeyCount: Int = 0,
-    @SerialName("project_id") val projectId: String? = null,
-    @SerialName("client_email") val clientEmail: String? = null,
-    /** Cloud-TTS Zeichen-Verbrauch im aktuellen Monat (für Free-Tier-Anzeige). */
-    @SerialName("cloud_tts_chars_this_month") val cloudTtsCharsThisMonth: Int = 0,
+    /** Mit diesem Anbieter wird gerade vorgelesen (grok, gemini_web, edge_tts).
+     *  Ist der gewaehlte nicht nutzbar, steht hier der, der einspringt. */
+    val provider: String = "grok",
+    /** Was der Nutzer gewaehlt hat. Leer bei einem aelteren Server. */
+    @SerialName("chosen_provider") val chosenProvider: String = "",
+    @SerialName("providers_available") val providersAvailable: List<String> = emptyList(),
     @SerialName("default_voice") val defaultVoice: String,
     val voices: List<TtsVoiceDto> = emptyList(),
-    /** Aktuell vom User gewähltes TTS-Modell (Gemini-Voices nutzen das,
-     *  Cloud-TTS Standard-Voices ignorieren es). */
-    @SerialName("tts_model") val ttsModel: String? = null,
-    @SerialName("available_models") val availableModels: List<TtsModelDto> = emptyList(),
-    /** Chunking-Schalter: bei langen Texten splittet der Server in parallele
-     *  Chunks. Server-Default ist provider-abhängig: cloud_tts → an,
-     *  gemini_api/edge_tts → aus (wegen RPD-Limit / Single-Session). */
-    @SerialName("chunking_enabled") val chunkingEnabled: Boolean = true,
-    /** TRUE = User hat den Chunking-Wert explizit gesetzt (KV-Override).
-     *  FALSE = Wert ist der Provider-Default und ändert sich beim Provider-Wechsel. */
+    /** Lange Texte in parallelen Teilen erzeugen (nur MP3: Grok, Edge). */
+    @SerialName("chunking_enabled") val chunkingEnabled: Boolean = false,
+    /** TRUE = vom Nutzer gesetzt, FALSE = Vorgabe des Anbieters. */
     @SerialName("chunking_explicit") val chunkingExplicit: Boolean = false,
 )
 
-/** Verfügbares TTS-Modell (gemini-*-tts-preview, etc.). */
-@Serializable
-data class TtsModelDto(
-    val id: String,
-    val label: String,
-    val tier: String = "",
-    @SerialName("price_hint") val priceHint: String = "",
-    val default: Boolean = false,
-)
 
-@Serializable
-data class TtsModelRequest(
-    @SerialName("model_id") val modelId: String,
-)
 
 /** Request-Body für PUT /tts/chunking. `enabled=null` setzt den Wert auf den
  *  Provider-Default zurück (löscht das KV-Override). */
@@ -221,67 +195,12 @@ data class TtsChunkingRequest(
     val enabled: Boolean? = null,
 )
 
-/** Status des verknüpften Google-Cloud-Billing-Setups. Wird vom Server-
- *  Endpoint GET /billing/status zurückgegeben.
- *  - `available=false` → kein Service-Account oder Cloud-Side-Fehler;
- *    `error` enthält dann die Diagnose.
- *  - Alle Beträge in `currencyCode` (typisch EUR).
- *  - `spendThisMonth` ist eine SERVER-SEITIGE SCHÄTZUNG (Cloud-TTS-Counter
- *    × Voice-Preis), NICHT der echte Cloud-Console-Spend (Google's
- *    Public-API gibt den nicht her ohne BigQuery-Export). */
-@Serializable
-data class BillingStatusDto(
-    val available: Boolean = false,
-    val error: String? = null,
-    /** Optionaler Info-Hinweis (z.B. „Budget-API nicht aktiviert"). Nicht
-     *  fatal — Widget bleibt sichtbar, Hinweis als kleiner Text. */
-    val warning: String? = null,
-    @SerialName("billing_account_id") val billingAccountId: String? = null,
-    @SerialName("project_id") val projectId: String? = null,
-    @SerialName("currency_code") val currencyCode: String = "EUR",
-    @SerialName("spend_this_month") val spendThisMonth: Double = 0.0,
-    @SerialName("budget_amount") val budgetAmount: Double? = null,
-    @SerialName("budget_name") val budgetName: String? = null,
-    @SerialName("credit_remaining") val creditRemaining: Double? = null,
-    @SerialName("credit_original") val creditOriginal: Double? = null,
-    @SerialName("credit_name") val creditName: String? = null,
-    @SerialName("estimated_real_cost") val estimatedRealCost: Double = 0.0,
-    @SerialName("last_updated_at") val lastUpdatedAt: String? = null,
-)
 
-/** Ein Key im Multi-Key-Pool. `masked` = "AIzaSy…JNrw" für Anzeige.
- *  `tierHint`: "unknown" | "free" | "likely_paid" — vom Server heuristisch erkannt.
- *  `successCount`: wieviele erfolgreiche TTS-Calls dieser Key bisher hatte. */
-@Serializable
-data class TtsApiKeyEntryDto(
-    val id: String,
-    val label: String = "",
-    val masked: String,
-    @SerialName("tier_hint") val tierHint: String = "unknown",
-    @SerialName("success_count") val successCount: Int = 0,
-)
 
-@Serializable
-data class TtsApiKeysDto(
-    val keys: List<TtsApiKeyEntryDto> = emptyList(),
-)
 
-@Serializable
-data class TtsApiKeyAddRequest(
-    @SerialName("api_key") val apiKey: String,
-    val label: String = "",
-)
 
 // ---------- Settings Export / Import ----------
 
-/** Ein vollständiger Multi-Key-Eintrag (mit KLARTEXT-Key) — für Export.
- *  ACHTUNG: das DTO enthält den unmaskierten Key, ist also sensitiv. */
-@Serializable
-data class TtsApiKeyFullDto(
-    val id: String = "",
-    val label: String = "",
-    val key: String,
-)
 
 /** Server-Anteil eines Settings-Exports (von GET /settings/export). */
 @Serializable
@@ -290,10 +209,8 @@ data class ServerSettingsExportDto(
     @SerialName("exported_at") val exportedAt: String,
     @SerialName("server_version") val serverVersion: String,
     @SerialName("tts_provider") val ttsProvider: String? = null,
-    @SerialName("tts_model") val ttsModel: String? = null,
     /** "1" / "0" / "" / null — siehe Server-Side DTO. */
     @SerialName("tts_chunking_enabled") val ttsChunkingEnabled: String? = null,
-    @SerialName("tts_api_keys") val ttsApiKeys: List<TtsApiKeyFullDto> = emptyList(),
     @SerialName("image_api_key") val imageApiKey: String? = null,
     @SerialName("skills_defaults") val skillsDefaults: SkillsDto? = null,
     @SerialName("extra_kv") val extraKv: Map<String, String> = emptyMap(),
@@ -346,9 +263,7 @@ data class FullSettingsExportDto(
 data class ServerSettingsImportRequest(
     @SerialName("schema_version") val schemaVersion: Int = 1,
     @SerialName("tts_provider") val ttsProvider: String? = null,
-    @SerialName("tts_model") val ttsModel: String? = null,
     @SerialName("tts_chunking_enabled") val ttsChunkingEnabled: String? = null,
-    @SerialName("tts_api_keys") val ttsApiKeys: List<TtsApiKeyFullDto>? = null,
     @SerialName("image_api_key") val imageApiKey: String? = null,
     @SerialName("skills_defaults") val skillsDefaults: SkillsDto? = null,
     @SerialName("extra_kv") val extraKv: Map<String, String>? = null,
@@ -361,16 +276,7 @@ data class SettingsImportResponseDto(
     @SerialName("tts_keys_imported") val ttsKeysImported: Int,
 )
 
-/** Body für PUT /tts/api-key */
-@Serializable
-data class TtsApiKeyRequest(
-    @SerialName("api_key") val apiKey: String,
-)
 
-@Serializable
-data class TtsCredentialsRequest(
-    @SerialName("credentials_json") val credentialsJson: String,
-)
 
 @Serializable
 data class TtsProviderRequest(
