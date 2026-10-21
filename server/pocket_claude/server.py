@@ -722,16 +722,12 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
     # ausgeliefert.
     needs_title = (conv.get("title") == "Neuer Chat")
 
-    # Denktiefe. Die erste Quelle, die etwas sagt, gewinnt:
-    #   1. die Denktiefe dieses Chats. Ein Gem legt sie beim Start an, im Chat
-    #      umgestellt wird sie per PATCH ueberschrieben. So gilt sie auch fuer
-    #      aeltere Clients, die nur ihre Familien-Vorgabe mitschicken.
-    #   2. die Vorgabe des Gems fuer Gem-Chats, die vor `chat_effort` angelegt
-    #      wurden (bisheriges Verhalten)
-    #   3. was der Client mitschickt
+    # Denktiefe: die dieses Chats, sonst was der Client mitschickt. Ein Gem
+    # legt sie beim Start am Chat an (aeltere Gem-Chats hat die Migration in
+    # db.py nachgetragen), im Chat umgestellt wird sie per PATCH. So gilt sie
+    # auch fuer aeltere Clients, die nur ihre Familien-Vorgabe mitschicken.
     effort = (
         (conv.get("chat_effort") or "").strip()
-        or ((gem.get("effort") or "").strip() if gem else "")
         or (body.effort or "high")
     ).lower().strip()
 
@@ -2903,6 +2899,12 @@ UI_SETTING_KEYS: frozenset[str] = frozenset({
     "sidebar",             # nur Web: Seitenleiste eingeklappt
 })
 _UI_SETTING_MAX_LEN = 64_000
+# JSON-Objekte, deren Eintraege einzeln zusammengefuehrt werden, wenn der Client
+# ein Objekt statt eines Strings schickt: {"gemini": "low"} aendert nur Gemini,
+# `null` entfernt einen Eintrag. Sonst wuerde ein Geraet mit altem Stand beim
+# Umstellen EINER Familie die anderen zuruecksetzen. Ein String ersetzt weiter
+# das Ganze (aeltere Clients, Import, Erstabgleich).
+_UI_MAP_KEYS = frozenset({"effortByFamily", "defaultModelByFamily", "autoSpeakByChat"})
 
 
 @app.get("/ui-settings")
@@ -2919,10 +2921,31 @@ async def put_ui_settings(body: dict, user=Depends(require_user)):
     Server nicht scheitert."""
     if not isinstance(body, dict):
         raise HTTPException(400, "JSON-Objekt erwartet.")
-    flat = {
-        str(k): str(v) for k, v in body.items()
-        if v is not None and str(k) in UI_SETTING_KEYS
-    }
+    current: dict | None = None
+    flat: dict[str, str] = {}
+    for k, v in body.items():
+        key = str(k)
+        if v is None or key not in UI_SETTING_KEYS:
+            continue
+        if isinstance(v, dict):
+            if key not in _UI_MAP_KEYS:
+                raise HTTPException(400, f"{key}: Text erwartet.")
+            if current is None:
+                current = await db.kv_get_all(scope=user["id"])
+            try:
+                merged = json.loads(current.get(key) or "{}")
+            except json.JSONDecodeError:
+                merged = {}
+            if not isinstance(merged, dict):
+                merged = {}
+            for entry, value in v.items():
+                if value is None:
+                    merged.pop(str(entry), None)
+                else:
+                    merged[str(entry)] = value
+            flat[key] = json.dumps(merged, ensure_ascii=False, separators=(",", ":"))
+        else:
+            flat[key] = str(v)
     if any(len(v) > _UI_SETTING_MAX_LEN for v in flat.values()):
         raise HTTPException(413, "Einstellung zu gross.")
     if flat:
@@ -3091,8 +3114,10 @@ def _avatar_path(user_id: str):
 
 
 def _avatar_version(user_id: str) -> int | None:
+    # Millisekunden: zwei Uploads in derselben Sekunde muessen verschiedene
+    # URLs ergeben, sonst bliebe das erste Bild im Cache.
     try:
-        return int(_avatar_path(user_id).stat().st_mtime)
+        return _avatar_path(user_id).stat().st_mtime_ns // 1_000_000
     except OSError:
         return None
 

@@ -716,14 +716,32 @@ async function pushSettingsToServer() {
   const current = settingsPayload();
   const base = _settingsSnapshot || {};
   const payload = {};
+  const sent = {};
   for (const [k, v] of Object.entries(current)) {
-    if (v !== undefined && v !== base[k]) payload[k] = v;
+    if (v === undefined || v === base[k]) continue;
+    sent[k] = v;
+    // Listen pro Familie bzw. Chat: nur die geaenderten Eintraege. Der Server
+    // fuehrt sie zusammen, und ein Eintrag, den die App inzwischen geaendert
+    // hat, bleibt so unangetastet.
+    const entries = SETTINGS_MAP_KEYS.has(k) && base[k] !== undefined ? mapDiff(base[k], v) : null;
+    payload[k] = entries || v;
   }
   if (!Object.keys(payload).length) return;
   try {
     await api('PUT', '/ui-settings', payload);
-    _settingsSnapshot = Object.assign({}, base, payload);
+    _settingsSnapshot = Object.assign({}, base, sent);
   } catch (e) { console.log('Settings-Push fehlgeschlagen:', e.message); }
+}
+const SETTINGS_MAP_KEYS = new Set(['effortByFamily', 'autoSpeakByChat']);
+/** Geaenderte Eintraege zweier JSON-Objekte; entfernte als null. */
+function mapDiff(beforeJson, afterJson) {
+  let a, b;
+  try { a = JSON.parse(beforeJson); b = JSON.parse(afterJson); } catch { return null; }
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return null;
+  const out = {};
+  for (const [k, v] of Object.entries(b)) if (JSON.stringify(a[k]) !== JSON.stringify(v)) out[k] = v;
+  for (const k of Object.keys(a)) if (!(k in b)) out[k] = null;
+  return out;
 }
 // Zurueck im Tab: was inzwischen in der App oder einem anderen Browser
 // umgestellt wurde, hierher holen. Eigene, noch nicht gesendete Aenderungen
@@ -1284,23 +1302,15 @@ function applyDetail(detail) {
   // Der Server weiss, was zuletzt in diesem Chat lief. Kennt er nichts, lief
   // ein Chat mit Nachrichten mit Claude (Bestandschats und ausdruecklich ""):
   // der darf nicht still zur Vorauswahl wechseln. Nur ein leerer Chat folgt ihr.
-  // Ein Gem bringt sein Modell mit wie ein GPT; das gilt, solange der Chat
-  // kein eigenes hat (der Server zieht ein mitgeschicktes Modell vor).
+  // Modell und Denktiefe eines Gems traegt der Server beim Anlegen am Chat ein.
   const stored = (detail.chat_model || '').trim();
-  const gemMeta = detail.gem_id ? state.gems.find((g) => g.id === detail.gem_id) : null;
-  state.convModel = stored || (gemMeta && gemMeta.model) || ((detail.messages || []).length ? '' : null);
-  // Gem-Chats von vor der Denktiefe pro Chat rechnet der Server noch mit der
-  // Vorgabe des Gems; die Anzeige soll dasselbe zeigen.
-  const storedEffort = (detail.chat_effort || '').trim();
-  state.convEffort = storedEffort || (gemMeta && gemMeta.effort) || null;
+  state.convModel = stored || ((detail.messages || []).length ? '' : null);
+  state.convEffort = (detail.chat_effort || '').trim() || null;
   state.gem = null;
   if (detail.gem_id) {
     gemFetch(detail.gem_id).then((g) => {
       if (state.cid !== detail.id) return;
       state.gem = g;
-      if (!stored && g.model) state.convModel = g.model;
-      if (!storedEffort && g.effort) state.convEffort = g.effort;
-      updateModelButton(); renderModelMenu();
       updateTopbar();
       if (!state.messages.length) renderMessages();
     }).catch(() => {});
@@ -1329,7 +1339,7 @@ async function newChat(opts = {}) {
     state.messages = [];
     // Gem-Chats starten mit Modell und Denktiefe des Gems (der Server hat
     // beides schon am Chat abgelegt), alle anderen mit der Vorauswahl.
-    state.convModel = c.chat_model || (opts.gem && opts.gem.model) || null;
+    state.convModel = c.chat_model || null;
     state.convEffort = c.chat_effort || null;
     state.skills = null;
     state.skillsIsOverride = false;
@@ -1538,9 +1548,20 @@ function selectModel(key) {
 function setEffort(value, family) {
   // Hat der Chat eine eigene Denktiefe (Gem), gilt die Wahl nur fuer ihn.
   if (!family && state.convEffort && state.cid) {
+    // Der Server rechnet mit der Denktiefe am Chat; klappt das Speichern
+    // nicht, gilt weiter die alte und die Anzeige muss das auch sagen.
+    const cid = state.cid;
+    const before = state.convEffort;
     state.convEffort = value;
-    api('PATCH', '/conversations/' + state.cid, { chat_effort: value })
-      .catch((e) => console.log('Denktiefe am Chat nicht gespeichert:', e.message));
+    api('PATCH', '/conversations/' + cid, { chat_effort: value })
+      .catch((e) => {
+        if (state.cid === cid && state.convEffort === value) {
+          state.convEffort = before;
+          updateModelButton();
+          renderModelMenu();
+        }
+        toast(t('toast_error_prefix', apiErrorText(e)), { error: true });
+      });
     updateModelButton();
     renderModelMenu();
     document.dispatchEvent(new CustomEvent('pc:effort-changed'));

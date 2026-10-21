@@ -16,6 +16,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** Vorgabe-Farbschema fuer den hellen Modus. Muss zur ID von
  *  `PocketPalette.NORDIC_BLUE` passen. */
@@ -332,7 +336,10 @@ class SettingsRepository(
             if (map.isEmpty()) prefs.remove(keyDefaultModelByFamily)
             else prefs[keyDefaultModelByFamily] = json.encodeToString(map)
         }
-        localChanged("defaultModelByFamily")
+        localEntriesChanged(
+            "defaultModelByFamily",
+            mapOf(family to if (value.isBlank()) JsonNull else JsonPrimitive(value)),
+        )
     }
 
     /** Merkt sich die Denktiefe pro Familie. Für Claude wird zusätzlich das alte
@@ -344,7 +351,8 @@ class SettingsRepository(
             map[family] = value
             prefs[keyEffortByFamily] = json.encodeToString(map)
         }
-        localChanged("effort", "effortByFamily")
+        if (family == ChatModelFamilies.CLAUDE) localChanged("effort")
+        localEntriesChanged("effortByFamily", mapOf(family to JsonPrimitive(value)))
     }
 
     suspend fun setImageDefaultSize(value: String) {
@@ -562,7 +570,8 @@ class SettingsRepository(
 
     suspend fun setEffort(value: String) {
         dataStore.edit { it[keyEffort] = value }
-        localChanged("effort", "effortByFamily")
+        localChanged("effort")
+        localEntriesChanged("effortByFamily", mapOf(ChatModelFamilies.CLAUDE to JsonPrimitive(value)))
     }
 
     suspend fun setSystemPromptMode(mode: SystemPromptMode) {
@@ -616,7 +625,10 @@ class SettingsRepository(
             if (map.isEmpty()) prefs.remove(keyTtsAutoSpeakPerChat)
             else prefs[keyTtsAutoSpeakPerChat] = json.encodeToString(map)
         }
-        localChanged("autoSpeakByChat")
+        localEntriesChanged(
+            "autoSpeakByChat",
+            mapOf(cid to if (override == null) JsonNull else JsonPrimitive(override)),
+        )
     }
 
     // ---------- Settings Export / Import (App-Anteil) ----------
@@ -690,20 +702,30 @@ class SettingsRepository(
     // Geraetebezogenes bleibt draussen (Server-Profile, Fingerabdruck,
     // Bilder-Verlauf, Sprache).
 
-    /** Wird bei jeder lokalen Aenderung mit den geaenderten Server-Werten
-     *  gerufen; [SettingsSync] schickt sie an den Server. */
+    /** Wird bei jeder lokalen Aenderung mit dem aktiven Profil und den
+     *  geaenderten Server-Werten gerufen; [SettingsSync] schickt sie hoch.
+     *  Ein [JsonObject] heisst: nur diese Eintraege der Liste aendern. */
     @Volatile
-    var onLocalChange: ((Map<String, String>) -> Unit)? = null
+    var onLocalChange: ((profileId: String, changes: Map<String, JsonElement>) -> Unit)? = null
+
+    /** Einzelne Eintraege einer Liste (pro Familie bzw. Chat) haben sich
+     *  geaendert; `JsonNull` heisst entfernt. Nur sie gehen an den Server, damit
+     *  ein Geraet mit altem Stand die uebrigen Eintraege nicht zuruecksetzt. */
+    private suspend fun localEntriesChanged(key: String, entries: Map<String, JsonElement>) {
+        val listener = onLocalChange ?: return
+        listener(current().activeProfileId, mapOf(key to JsonObject(entries)))
+    }
 
     private suspend fun localChanged(vararg remoteKeys: String) {
         val listener = onLocalChange ?: return
-        val values = sharedValues(dataStore.data.first())
+        val prefs = dataStore.data.first()
+        val values = sharedValues(prefs)
         // Ein geleerter Wert steht lokal gar nicht mehr da; der Server muss
         // ihn trotzdem erfahren, sonst kaeme der alte Wert beim Abgleich zurueck.
         val changed = remoteKeys.associateWith { key -> values[key] ?: CLEARED_VALUES[key] }
             .filterValues { it != null }
-            .mapValues { it.value!! }
-        if (changed.isNotEmpty()) listener(changed)
+            .mapValues { JsonPrimitive(it.value!!) as JsonElement }
+        if (changed.isNotEmpty()) listener(current().activeProfileId, changed)
     }
 
     private companion object {
@@ -786,12 +808,20 @@ class SettingsRepository(
      * ueberschreiben. Danach gilt der Server, die App laedt nur hoch, was dort
      * noch fehlt.
      */
-    suspend fun syncWithRemote(profileId: String, remote: Map<String, String>): Map<String, String> {
+    suspend fun syncWithRemote(
+        profileId: String,
+        remote: Map<String, String>,
+        protectedKeys: Set<String> = emptySet(),
+    ): Map<String, String> {
         var upload: Map<String, String> = emptyMap()
         dataStore.edit { prefs ->
+            // Kein Abgleich fuer ein Profil, das inzwischen nicht mehr aktiv ist.
+            if (prefs[keyActiveProfileId] != null && prefs[keyActiveProfileId] != profileId) return@edit
             val local = sharedValues(prefs)
             val firstSync = profileId !in (prefs[keyUiSyncedProfiles] ?: emptySet())
-            val take = if (firstSync) remote.filterKeys { it !in local } else remote
+            // Was hier gerade geaendert und noch nicht bestaetigt ist, bleibt.
+            val fresh = remote.filterKeys { it !in protectedKeys }
+            val take = if (firstSync) fresh.filterKeys { it !in local } else fresh
             applyShared(prefs, take)
             upload = if (firstSync) local.filter { (k, v) -> remote[k] != v }
                      else local.filterKeys { it !in remote }

@@ -205,6 +205,17 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
     # Denktiefe der Modell-Familie aus den Einstellungen.
     if "chat_effort" not in conv_cols:
         await db.execute("ALTER TABLE conversations ADD COLUMN chat_effort TEXT")
+        # Einmalig: bestehende Gem-Chats bekommen Modell und Denktiefe ihres
+        # Gems fest eingetragen, so wie neue Gem-Chats beim Anlegen. Bisher
+        # rechneten Server und Clients beides bei jedem Turn aus dem Gem nach;
+        # damit liess sich "im Chat auf Claude bzw. Familien-Vorgabe zurueck"
+        # nicht von "nie umgestellt" unterscheiden.
+        await db.execute(
+            "UPDATE conversations SET "
+            "chat_model = COALESCE(chat_model, (SELECT NULLIF(g.model, '') FROM gems g WHERE g.id = conversations.gem_id)), "
+            "chat_effort = (SELECT NULLIF(g.effort, '') FROM gems g WHERE g.id = conversations.gem_id) "
+            "WHERE gem_id IS NOT NULL"
+        )
     cur = await db.execute("PRAGMA table_info(attachments)")
     att_cols = {row[1] for row in await cur.fetchall()}
     if "user_id" not in att_cols:
