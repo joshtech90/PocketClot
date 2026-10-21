@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -65,19 +66,36 @@ class SettingsSync(
     private fun addPending(profileId: String, changed: Map<String, JsonElement>, newerWins: Boolean) =
         synchronized(lock) {
             if (pendingProfile != profileId) {
+                // Ein verspaeteter Fehler eines inzwischen verlassenen Profils
+                // darf die Aenderungen des aktiven nicht verdraengen.
+                if (!newerWins && pendingProfile != null && pending.isNotEmpty()) return@synchronized
                 pending.clear()
                 pendingProfile = profileId
             }
             for ((key, value) in changed) {
                 val old = pending[key]
                 pending[key] = when {
-                    old is JsonObject && value is JsonObject ->
-                        JsonObject(if (newerWins) old + value else value + old)
-                    old == null || newerWins -> value
+                    old == null -> value
+                    // Listen: Eintraege zusammenfuehren, auch wenn eine Seite
+                    // als ganzer JSON-Text vorliegt (Erstabgleich).
+                    old is JsonObject || value is JsonObject -> {
+                        val a = asObject(old)
+                        val b = asObject(value)
+                        if (a != null && b != null) JsonObject(if (newerWins) a + b else b + a)
+                        else if (newerWins) value else old
+                    }
+                    newerWins -> value
                     else -> old
                 }
             }
         }
+
+    private fun asObject(e: JsonElement): JsonObject? = when {
+        e is JsonObject -> e
+        e is JsonPrimitive && e.isString ->
+            runCatching { Json.parseToJsonElement(e.content) as? JsonObject }.getOrNull()
+        else -> null
+    }
 
     private fun schedulePush() {
         pushJob?.cancel()
@@ -122,17 +140,24 @@ class SettingsSync(
             val dirty = synchronized(lock) {
                 if (pendingProfile == current.activeProfileId) pending.keys.toSet() else emptySet()
             }
+            // null: das Profil ist inzwischen nicht mehr aktiv, nichts tun.
             val upload = settings.syncWithRemote(current.activeProfileId, remote, dirty)
+                ?: return@withLock
+            var uploaded = true
             if (upload.isNotEmpty()) {
                 val asJson = upload.mapValues { JsonPrimitive(it.value) as JsonElement }
                 runCatching { api.putUiSettings(asJson) }
                     .onFailure {
+                        uploaded = false
                         Log.w("PC_NET", "ui-settings upload failed: ${it::class.java.simpleName}")
                         // Beim naechsten Mal erneut, und bis dahin geschuetzt.
                         addPending(current.activeProfileId, asJson, newerWins = false)
                         schedulePush()
                     }
             }
+            // Erst mit bestaetigtem Upload ist der Erstabgleich erledigt; sonst
+            // gewinnt beim naechsten Start wieder, was die App hat.
+            if (uploaded) settings.markUiSynced(current.activeProfileId)
             Log.i("PC_NET", "ui-settings synced: ${remote.size} from server, ${upload.size} up, ${dirty.size} kept")
         }
     }

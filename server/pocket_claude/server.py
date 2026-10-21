@@ -2905,6 +2905,10 @@ _UI_SETTING_MAX_LEN = 64_000
 # Umstellen EINER Familie die anderen zuruecksetzen. Ein String ersetzt weiter
 # das Ganze (aeltere Clients, Import, Erstabgleich).
 _UI_MAP_KEYS = frozenset({"effortByFamily", "defaultModelByFamily", "autoSpeakByChat"})
+# Lesen, Zusammenfuehren und Schreiben pro User am Stueck, sonst verliert von
+# zwei gleichzeitigen Aenderungen verschiedener Eintraege eine. Der Server
+# laeuft als ein Prozess, ein asyncio-Lock reicht.
+_UI_SETTINGS_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 @app.get("/ui-settings")
@@ -2921,6 +2925,12 @@ async def put_ui_settings(body: dict, user=Depends(require_user)):
     Server nicht scheitert."""
     if not isinstance(body, dict):
         raise HTTPException(400, "JSON-Objekt erwartet.")
+    lock = _UI_SETTINGS_LOCKS.setdefault(user["id"], asyncio.Lock())
+    async with lock:
+        return await _put_ui_settings_locked(body, user)
+
+
+async def _put_ui_settings_locked(body: dict, user: dict) -> dict:
     current: dict | None = None
     flat: dict[str, str] = {}
     for k, v in body.items():

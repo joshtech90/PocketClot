@@ -710,9 +710,16 @@ function settingsPayload() {
     autoSendSilenceMs: silence || undefined,
   };
 }
-async function pushSettingsToServer() {
+// Speichervorgaenge laufen nacheinander, sonst koennte eine spaete Antwort den
+// Stand eines neueren Speicherns zuruecksetzen. Ergebnis: true = alles oben.
+let _settingsPushChain = Promise.resolve(true);
+function pushSettingsToServer() {
   _settingsPushTimer = null;
-  if (!state.token) return;
+  _settingsPushChain = _settingsPushChain.then(pushSettingsNow, pushSettingsNow);
+  return _settingsPushChain;
+}
+async function pushSettingsNow() {
+  if (!state.token) return true;
   const current = settingsPayload();
   const base = _settingsSnapshot || {};
   const payload = {};
@@ -726,11 +733,15 @@ async function pushSettingsToServer() {
     const entries = SETTINGS_MAP_KEYS.has(k) && base[k] !== undefined ? mapDiff(base[k], v) : null;
     payload[k] = entries || v;
   }
-  if (!Object.keys(payload).length) return;
+  if (!Object.keys(payload).length) return true;
   try {
     await api('PUT', '/ui-settings', payload);
     _settingsSnapshot = Object.assign({}, base, sent);
-  } catch (e) { console.log('Settings-Push fehlgeschlagen:', e.message); }
+    return true;
+  } catch (e) {
+    console.log('Settings-Push fehlgeschlagen:', e.message);
+    return false;
+  }
 }
 const SETTINGS_MAP_KEYS = new Set(['effortByFamily', 'autoSpeakByChat']);
 /** Geaenderte Eintraege zweier JSON-Objekte; entfernte als null. */
@@ -749,7 +760,11 @@ function mapDiff(beforeJson, afterJson) {
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible' || !state.token || !state.me) return;
   if (Date.now() - _settingsLoadedAt < 30_000) return;
-  if (_settingsPushTimer) { clearTimeout(_settingsPushTimer); await pushSettingsToServer(); }
+  clearTimeout(_settingsPushTimer);
+  // Konnte eine eigene Aenderung nicht gespeichert werden, nicht drueberladen:
+  // sie waere sonst weg. Der naechste Versuch kommt mit der naechsten Aenderung
+  // bzw. beim naechsten Zurueckkehren in den Tab.
+  if (!(await pushSettingsToServer())) return;
   await loadServerSettings();
   applyTheme();
   updateModelButton();
@@ -1306,6 +1321,7 @@ function applyDetail(detail) {
   const stored = (detail.chat_model || '').trim();
   state.convModel = stored || ((detail.messages || []).length ? '' : null);
   state.convEffort = (detail.chat_effort || '').trim() || null;
+  state.convEffortConfirmed = state.convEffort;
   state.gem = null;
   if (detail.gem_id) {
     gemFetch(detail.gem_id).then((g) => {
@@ -1341,6 +1357,7 @@ async function newChat(opts = {}) {
     // beides schon am Chat abgelegt), alle anderen mit der Vorauswahl.
     state.convModel = c.chat_model || null;
     state.convEffort = c.chat_effort || null;
+    state.convEffortConfirmed = state.convEffort;
     state.skills = null;
     state.skillsIsOverride = false;
     resetComposerFor(c.id);
@@ -1551,12 +1568,12 @@ function setEffort(value, family) {
     // Der Server rechnet mit der Denktiefe am Chat; klappt das Speichern
     // nicht, gilt weiter die alte und die Anzeige muss das auch sagen.
     const cid = state.cid;
-    const before = state.convEffort;
     state.convEffort = value;
     api('PATCH', '/conversations/' + cid, { chat_effort: value })
+      .then((c) => { if (state.cid === cid) state.convEffortConfirmed = c.chat_effort || null; })
       .catch((e) => {
         if (state.cid === cid && state.convEffort === value) {
-          state.convEffort = before;
+          state.convEffort = state.convEffortConfirmed || state.convEffort;
           updateModelButton();
           renderModelMenu();
         }

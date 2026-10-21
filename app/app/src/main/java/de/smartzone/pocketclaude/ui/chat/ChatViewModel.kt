@@ -346,22 +346,26 @@ class ChatViewModel(
             }
     }
 
+    /** Zuletzt vom Server bestaetigte Denktiefe dieses Chats (Ruecknahme). */
+    private var confirmedChatEffort: String? = null
+
     /** Denktiefe der aktuell gewählten Familie. */
     fun effortFor(family: String): String =
         cachedSettings?.effortFor(family) ?: DEFAULT_EFFORT
 
     fun setEffort(family: String, effort: String) = viewModelScope.launch {
-        val before = _state.value.chatEffort
-        if (before != null) {
+        if (_state.value.chatEffort != null) {
             _state.update { it.copy(chatEffort = effort) }
             // Der Server rechnet mit der Denktiefe am Chat. Klappt das Speichern
-            // nicht, gilt weiter die alte, und die Anzeige muss das auch sagen.
+            // nicht, gilt dort der zuletzt bestaetigte Wert, und die Anzeige
+            // muss das auch sagen.
             runCatching { repo.setChatEffort(cid, effort) }
+                .onSuccess { confirmedChatEffort = effort }
                 .onFailure { e ->
                     Log.w("PC_NET", "chat effort not saved: ${e::class.java.simpleName}")
                     _state.update {
                         if (it.chatEffort == effort) it.copy(
-                            chatEffort = before,
+                            chatEffort = confirmedChatEffort ?: it.chatEffort,
                             errorMessage = e.message ?: e::class.java.simpleName,
                         ) else it
                     }
@@ -468,6 +472,7 @@ class ChatViewModel(
                 chatEffort = detail.chatEffort?.takeIf { e -> e.isNotBlank() },
             )
         }
+        confirmedChatEffort = detail.chatEffort?.takeIf { e -> e.isNotBlank() }
         loadGemMeta(detail.gemId)
     }
 

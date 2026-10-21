@@ -812,8 +812,8 @@ class SettingsRepository(
         profileId: String,
         remote: Map<String, String>,
         protectedKeys: Set<String> = emptySet(),
-    ): Map<String, String> {
-        var upload: Map<String, String> = emptyMap()
+    ): Map<String, String>? {
+        var upload: Map<String, String>? = null
         dataStore.edit { prefs ->
             // Kein Abgleich fuer ein Profil, das inzwischen nicht mehr aktiv ist.
             if (prefs[keyActiveProfileId] != null && prefs[keyActiveProfileId] != profileId) return@edit
@@ -825,9 +825,15 @@ class SettingsRepository(
             applyShared(prefs, take)
             upload = if (firstSync) local.filter { (k, v) -> remote[k] != v }
                      else local.filterKeys { it !in remote }
-            prefs[keyUiSyncedProfiles] = (prefs[keyUiSyncedProfiles] ?: emptySet()) + profileId
         }
         return upload
+    }
+
+    /** Erstabgleich fuer dieses Profil abgeschlossen (Upload bestaetigt). */
+    suspend fun markUiSynced(profileId: String) {
+        dataStore.edit { prefs ->
+            prefs[keyUiSyncedProfiles] = (prefs[keyUiSyncedProfiles] ?: emptySet()) + profileId
+        }
     }
 }
 
