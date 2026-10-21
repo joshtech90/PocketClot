@@ -32,13 +32,14 @@ class Antwort:
 class GrunddatenTest(unittest.TestCase):
     def test_provider_ist_gueltig_und_vorgabe(self):
         self.assertIn(tts.PROVIDER_GEMINI_WEB, tts.VALID_PROVIDERS)
-        self.assertEqual(tts.DEFAULT_PROVIDER, tts.PROVIDER_GEMINI_WEB)
+        # Seit 21.10.2026 nur noch kostenlose Anbieter, Vorgabe Grok.
+        self.assertEqual(tts.VALID_PROVIDERS, {"grok", "gemini_web", "edge_tts"})
+        self.assertEqual(tts.DEFAULT_PROVIDER, tts.PROVIDER_GROK)
 
     def test_ogg_als_medientyp(self):
         self.assertEqual(tts.media_type_for(tts.PROVIDER_GEMINI_WEB), "audio/ogg")
-        # Die anderen bleiben, wie sie waren.
-        self.assertEqual(tts.media_type_for(tts.PROVIDER_CLOUD_TTS), "audio/mpeg")
-        self.assertEqual(tts.media_type_for(tts.PROVIDER_GEMINI_API), "audio/wav")
+        self.assertEqual(tts.media_type_for(tts.PROVIDER_EDGE_TTS), "audio/mpeg")
+        self.assertEqual(tts.media_type_for(tts.PROVIDER_GROK), "audio/mpeg")
 
     def test_stimme_existiert_und_passt_nur_zu_diesem_anbieter(self):
         stimme = tts.default_voice_for(tts.PROVIDER_GEMINI_WEB)
@@ -65,14 +66,6 @@ class SyntheseTest(unittest.TestCase):
                                return_value=Antwort(503, b'{"error":"session_expired"}')):
             with self.assertRaises(tts.TtsSessionExpiredError):
                 tts._synthesize_gemini_web("Hallo")
-
-    def test_abgelaufene_sitzung_sperrt_nicht_cloud_tts(self):
-        # Wichtig: NICHT TtsCloudTtsUnavailableError. Die setzt im Endpunkt eine
-        # serverweite Cloud-TTS-Sperre fuer fuenf Minuten — also ausgerechnet
-        # fuer den Anbieter, auf den die Fehlermeldung zum Ausweichen verweist.
-        self.assertFalse(
-            issubclass(tts.TtsSessionExpiredError, tts.TtsCloudTtsUnavailableError)
-        )
 
     def test_dienst_nicht_erreichbar_ist_voruebergehend(self):
         with mock.patch.object(tts.httpx, "post",

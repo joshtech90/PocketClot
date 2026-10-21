@@ -627,10 +627,9 @@
               <span class="set-hint" id="tts-provider-hint"></span>
             </div>
             <select id="tts-provider" class="select">
-              <option value="gemini_web" data-i18n="tts_provider_option_web">Gemini Web (Standard, gratis, kein Setup)</option>
+              <option value="grok" data-i18n="tts_provider_option_grok">Grok (Standard, gratis, 28 Stimmen)</option>
+              <option value="gemini_web" data-i18n="tts_provider_option_web">Gemini Web (gratis, eine Stimme)</option>
               <option value="edge_tts" data-i18n="tts_provider_option_edge">Microsoft Edge (gratis, kein Setup)</option>
-              <option value="gemini_api" data-i18n="tts_provider_option_gemini">Gemini API</option>
-              <option value="cloud_tts" data-i18n="tts_provider_option_cloud">Cloud TTS (Service Account)</option>
             </select>
           </div>
           <div class="set-row">
@@ -662,40 +661,8 @@
             </div>
             <input id="tts-chunking" type="checkbox" class="switch">
           </label>
-          <div class="set-row hidden" id="tts-model-row">
-            <div class="set-text"><span class="set-title" data-i18n="tts_model">Sprachmodell</span></div>
-            <select id="tts-model" class="select"></select>
-          </div>
         </div>
 
-        <div class="set-group hidden" id="tts-keys-block">
-          <div class="set-group-head">
-            <span class="set-title" data-i18n="tts_keys_title">Gemini-API-Schlüssel</span>
-            <span class="set-hint" data-i18n="tts_keys_hint">Mehrere Schlüssel werden der Reihe nach genutzt, wenn einer sein Tageslimit erreicht.</span>
-          </div>
-          <div id="tts-keys-list" class="key-list"></div>
-          <div class="set-row set-row-inputs">
-            <input id="tts-key-label" type="text" class="input" placeholder="Bezeichnung" data-i18n-placeholder="tts_key_label" autocomplete="off">
-            <input id="tts-key-input" type="password" class="input mono" placeholder="AIza…" autocomplete="off">
-            <button id="tts-key-add" type="button" class="btn-secondary" data-i18n="add">Hinzufügen</button>
-          </div>
-          <div id="tts-keys-status" class="backup-status"></div>
-        </div>
-
-        <div class="set-group hidden" id="tts-cloud-block">
-          <div class="set-group-head">
-            <span class="set-title" data-i18n="tts_cloud_title">Cloud-TTS-Zugang</span>
-            <span class="set-hint" id="tts-cloud-state"></span>
-          </div>
-          <div class="set-row">
-            <div class="set-text"><span class="set-hint" data-i18n="tts_cloud_hint">Service-Account-JSON aus der Google Cloud Console.</span></div>
-            <div class="row-gap">
-              <button id="tts-cloud-upload" type="button" class="btn-secondary"><svg class="icon"><use href="#icon-upload"/></svg><span data-i18n="upload">Hochladen</span></button>
-              <button id="tts-cloud-delete" type="button" class="btn-ghost" data-i18n="remove">Entfernen</button>
-            </div>
-            <input id="tts-cloud-input" type="file" hidden accept="application/json,.json">
-          </div>
-        </div>
       </section>
 
       <!-- Spracheingabe -->

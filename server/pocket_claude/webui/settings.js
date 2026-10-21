@@ -235,22 +235,23 @@
   const ttsSpeedLabel = $('tts-speed-label');
   const autoSpeakBox = $('tts-auto-speak');
   const chunkBox = $('tts-chunking');
-  const ttsModel = $('tts-model');
   let ttsStatus = null;
-  const TIER_LABELS = () => ({
-    geminiweb: 'Gemini Web', edge: 'Microsoft Edge', gemini: 'Gemini',
-    chirp3hd: 'Chirp 3 HD', studio: 'Studio', neural2: 'Neural2', wavenet: 'Wavenet', standard: 'Standard',
-  });
-  const TIER_ORDER = ['geminiweb', 'edge', 'gemini', 'chirp3hd', 'studio', 'neural2', 'wavenet', 'standard'];
+  const TIER_LABELS = () => ({ grok: 'Grok', geminiweb: 'Gemini Web', edge: 'Microsoft Edge' });
+  const TIER_ORDER = ['grok', 'geminiweb', 'edge'];
+  /** Gewaehlter Anbieter. `provider` ist der, der gerade wirklich vorliest;
+   *  springt einer ein, weil der gewaehlte nicht laeuft, bleibt die Wahl. */
+  const chosenProvider = (s) => s.chosen_provider || s.provider || 'grok';
 
   function renderTtsHint(s) {
     const el = $('tts-provider-hint');
-    const p = s.provider || 'gemini_web';
+    const p = chosenProvider(s);
     let ok, text;
-    if (p === 'gemini_web') { ok = !!s.configured; text = s.configured ? t('tts_hint_web_ok') : t('tts_hint_web_down'); }
-    else if (p === 'edge_tts') { ok = true; text = t('tts_hint_edge_ok'); }
-    else if (p === 'gemini_api') { ok = !!s.gemini_api_configured; text = ok ? t('tts_hint_gemini_ok') : t('tts_hint_gemini_missing'); }
-    else { ok = !!s.cloud_tts_configured; text = ok ? t('tts_hint_cloud_ok', s.client_email || '?') : t('tts_hint_cloud_missing'); }
+    if (s.provider && s.provider !== p) {
+      ok = false;
+      text = t('tts_hint_fallback', ttsProvider.querySelector(`option[value="${s.provider}"]`)?.textContent || s.provider);
+    } else if (p === 'grok') { ok = !!s.configured; text = ok ? t('tts_hint_grok_ok') : t('tts_hint_grok_down'); }
+    else if (p === 'gemini_web') { ok = !!s.configured; text = ok ? t('tts_hint_web_ok') : t('tts_hint_web_down'); }
+    else { ok = true; text = t('tts_hint_edge_ok'); }
     el.textContent = text;
     el.classList.toggle('status-ok', ok);
     el.classList.toggle('status-warn', !ok);
@@ -258,7 +259,7 @@
   /** Stimmen nur fuer den gewaehlten Anbieter anbieten (compatible_providers),
    *  wie die App. Passt die gemerkte Stimme nicht, gilt die Vorgabe des Anbieters. */
   function renderVoices(s) {
-    const provider = s.provider || 'gemini_web';
+    const provider = chosenProvider(s);
     const voices = (s.voices || []).filter((v) => !v.compatible_providers || !v.compatible_providers.length || v.compatible_providers.includes(provider));
     ttsVoice.innerHTML = '';
     const grouped = {};
@@ -279,7 +280,8 @@
     }
     const ids = voices.map((v) => v.id);
     if (ids.length && !ids.includes(state.ttsVoice)) {
-      state.ttsVoice = ids.includes(s.default_voice) ? s.default_voice : ids[0];
+      const fallback = provider === 'grok' ? 'grok-leo' : s.default_voice;
+      state.ttsVoice = ids.includes(fallback) ? fallback : ids[0];
       localStorage.setItem(LS.ttsVoice, state.ttsVoice);
       queueSettingsPush();
     }
@@ -289,35 +291,15 @@
   function renderTts(s) {
     ttsStatus = s;
     state.ttsProvider = s.provider || null;
-    ttsProvider.value = s.provider || 'gemini_web';
+    ttsProvider.value = chosenProvider(s);
     renderTtsHint(s);
     renderVoices(s);
     ttsSpeed.value = state.ttsSpeed;
     ttsSpeedLabel.textContent = state.ttsSpeed.toFixed(2) + '×';
     autoSpeakBox.checked = state.autoSpeak;
-    $('tts-chunking-row').classList.toggle('hidden', s.provider === 'gemini_web');
+    // Stueckeln geht nur mit MP3 (Grok, Edge), nie mit dem Ogg von Gemini Web.
+    $('tts-chunking-row').classList.toggle('hidden', chosenProvider(s) === 'gemini_web');
     chunkBox.checked = !!s.chunking_enabled;
-    const models = s.available_models || [];
-    const showModel = ['gemini_api', 'cloud_tts'].includes(s.provider) && models.length > 0;
-    $('tts-model-row').classList.toggle('hidden', !showModel);
-    if (showModel) {
-      ttsModel.innerHTML = '';
-      for (const m of models) {
-        const o = document.createElement('option');
-        o.value = m.id;
-        o.textContent = m.label + (m.price_hint ? ` · ${m.price_hint}` : '');
-        ttsModel.appendChild(o);
-      }
-      ttsModel.value = s.tts_model || (models.find((m) => m.default) || models[0]).id;
-    }
-    $('tts-keys-block').classList.toggle('hidden', s.provider !== 'gemini_api');
-    if (s.provider === 'gemini_api') loadTtsKeys();
-    const showCloud = s.provider === 'cloud_tts' && !!(state.me && state.me.is_admin);
-    $('tts-cloud-block').classList.toggle('hidden', !showCloud);
-    if (showCloud) {
-      $('tts-cloud-state').textContent = s.cloud_tts_configured ? t('tts_cloud_set', s.client_email || s.project_id || '') : t('tts_hint_cloud_missing');
-      $('tts-cloud-delete').classList.toggle('hidden', !s.cloud_tts_configured);
-    }
   }
   async function loadTts() {
     try { renderTts(await api('GET', '/tts/status')); }
@@ -330,7 +312,7 @@
       toast(t('toast_provider_changed', ttsProvider.options[ttsProvider.selectedIndex].textContent));
     } catch (e) {
       toast(t('toast_provider_switch_failed', apiErrorText(e)), { error: true });
-      if (ttsStatus) ttsProvider.value = ttsStatus.provider;
+      if (ttsStatus) ttsProvider.value = chosenProvider(ttsStatus);
     }
   });
   ttsVoice.addEventListener('change', () => {
@@ -374,66 +356,6 @@
   chunkBox.addEventListener('change', async () => {
     try { renderTts(await api('PUT', '/tts/chunking', { enabled: chunkBox.checked })); }
     catch (e) { chunkBox.checked = !chunkBox.checked; toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
-  });
-  ttsModel.addEventListener('change', async () => {
-    try { renderTts(await api('PUT', '/tts/model', { model_id: ttsModel.value })); }
-    catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
-  });
-
-  // Gemini-API-Schluessel fuers Vorlesen (Pool, der Server wechselt reihum)
-  async function loadTtsKeys() {
-    const list = $('tts-keys-list');
-    try {
-      const r = await api('GET', '/tts/api-keys');
-      list.innerHTML = '';
-      if (!(r.keys || []).length) {
-        list.innerHTML = `<p class="set-hint" style="padding:10px 0">${escapeHtml(t('tts_keys_empty'))}</p>`;
-        return;
-      }
-      for (const k of r.keys) {
-        const row = document.createElement('div');
-        row.className = 'key-row';
-        const tier = k.tier_hint === 'free' ? t('tts_key_tier_free') : k.tier_hint === 'likely_paid' ? t('tts_key_tier_paid') : '';
-        row.innerHTML = `<span class="grow"><span class="key-label"></span><span class="key-mask mono"></span></span>
-          ${tier ? `<span class="badge">${escapeHtml(tier)}</span>` : ''}
-          <span class="set-hint">${escapeHtml(t('tts_key_calls', k.success_count || 0))}</span>
-          <button type="button" class="icon-btn" title="${escapeHtml(t('remove'))}"><svg class="icon"><use href="#icon-trash"/></svg></button>`;
-        row.querySelector('.key-label').textContent = k.label || t('tts_key_unnamed');
-        row.querySelector('.key-mask').textContent = k.masked;
-        row.querySelector('button').addEventListener('click', async () => {
-          if (!(await showConfirm({ title: t('remove'), text: t('confirm_remove_api_key'), okLabel: t('remove'), danger: true }))) return;
-          try { await api('DELETE', '/tts/api-keys/' + encodeURIComponent(k.id)); await loadTtsKeys(); loadTts(); }
-          catch (e) { setStatus('tts-keys-status', t('toast_error_prefix', apiErrorText(e)), 'error'); }
-        });
-        list.appendChild(row);
-      }
-    } catch (e) { setStatus('tts-keys-status', t('toast_error_prefix', apiErrorText(e)), 'error'); }
-  }
-  $('tts-key-add').addEventListener('click', async () => {
-    const key = $('tts-key-input').value.trim();
-    if (!key) return;
-    try {
-      await api('POST', '/tts/api-keys', { api_key: key, label: $('tts-key-label').value.trim() });
-      $('tts-key-input').value = '';
-      $('tts-key-label').value = '';
-      setStatus('tts-keys-status', t('toast_api_key_saved'), 'ok');
-      await loadTtsKeys();
-      loadTts();
-    } catch (e) { setStatus('tts-keys-status', t('toast_error_prefix', apiErrorText(e)), 'error'); }
-  });
-  // Cloud-TTS-Zugang (nur Admin, Service-Account-JSON)
-  $('tts-cloud-upload').addEventListener('click', () => $('tts-cloud-input').click());
-  $('tts-cloud-input').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
-    try { renderTts(await api('PUT', '/tts/credentials', { credentials_json: await f.text() })); toast(t('saved')); }
-    catch (err) { toast(t('toast_error_prefix', apiErrorText(err)), { error: true }); }
-  });
-  $('tts-cloud-delete').addEventListener('click', async () => {
-    if (!(await showConfirm({ title: t('remove'), text: t('tts_cloud_remove_confirm'), okLabel: t('remove'), danger: true }))) return;
-    try { await api('DELETE', '/tts/credentials'); loadTts(); }
-    catch (err) { toast(t('toast_error_prefix', apiErrorText(err)), { error: true }); }
   });
 
   // =========================================================

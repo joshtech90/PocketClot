@@ -161,3 +161,17 @@ def test_migration_pins_existing_gem_chats(ctx):
     asyncio.run(downgrade_and_migrate())
     detail = c.get(f"/conversations/{old}", headers=h).json()
     assert detail["chat_model"] == "sonnet" and detail["chat_effort"] == "medium"
+
+
+def test_defaults_migration_sets_opus_high_once(ctx):
+    uid = ctx["user"]["id"]
+    asyncio.run(db.kv_set_many({"chatModel": "gw:x:y", "effortByFamily": '{"gemini":"low","claude":"max"}',
+                                "defaults_opus_high_migrated": ""}, scope=uid))
+    asyncio.run(server._migrate_defaults_opus_high())
+    kv = asyncio.run(db.kv_get_all(scope=uid))
+    assert kv["chatModel"] == "opus" and kv["effort"] == "high"
+    assert json.loads(kv["effortByFamily"]) == {"gemini": "low", "claude": "high"}
+    # Eine spaetere eigene Wahl bleibt
+    asyncio.run(db.kv_set_many({"chatModel": "sonnet"}, scope=uid))
+    asyncio.run(server._migrate_defaults_opus_high())
+    assert asyncio.run(db.kv_get_all(scope=uid))["chatModel"] == "sonnet"

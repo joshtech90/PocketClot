@@ -8,8 +8,8 @@ Workflow:
    nachgeschaut. Cache-Hit → 0ms Server-Latenz, App spielt sofort.
 3. LRU: bei Überschreitung von `MAX_BYTES` werden älteste Einträge entfernt.
 
-Der `provider` ist im Key, weil MP3-Bytes (cloud_tts) und WAV-Bytes
-(gemini_api) für dieselbe Voice nicht austauschbar sind — wenn der User mid-
+Der `provider` ist im Key, weil MP3-Bytes (Edge, Grok) und Ogg-Bytes
+(Gemini Web) nicht austauschbar sind — wenn der User mid-
 Session den Provider wechselt, soll der Cache des anderen Providers nicht
 fälschlich getroffen werden.
 

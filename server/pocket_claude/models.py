@@ -125,67 +125,30 @@ class TtsVoiceDto(BaseModel):
     label: str
     gender: str
     tier: str
-    # Welche TTS-Provider kennen diese Voice? Cloud-TTS-API kennt alle Voices
-    # (Chirp 3 HD, Studio, Neural2 etc.). Die Gemini-Direct-API
-    # (`generativelanguage.googleapis.com`) kennt nur Sternennamen-Voices
-    # mit `gemini-`-Prefix. Default `["cloud_tts"]`.
-    compatible_providers: list[str] = ["cloud_tts"]
+    # Mit welchen Anbietern diese Stimme funktioniert (grok, gemini_web, edge_tts).
+    compatible_providers: list[str] = []
 
 
 class TtsStatusDto(BaseModel):
-    # `configured` heißt: AKTUELLER Provider ist einsatzbereit. Für cloud_tts
-    # = Service-Account-JSON da. Für gemini_api = User hat einen API-Key.
+    # `configured`: der GEWAEHLTE Anbieter laeuft und hat seine Sitzung.
     configured: bool
-    # Welcher Provider ist beim aktuellen User aktiv?
-    provider: str = "gemini_api"
-    # Welche Provider sind theoretisch wählbar (Setup-Status pro Provider).
-    cloud_tts_configured: bool = False
-    gemini_api_configured: bool = False
-    # Masked-Anzeige des aktuell hinterlegten Gemini-API-Keys (für UI). None
-    # wenn keiner gesetzt. (Bei Multi-Key-Pool: zeigt den ersten Key.)
-    gemini_api_key_masked: str | None = None
-    # Wo kommt der TTS-Key her? "tts" = eigener Slot, "image" = Fallback auf
-    # den Image-Key (für Bestands-User vor der Trennung), "none" = keiner.
-    gemini_api_key_source: str = "none"
-    # Anzahl Keys im Multi-Key-Pool. Wenn >1: Server verteilt TTS-Calls per
-    # Round-Robin + Rate-Limiter, um Free-Tier-Limits zu umgehen.
-    gemini_api_key_count: int = 0
-    # Cloud-TTS-Meta (nur befüllt wenn Service-Account-JSON geladen ist).
-    project_id: str | None = None
-    client_email: str | None = None
-    # Cloud-TTS-Verbrauch im aktuellen Kalendermonat (Zeichen-Counter).
-    # Hilfreich um zu sehen ob das 1-Mio-Free-Tier-Contingent noch reicht.
-    cloud_tts_chars_this_month: int = 0
+    # Mit diesem Anbieter wird gerade vorgelesen. Ist der gewaehlte nicht
+    # nutzbar, steht hier der, der einspringt (Grok → Gemini Web → Edge).
+    provider: str = "grok"
+    # Was der Nutzer gewaehlt hat (bzw. die Vorgabe).
+    chosen_provider: str = "grok"
+    # Welche Anbieter gerade nutzbar sind.
+    providers_available: list[str] = []
     default_voice: str
     voices: list[TtsVoiceDto]
-    # TTS-Modell-Selektion: aktiv und Auswahl-Liste. Gilt für Gemini-Voices
-    # (sowohl Provider=gemini_api als auch Cloud-TTS mit gemini-Voices).
-    tts_model: str | None = None
-    available_models: list["TtsModelDto"] = []
-    # Chunking: TRUE = lange Texte werden in parallele Chunks gesplittet.
-    # Default: cloud_tts → an, gemini_api/edge_tts → aus (RPD-Limit-Schutz).
-    chunking_enabled: bool = True
-    # Wurde der Chunking-Wert vom User explizit gesetzt, oder ist's nur der
-    # Provider-Default? Wichtig fürs UI um zwischen "User-Wahl" und "Auto"
-    # zu unterscheiden.
+    # Stueckeln: lange Texte in parallele Teile (nur MP3, also Edge und Grok).
+    chunking_enabled: bool = False
+    # Vom Nutzer gesetzt oder nur Vorgabe des Anbieters?
     chunking_explicit: bool = False
 
 
-class TtsModelDto(BaseModel):
-    """Ein verfügbares TTS-Modell (gemini-*-tts-preview, etc.)."""
-    id: str
-    label: str
-    tier: str = ""        # "flash" | "pro" | ...
-    price_hint: str = ""  # menschen-lesbare Preis-Info
-    default: bool = False
-
-
-class TtsCredentialsRequest(BaseModel):
-    credentials_json: str
-
-
 class TtsProviderRequest(BaseModel):
-    provider: str  # "cloud_tts" | "gemini_api" | "edge_tts"
+    provider: str  # "grok" | "gemini_web" | "edge_tts"
 
 
 class TtsChunkingRequest(BaseModel):
@@ -196,70 +159,14 @@ class TtsChunkingRequest(BaseModel):
     enabled: bool | None = None
 
 
-class TtsModelRequest(BaseModel):
-    """Setzt das aktive TTS-Modell für den User. Wert muss in der Liste
-    `available_models` enthalten sein, sonst HTTP 400."""
-    model_id: str
 
 
-class BillingStatusDto(BaseModel):
-    """Status der Cloud-Billing-Lage für das verknüpfte Cloud-Projekt.
-
-    Wird vom GET /billing/status-Endpoint zurückgegeben. Alle Beträge in der
-    Currency des Billing-Accounts (typisch EUR oder USD). `available=False` →
-    Server konnte das Billing-API nicht erreichen (kein Service-Account-JSON,
-    Rolle fehlt, oder Cloud-Side-Fehler); `error` enthält dann den Grund.
-    """
-    available: bool = False
-    error: str | None = None
-    # Informativer Hinweis (z.B. „Budget-API nicht aktiviert"). Anders als
-    # `error` ist `warning` NICHT fatal — der Rest des Widgets bleibt sichtbar
-    # und der Hinweis wird als kleiner Text gerendert, kein Error-Banner.
-    warning: str | None = None
-    # Welche Cloud-Billing-Identifikation (für UI-Anzeige)
-    billing_account_id: str | None = None
-    project_id: str | None = None
-    currency_code: str = "EUR"
-    # Aktueller Monatsverbrauch (Brutto, vor Credit-Anrechnung). Cloud-Console
-    # zeigt diese Zahl. „Echtkosten" wären Brutto − Credit, aber das wird erst
-    # beim Monatsabschluss verrechnet.
-    spend_this_month: float = 0.0
-    # Konfiguriertes Budget (Pocket-Claude Hard Cap)
-    budget_amount: float | None = None
-    budget_name: str | None = None
-    # Verfügbares AI-Pro-Credit (Restwert)
-    credit_remaining: float | None = None
-    credit_original: float | None = None
-    credit_name: str | None = None
-    # Berechnete Realkosten am Monatsende (Schätzung): max(0, spend - credit)
-    estimated_real_cost: float = 0.0
-    # Wann zuletzt aktualisiert (ISO-UTC), damit die App den Cache-Stand sieht.
-    last_updated_at: str | None = None
 
 
-class TtsApiKeyEntryDto(BaseModel):
-    """Ein einzelner Gemini-API-Key im Multi-Key-Pool. `id` ist serverseitig
-    generiert (random), zum Löschen/Updaten."""
-    id: str
-    label: str = ""
-    masked: str  # "AIzaSy…JNrw" (für UI-Anzeige)
-    # Tier-Heuristik:
-    #  - "unknown"     → noch nie verwendet, oder zu wenig Daten
-    #  - "free"        → 429 mit FreeTier-Quota gesehen → bestätigt Free-Tier
-    #  - "likely_paid" → >15 erfolgreiche Calls ohne FreeTier-Burn → vermutlich Paid
-    tier_hint: str = "unknown"
-    success_count: int = 0
 
 
-class TtsApiKeysDto(BaseModel):
-    """Liste aller Gemini-API-Keys des Users (per Multi-Key-Pool). Server
-    verteilt TTS-Calls per Round-Robin und Rate-Limiter auf die Keys."""
-    keys: list[TtsApiKeyEntryDto] = []
 
 
-class TtsApiKeyAddRequest(BaseModel):
-    api_key: str
-    label: str = ""
 
 
 # ---------- Settings Export / Import ----------
