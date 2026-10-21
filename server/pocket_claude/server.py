@@ -1408,6 +1408,10 @@ async def tts_message_audio(
         except Exception:
             log.exception("TTS-Stream-Fehler (provider=%s)", provider)
             return
+        finally:
+            # Hoerer weg oder Fehler: den Erzeuger sofort schliessen, damit
+            # offene Verbindungen (Grok-Stream) nicht haengen bleiben.
+            await gen.aclose()
 
     from fastapi.responses import StreamingResponse
     return StreamingResponse(

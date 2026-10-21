@@ -21,6 +21,7 @@ Ogg-Stroeme lassen sich nicht aneinanderhaengen.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import random
@@ -1023,9 +1024,12 @@ async def synthesize_chunked(
         for attempt in range(2):
             geliefert = False
             try:
-                async for teil in _stream_grok(cleaned, voice, rate):
-                    geliefert = True
-                    yield teil
+                # aclosing: bricht der Hoerer ab, wird die Verbindung zum Dienst
+                # sofort geschlossen und nicht erst beim Aufraeumen der Loop.
+                async with contextlib.aclosing(_stream_grok(cleaned, voice, rate)) as strom:
+                    async for teil in strom:
+                        geliefert = True
+                        yield teil
                 return
             except TtsTransientError as e:
                 if geliefert or attempt == 1:
