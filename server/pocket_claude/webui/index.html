@@ -193,9 +193,14 @@
         <img class="brand-mark" src="brand-mark.png" alt="">
         <span data-i18n="app_name">PocketClot</span>
       </button>
-      <button id="sidebar-toggle" class="icon-btn" type="button" data-i18n-title="sidebar_close" title="Seitenleiste schließen">
-        <svg class="icon"><use href="#icon-dock-to-right"/></svg>
-      </button>
+      <div class="sb-top-actions">
+        <button id="sb-search-top" class="icon-btn" type="button" data-i18n-title="search_chats" title="Chats durchsuchen">
+          <svg class="icon"><use href="#icon-search"/></svg>
+        </button>
+        <button id="sidebar-toggle" class="icon-btn" type="button" data-i18n-title="sidebar_close" title="Seitenleiste schließen">
+          <svg class="icon"><use href="#icon-dock-to-right"/></svg>
+        </button>
+      </div>
     </div>
 
     <nav class="sb-actions">
@@ -229,7 +234,7 @@
     </div>
 
     <div class="sb-footer">
-      <button id="footer-user" class="sb-user" type="button" aria-haspopup="menu"></button>
+      <button id="footer-user" class="sb-user" type="button" aria-haspopup="menu" data-i18n-title="my_account" title="Mein Konto"></button>
       <div id="profile-menu" class="menu profile-menu hidden" role="menu">
         <div class="menu-head" id="profile-menu-head"></div>
         <button type="button" data-profile="settings" role="menuitem">
@@ -838,6 +843,17 @@
         <div class="set-group">
           <div class="set-row">
             <div class="set-text">
+              <span class="set-title" data-i18n="avatar_title">Profilbild</span>
+              <span class="set-hint" data-i18n="avatar_hint">Erscheint unten in der Seitenleiste.</span>
+            </div>
+            <div class="avatar-edit">
+              <span id="my-avatar-preview" class="avatar-slot"></span>
+              <button id="my-avatar-pick" class="btn-secondary btn-sm" type="button" data-i18n="avatar_choose">Bild wählen</button>
+              <button id="my-avatar-remove" class="btn-ghost btn-sm hidden" type="button" data-i18n="avatar_remove">Entfernen</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <div class="set-text">
               <span class="set-title" data-i18n="signed_in_as">Eingeloggt als</span>
               <span class="set-hint"><strong id="my-account-name">—</strong></span>
             </div>
@@ -971,6 +987,7 @@
           <div id="new-user-result" class="backup-status set-pad"></div>
         </div>
       </section>
+      <input id="avatar-file-input" type="file" hidden accept="image/png,image/jpeg,image/webp,image/heic,image/*">
 
       <!-- Ueber -->
       <section class="settings-pane" data-pane="about">
@@ -1054,6 +1071,7 @@
           <select id="gem-effort" class="select"></select>
         </label>
       </div>
+      <p class="set-hint" data-i18n="gem_defaults_hint">Damit startet jeder neue Chat mit diesem Gem. Im Chat kannst du beides jederzeit umstellen.</p>
       <div class="field">
         <span data-i18n="gem_skills_label">Fähigkeiten</span>
         <label class="gem-chk"><input type="checkbox" id="gem-skill-web-search"> <span data-i18n="gem_skill_web_search">Websuche</span></label>

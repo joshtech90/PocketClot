@@ -14,6 +14,9 @@ window.PocketVoice = (() => {
   const autoSendBox = $('voice-auto-send');
   const silenceEl = $('voice-silence');
   const LS_AUTO_SEND = 'pc.voiceAutoSend';
+  // Stille bis zum automatischen Senden; kommt wie in der App aus den
+  // geteilten Einstellungen, sonst 3 s.
+  const LS_SILENCE_MS = 'pc.voiceSilenceMs';
 
   // Werte wie in der App (ChatViewModel.runAutoModeLoop): 5 s Bedenkzeit am
   // Anfang, danach sendet 3 s Stille automatisch, wenn der Schalter an ist.
@@ -30,6 +33,10 @@ window.PocketVoice = (() => {
   let listenResolve = null;       // beendet das Zuhoeren im Sprachgespraech
   let vad = null;                 // { ctx, timer }
   let autoSend = localStorage.getItem(LS_AUTO_SEND) === 'true';
+  function silenceMs() {
+    const v = Number(localStorage.getItem(LS_SILENCE_MS));
+    return v >= 500 && v <= 10000 ? v : VAD_SILENCE_MS;
+  }
   // Jede Aufnahme hat eine Generation. Abbrechen zaehlt hoch: eine spaet
   // eintreffende Mikrofon-Freigabe oder Transkription gehoert dann zu einer
   // verworfenen Aufnahme und wird nicht mehr verwendet.
@@ -182,8 +189,8 @@ window.PocketVoice = (() => {
       const threshold = Math.max(0.012, (isFinite(noiseFloor) ? noiseFloor : 0) * 3);
       if (!autoSend || elapsed < VAD_INITIAL_BLOCK_MS) { setSilence(0); return; }
       if (rms < threshold) silentMs += VAD_POLL_MS; else silentMs = 0;
-      setSilence(silentMs / VAD_SILENCE_MS);
-      if (silentMs >= VAD_SILENCE_MS) {
+      setSilence(silentMs / silenceMs());
+      if (silentMs >= silenceMs()) {
         setSilence(0);
         finishListening();
       }
@@ -336,10 +343,16 @@ window.PocketVoice = (() => {
     autoSendBox.addEventListener('change', () => {
       autoSend = autoSendBox.checked;
       localStorage.setItem(LS_AUTO_SEND, String(autoSend));
+      queueSettingsPush();
       if (autoMode && micState === 'recording') { if (autoSend) startVad(); else stopVad(); }
       if (autoMode) setPhase(bar.dataset.phase || 'listening');
     });
   }
+  // Einstellungen vom Server (z.B. in der App umgestellt) uebernehmen.
+  document.addEventListener('pc:settings-synced', () => {
+    autoSend = localStorage.getItem(LS_AUTO_SEND) === 'true';
+    if (autoSendBox) autoSendBox.checked = autoSend;
+  });
   setInterval(updateMicEnabled, 400);
   setMicState('idle');
 

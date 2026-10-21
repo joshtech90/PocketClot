@@ -670,6 +670,12 @@ async function loadServerSettings() {
         }
       } catch (e) { console.log('effortByFamily unlesbar:', e.message); }
     }
+    // Sprachgespraech (voice.js liest beides aus dem localStorage)
+    if (s.autoSend !== undefined) localStorage.setItem('pc.voiceAutoSend', String(boolFrom(s.autoSend)));
+    if (s.autoSendSilenceMs !== undefined) localStorage.setItem('pc.voiceSilenceMs', s.autoSendSilenceMs);
+    _settingsLoadedAt = Date.now();
+    _settingsSnapshot = settingsPayload();
+    document.dispatchEvent(new CustomEvent('pc:settings-synced'));
   } catch (e) {
     console.log('Server-Settings nicht abrufbar:', e.message);
   }
@@ -678,9 +684,14 @@ function queueSettingsPush() {
   clearTimeout(_settingsPushTimer);
   _settingsPushTimer = setTimeout(pushSettingsToServer, 600);
 }
-async function pushSettingsToServer() {
-  if (!state.token) return;
-  const payload = {
+// Stand nach dem letzten Laden bzw. Speichern. Gespeichert wird nur, was sich
+// seitdem HIER geaendert hat. Sonst wuerde ein lange offener Tab beim naechsten
+// Klick alles zurueckschreiben, was inzwischen in der App umgestellt wurde.
+let _settingsSnapshot = null;
+let _settingsLoadedAt = 0;
+function settingsPayload() {
+  const silence = localStorage.getItem('pc.voiceSilenceMs');
+  return {
     theme: state.themeMode,
     paletteLight: state.paletteLight,
     paletteDark: state.paletteDark,
@@ -695,10 +706,37 @@ async function pushSettingsToServer() {
     sidebar: localStorage.getItem(LS.sidebar) || '0',
     chatModel: state.chatModel,
     effortByFamily: JSON.stringify(state.effortByFamily),
+    autoSend: String(localStorage.getItem('pc.voiceAutoSend') === 'true'),
+    autoSendSilenceMs: silence || undefined,
   };
-  try { await api('PUT', '/ui-settings', payload); }
-  catch (e) { console.log('Settings-Push fehlgeschlagen:', e.message); }
 }
+async function pushSettingsToServer() {
+  _settingsPushTimer = null;
+  if (!state.token) return;
+  const current = settingsPayload();
+  const base = _settingsSnapshot || {};
+  const payload = {};
+  for (const [k, v] of Object.entries(current)) {
+    if (v !== undefined && v !== base[k]) payload[k] = v;
+  }
+  if (!Object.keys(payload).length) return;
+  try {
+    await api('PUT', '/ui-settings', payload);
+    _settingsSnapshot = Object.assign({}, base, payload);
+  } catch (e) { console.log('Settings-Push fehlgeschlagen:', e.message); }
+}
+// Zurueck im Tab: was inzwischen in der App oder einem anderen Browser
+// umgestellt wurde, hierher holen. Eigene, noch nicht gesendete Aenderungen
+// gehen vorher raus.
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !state.token || !state.me) return;
+  if (Date.now() - _settingsLoadedAt < 30_000) return;
+  if (_settingsPushTimer) { clearTimeout(_settingsPushTimer); await pushSettingsToServer(); }
+  await loadServerSettings();
+  applyTheme();
+  updateModelButton();
+  renderModelMenu();
+});
 
 // =========================================================
 // Start und Navigation (#/chat/<id>, #/images)
@@ -789,6 +827,7 @@ els.headerNewChat.addEventListener('click', () => newChat());
 els.sbBrand.addEventListener('click', () => newChat());
 els.imagesBtn.addEventListener('click', () => showImagesView());
 els.sbSearchBtn.addEventListener('click', () => openSearch());
+$('sb-search-top').addEventListener('click', () => openSearch());
 $('search-kbd').textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
 async function refreshChatList() {
@@ -963,18 +1002,67 @@ async function deleteChat(chat) {
   } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
 }
 
-// Profil unten in der Leiste: Einstellungen, Design, Abmelden
+// =========================================================
+// Profilbild: eigenes Bild vom Server, sonst der Anfangsbuchstabe
+// =========================================================
+/** Bild-URL mit Version (Cache) und Token (fuer <img src>, wie bei Anhaengen). */
+function avatarUrl(user) {
+  if (!user || !user.avatar_version) return '';
+  return `${state.serverUrl}/users/${encodeURIComponent(user.id)}/avatar?v=${user.avatar_version}&token=${encodeURIComponent(state.token)}`;
+}
+/** Rundes Profilbild als Element; `extra` sind zusaetzliche Klassen. */
+function avatarEl(user, extra = '') {
+  const url = avatarUrl(user);
+  const name = (user && user.name) || '';
+  if (url) {
+    const img = document.createElement('img');
+    img.className = ('avatar ' + extra).trim();
+    img.alt = '';
+    img.src = url;
+    // Bild weg (geloescht, Server kurz nicht da): Buchstabe statt Bruchsymbol.
+    img.addEventListener('error', () => img.replaceWith(avatarEl({ name }, extra)), { once: true });
+    return img;
+  }
+  const span = document.createElement('span');
+  span.className = ('avatar ' + extra).trim();
+  span.textContent = (name || '?').trim().slice(0, 1).toUpperCase();
+  return span;
+}
+/** Verkleinert ein gewaehltes Bild auf ein 256-px-Quadrat (Mitte), damit der
+ *  Server keine Bildbibliothek braucht und das Bild schnell laedt. */
+async function avatarBlobFrom(file) {
+  const bmp = await createImageBitmap(file);
+  const side = Math.min(bmp.width, bmp.height);
+  const size = Math.min(256, side);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+  bmp.close && bmp.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas'))), 'image/jpeg', 0.9));
+}
+/** Laedt ein Profilbild hoch: eigenes (`userId` leer) oder als Admin fuer andere. */
+async function uploadAvatar(file, userId) {
+  const blob = await avatarBlobFrom(file);
+  const fd = new FormData();
+  fd.append('file', blob, 'avatar.jpg');
+  return api('PUT', userId ? '/users/' + encodeURIComponent(userId) + '/avatar' : '/me/avatar', fd);
+}
+
+// Profil unten in der Leiste: nur das Bild, schwebend. Name und Server stehen
+// oben im Menue, das es oeffnet.
 function renderFooterUser() {
-  const name = state.me?.name || '';
-  const initial = (name || '?').trim().slice(0, 1).toUpperCase();
-  const role = state.me?.is_admin ? t('admin_label') : '';
-  els.footerUser.innerHTML = `
-    <span class="avatar">${escapeHtml(initial)}</span>
-    <span class="who"><span class="name">${escapeHtml(name)}</span>${role ? `<span class="role">${escapeHtml(role)}</span>` : ''}</span>
-    <svg class="icon"><use href="#icon-expand-less"/></svg>`;
-  $('profile-menu-head').innerHTML = `
-    <span class="avatar">${escapeHtml(initial)}</span>
-    <span><span class="name">${escapeHtml(name)}</span><br><span class="sub">${escapeHtml(state.serverUrl.replace(/^https?:\/\//, ''))}</span></span>`;
+  const me = state.me || {};
+  els.footerUser.replaceChildren(avatarEl(me));
+  els.footerUser.title = me.name || '';
+  const head = $('profile-menu-head');
+  const who = document.createElement('span');
+  who.innerHTML = `<span class="name"></span><br><span class="sub"></span>`;
+  who.querySelector('.name').textContent = me.name || '';
+  who.querySelector('.sub').textContent = state.serverUrl.replace(/^https?:\/\//, '');
+  head.replaceChildren(avatarEl(me), who);
 }
 els.footerUser.addEventListener('click', () => togglePopup(els.profileMenu, els.footerUser, applyTheme));
 els.profileMenu.addEventListener('click', (e) => {

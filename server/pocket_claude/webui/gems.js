@@ -12,7 +12,6 @@ const CLAUDE_MODELS = [
   { id: 'haiku',  label: 'Haiku (neueste Generation)' },
 ];
 window.PC_CLAUDE_MODELS = CLAUDE_MODELS;
-const GEM_EFFORTS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 // Global, weil openChat()/renderMessages() in app.js sie brauchen.
 function gemFetch(id) { return api('GET', '/me/gems/' + encodeURIComponent(id)); }
@@ -141,6 +140,48 @@ function gemWelcomeEl(gem) {
     sel.value = value;
   }
 
+  /** Alle Modelle wie im Modell-Menue des Chats, nach Anbieter gruppiert.
+   *  Claude als Familie (der Server nimmt die neueste Generation), Gemini und
+   *  GPT aus der Liste der Gateways. */
+  function renderGemModelSelect(value) {
+    const sel = $('gem-model');
+    sel.innerHTML = '';
+    const add = (parent, v, label) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label;
+      parent.appendChild(o);
+    };
+    add(sel, '', t('gem_model_global_default'));
+    const groups = [
+      ['claude', t('model_family_claude'), CLAUDE_MODELS.map((m) => ({ key: m.id, label: m.label }))],
+      ['gemini', t('model_family_gemini'), null],
+      ['gpt', t('model_family_gpt'), null],
+      ['other', t('model_family_other'), null],
+    ];
+    const known = new Set(['']);
+    for (const [fam, label, fixed] of groups) {
+      const list = fixed || state.chatModels.filter((m) => m.family === fam);
+      if (!list.length) continue;
+      const g = document.createElement('optgroup');
+      g.label = label;
+      for (const m of list) { add(g, m.key, m.label || m.key); known.add(m.key); }
+      sel.appendChild(g);
+    }
+    // Ein Modell, das gerade nicht angeboten wird, bleibt sichtbar gewaehlt,
+    // statt beim naechsten Speichern still zu verschwinden.
+    if (value && !known.has(value)) add(sel, value, modelLabel(value));
+    sel.value = value;
+  }
+
+  /** Denktiefen, die das gewaehlte Modell kann. */
+  function renderGemEffortSelect(value) {
+    const efforts = modelEfforts($('gem-model').value);
+    const options = [{ value: '', label: t('gem_effort_chat_default') }]
+      .concat(EFFORT_ORDER.filter((e) => efforts.includes(e)).map((e) => ({ value: e, label: formatEffortLabel(e) })));
+    const keep = value && efforts.length ? clampEffort(value, efforts) : '';
+    setSelect($('gem-effort'), options, keep);
+  }
+
   function openGemEditor(gem, opts = {}) {
     const dup = !!opts.duplicate;
     readOnly = !!opts.readOnly;
@@ -154,12 +195,16 @@ function gemWelcomeEl(gem) {
     $('gem-instructions').value = gem ? (gem.instructions || '') : '';
     $('gem-starters').innerHTML = '';
     ((gem && gem.conversation_starters) || []).forEach((s) => addStarterRow(s));
-    setSelect($('gem-model'),
-      [{ value: '', label: t('gem_model_global_default') }].concat(CLAUDE_MODELS.map((m) => ({ value: m.id, label: m.label }))),
-      gem && gem.model ? gem.model : '');
-    setSelect($('gem-effort'),
-      [{ value: '', label: t('gem_effort_chat_default') }].concat(GEM_EFFORTS.map((e) => ({ value: e, label: formatEffortLabel(e) }))),
-      gem && gem.effort ? gem.effort : '');
+    renderGemModelSelect(gem && gem.model ? gem.model : '');
+    renderGemEffortSelect(gem && gem.effort ? gem.effort : '');
+    // Ohne geladene Modell-Liste fehlen Gemini und GPT; nachladen und die
+    // Auswahl stehen lassen.
+    if (!state.chatModels.length) {
+      loadChatModels(false).then(() => {
+        renderGemModelSelect($('gem-model').value);
+        renderGemEffortSelect($('gem-effort').value);
+      });
+    }
     const sk = gem && gem.skills ? gem.skills : { web_search: true, web_fetch: true, code_execution: false };
     $('gem-skill-web-search').checked = sk.web_search !== false;
     $('gem-skill-web-fetch').checked = sk.web_fetch !== false;
@@ -280,6 +325,7 @@ function gemWelcomeEl(gem) {
   $('gem-editor-close')?.addEventListener('click', closeEditor);
   $('gem-editor-cancel')?.addEventListener('click', closeEditor);
   $('gem-editor-save')?.addEventListener('click', saveGem);
+  $('gem-model')?.addEventListener('change', () => renderGemEffortSelect($('gem-effort').value));
   $('gem-add-starter')?.addEventListener('click', () => addStarterRow('').focus());
   const modal = $('gem-editor-modal');
   modal?.addEventListener('mousedown', (e) => { if (e.target === modal) closeEditor(); });

@@ -575,8 +575,47 @@
   // =========================================================
   // Konto
   // =========================================================
+  // Profilbild: ein gemeinsamer Datei-Dialog fuer das eigene Bild und (als
+  // Admin) fuer die Bilder der anderen.
+  let avatarTarget = null;   // null = eigenes Bild, sonst User-ID
+  function pickAvatar(userId) {
+    avatarTarget = userId || null;
+    $('avatar-file-input').click();
+  }
+  function renderMyAvatar() {
+    $('my-avatar-preview').replaceChildren(avatarEl(state.me || {}, 'avatar-lg'));
+    $('my-avatar-remove').classList.toggle('hidden', !(state.me && state.me.avatar_version));
+  }
+  $('avatar-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const target = avatarTarget;
+    try {
+      const u = await uploadAvatar(file, target);
+      if (!target || (state.me && u.id === state.me.id)) {
+        state.me = Object.assign({}, state.me, u);
+        renderFooterUser();
+        renderMyAvatar();
+      }
+      if (target) await loadUsersList();
+      toast(t('avatar_saved'));
+    } catch (err) {
+      toast(t('toast_error_prefix', err && err.name === 'InvalidStateError' ? t('avatar_unreadable') : apiErrorText(err)), { error: true });
+    }
+  });
+  $('my-avatar-pick').addEventListener('click', () => pickAvatar(null));
+  $('my-avatar-remove').addEventListener('click', async () => {
+    try {
+      state.me = Object.assign({}, state.me, await api('DELETE', '/me/avatar'));
+      renderFooterUser();
+      renderMyAvatar();
+    } catch (err) { toast(t('toast_error_prefix', apiErrorText(err)), { error: true }); }
+  });
+
   async function loadAccount() {
     $('my-account-name').textContent = state.me ? state.me.name : '—';
+    renderMyAvatar();
     $('account-server').textContent = state.serverUrl || location.origin;
     const conn = $('account-conn');
     conn.className = 'conn-state';
@@ -904,10 +943,26 @@
           ${u.must_change_password ? `<span class="badge warn" title="${escapeHtml(t('user_pw_reset_due_title'))}">${escapeHtml(t('user_pw_reset_due'))}</span>` : ''}
           <span class="user-spacer"></span>
           <span class="actions">
+            <button class="icon-btn" data-act="rename" title="${escapeHtml(t('user_rename'))}"><svg class="icon"><use href="#icon-edit"/></svg></button>
+            <button class="icon-btn" data-act="avatar" title="${escapeHtml(t('avatar_choose'))}"><svg class="icon"><use href="#icon-add-photo"/></svg></button>
             <button class="icon-btn" data-act="reset" title="${escapeHtml(t('reset_password_title'))}"><svg class="icon"><use href="#icon-key"/></svg></button>
             ${u.id === state.me.id ? '' : `<button class="icon-btn" data-act="delete" title="${escapeHtml(t('delete'))}"><svg class="icon"><use href="#icon-trash"/></svg></button>`}
           </span>`;
         row.querySelector('.name').textContent = u.name;
+        row.prepend(avatarEl(u));
+        row.querySelector('[data-act="avatar"]').addEventListener('click', () => pickAvatar(u.id));
+        row.querySelector('[data-act="rename"]').addEventListener('click', async () => {
+          const name = await showPrompt({ title: t('user_rename'), text: t('user_rename_prompt', u.name), type: 'text', value: u.name, okLabel: t('save') });
+          if (name === null || !name.trim() || name.trim() === u.name) return;
+          try {
+            const updated = await api('PATCH', '/users/' + u.id, { name: name.trim() });
+            if (state.me && updated.id === state.me.id) {
+              state.me = Object.assign({}, state.me, updated);
+              renderFooterUser();
+            }
+            await loadUsersList();
+          } catch (e) { toast(t('toast_error_prefix', apiErrorText(e)), { error: true }); }
+        });
         row.querySelector('[data-act="reset"]').addEventListener('click', async () => {
           const custom = await showPrompt({ title: t('reset_password_title'), text: t('user_reset_pw_prompt', u.name), type: 'text', okLabel: t('ok') });
           if (custom === null) return;
