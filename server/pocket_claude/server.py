@@ -1239,9 +1239,9 @@ async def _build_tts_status(user_id: str) -> TtsStatusDto:
     avail = await _available_providers()
     chunking_raw = (kv.get(_KV_TTS_CHUNKING_ENABLED) or "").strip()
     return TtsStatusDto(
-        # "Eingerichtet" heisst: der gewaehlte Anbieter laeuft und hat seine
-        # Sitzung. Springt ein anderer ein, sagt das `provider` != Wahl.
-        configured=avail.get(chosen or provider, False),
+        # "Eingerichtet" heisst: es wird vorgelesen, notfalls vom einspringenden
+        # Anbieter. Dass das nicht der gewaehlte ist, sagt `provider` != Wahl.
+        configured=avail.get(provider, False),
         provider=provider,
         chosen_provider=chosen if chosen in tts.VALID_PROVIDERS else provider,
         providers_available=[p for p, ok in avail.items() if ok],

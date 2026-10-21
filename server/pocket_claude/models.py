@@ -130,7 +130,7 @@ class TtsVoiceDto(BaseModel):
 
 
 class TtsStatusDto(BaseModel):
-    # `configured`: der GEWAEHLTE Anbieter laeuft und hat seine Sitzung.
+    # `configured`: es wird vorgelesen (notfalls vom einspringenden Anbieter).
     configured: bool
     # Mit diesem Anbieter wird gerade vorgelesen. Ist der gewaehlte nicht
     # nutzbar, steht hier der, der einspringt (Grok → Gemini Web → Edge).

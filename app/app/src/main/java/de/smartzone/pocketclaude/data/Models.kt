@@ -170,7 +170,7 @@ data class TtsVoiceDto(
 
 @Serializable
 data class TtsStatusDto(
-    /** Der GEWAEHLTE Anbieter laeuft und hat seine Sitzung. */
+    /** Es wird vorgelesen, notfalls vom einspringenden Anbieter. */
     val configured: Boolean,
     /** Mit diesem Anbieter wird gerade vorgelesen (grok, gemini_web, edge_tts).
      *  Ist der gewaehlte nicht nutzbar, steht hier der, der einspringt. */
