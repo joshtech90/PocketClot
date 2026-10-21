@@ -75,6 +75,9 @@ const state = {
   chatModel: localStorage.getItem(LS.chatModel) || '',
   // Modell des offenen Chats (vom Server). null = folgt der Vorauswahl.
   convModel: null,
+  // Denktiefe nur fuer den offenen Chat (vom Gem mitgebracht oder im Chat
+  // umgestellt). null = die gemerkte Denktiefe der Modell-Familie.
+  convEffort: null,
   effortByFamily: Object.assign({}, EFFORT_DEFAULTS, readJson(LS.effortByFamily, {})),
   chatModels: [],
   gateways:   [],
@@ -1198,12 +1201,18 @@ function applyDetail(detail) {
   const stored = (detail.chat_model || '').trim();
   const gemMeta = detail.gem_id ? state.gems.find((g) => g.id === detail.gem_id) : null;
   state.convModel = stored || (gemMeta && gemMeta.model) || ((detail.messages || []).length ? '' : null);
+  // Gem-Chats von vor der Denktiefe pro Chat rechnet der Server noch mit der
+  // Vorgabe des Gems; die Anzeige soll dasselbe zeigen.
+  const storedEffort = (detail.chat_effort || '').trim();
+  state.convEffort = storedEffort || (gemMeta && gemMeta.effort) || null;
   state.gem = null;
   if (detail.gem_id) {
     gemFetch(detail.gem_id).then((g) => {
       if (state.cid !== detail.id) return;
       state.gem = g;
-      if (!stored && g.model) { state.convModel = g.model; updateModelButton(); renderModelMenu(); }
+      if (!stored && g.model) state.convModel = g.model;
+      if (!storedEffort && g.effort) state.convEffort = g.effort;
+      updateModelButton(); renderModelMenu();
       updateTopbar();
       if (!state.messages.length) renderMessages();
     }).catch(() => {});
@@ -1230,8 +1239,10 @@ async function newChat(opts = {}) {
     state.chatLocked = false;
     state.gem = opts.gem || null;
     state.messages = [];
-    // Gem-Chats starten mit dem Modell des Gems, alle anderen mit der Vorauswahl.
-    state.convModel = (opts.gem && opts.gem.model) || null;
+    // Gem-Chats starten mit Modell und Denktiefe des Gems (der Server hat
+    // beides schon am Chat abgelegt), alle anderen mit der Vorauswahl.
+    state.convModel = c.chat_model || (opts.gem && opts.gem.model) || null;
+    state.convEffort = c.chat_effort || null;
     state.skills = null;
     state.skillsIsOverride = false;
     resetComposerFor(c.id);
@@ -1307,7 +1318,7 @@ function clampEffort(effort, available) {
 function currentEffort() {
   const key = effectiveModelKey();
   const fam = familyForKey(key);
-  return clampEffort(state.effortByFamily[fam] || 'high', modelEfforts(key));
+  return clampEffort(state.convEffort || state.effortByFamily[fam] || 'high', modelEfforts(key));
 }
 function formatEffortLabel(eff) {
   if (!eff) return '';
@@ -1437,6 +1448,16 @@ function selectModel(key) {
   renderModelMenu();
 }
 function setEffort(value, family) {
+  // Hat der Chat eine eigene Denktiefe (Gem), gilt die Wahl nur fuer ihn.
+  if (!family && state.convEffort && state.cid) {
+    state.convEffort = value;
+    api('PATCH', '/conversations/' + state.cid, { chat_effort: value })
+      .catch((e) => console.log('Denktiefe am Chat nicht gespeichert:', e.message));
+    updateModelButton();
+    renderModelMenu();
+    document.dispatchEvent(new CustomEvent('pc:effort-changed'));
+    return;
+  }
   const fam = family || familyForKey(effectiveModelKey());
   state.effortByFamily[fam] = value;
   state.effort = value;

@@ -45,6 +45,9 @@ class ConversationOut(BaseModel):
     # Zuletzt in diesem Chat benutztes Modell (siehe SendMessageRequest.model).
     # NULL = Claude.
     chat_model: str | None = None
+    # Denktiefe nur fuer diesen Chat (vom Gem mitgebracht oder im Chat
+    # umgestellt). NULL = die gemerkte Denktiefe der Modell-Familie.
+    chat_effort: str | None = None
 
 
 class ConversationDetail(ConversationOut):
@@ -64,6 +67,8 @@ class ConversationPatch(BaseModel):
     locked: bool | None = None
     # "" setzt den Chat auf Claude zurueck, None laesst den Wert unveraendert.
     chat_model: str | None = None
+    # "" gibt die Denktiefe wieder an die Familien-Vorgabe ab, None laesst sie.
+    chat_effort: str | None = None
 
 
 class SendMessageRequest(BaseModel):

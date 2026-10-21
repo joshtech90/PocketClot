@@ -254,6 +254,7 @@ def _row_to_conv_out(row: dict) -> ConversationOut:
         locked=bool(row.get("locked", 0)),
         gem_id=row.get("gem_id"),
         chat_model=row.get("chat_model") or None,
+        chat_effort=row.get("chat_effort") or None,
     )
 
 
@@ -311,11 +312,19 @@ async def list_conversations(user=Depends(require_user)) -> list[ConversationOut
 )
 async def create_conversation(body: ConversationCreate, user=Depends(require_user)) -> ConversationOut:
     gem_id = (body.gem_id or "").strip() or None
+    gem = None
     if gem_id is not None:
         gem = await db.get_gem(gem_id, user_id=user["id"])
         if not gem:
             raise HTTPException(404, "Gem nicht gefunden.")
-    cid = await db.create_conversation(body.title, user_id=user["id"], gem_id=gem_id)
+    # Ein Gem startet den Chat mit seinem Modell und seiner Denktiefe. Beides
+    # landet beim Chat selbst: stellt man es dort um, gilt ab dann die
+    # Wahl im Chat und nicht mehr die Vorgabe des Gems.
+    cid = await db.create_conversation(
+        body.title, user_id=user["id"], gem_id=gem_id,
+        chat_model=(gem.get("model") if gem else None),
+        chat_effort=(gem.get("effort") if gem else None),
+    )
     conv = await db.get_conversation(cid, user_id=user["id"])
     assert conv is not None
     return ConversationOut(
@@ -326,6 +335,8 @@ async def create_conversation(body: ConversationCreate, user=Depends(require_use
         message_count=0,
         total_tokens=0,
         gem_id=conv.get("gem_id"),
+        chat_model=conv.get("chat_model") or None,
+        chat_effort=conv.get("chat_effort") or None,
     )
 
 
@@ -352,6 +363,7 @@ async def get_conversation(cid: str = PathParam(...), user=Depends(require_user)
         locked=bool(conv.get("locked", 0)),
         gem_id=conv.get("gem_id"),
         chat_model=conv.get("chat_model") or None,
+        chat_effort=conv.get("chat_effort") or None,
         messages=messages,
     )
 
@@ -437,6 +449,11 @@ async def rewind_conversation(
     return RewindResponse(removed=removed, chat_model=new_model)
 
 
+# Alles, was irgendein Modell als Denktiefe kennt. Was das gerade gewaehlte
+# Modell davon kann, klaeren die Engines beim Senden.
+_CHAT_EFFORTS = {"off", *gateways.EFFORT_ORDER}
+
+
 @app.patch("/conversations/{cid}", response_model=ConversationOut)
 async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(require_user)) -> ConversationOut:
     conv = await db.get_conversation(cid, user_id=user["id"])
@@ -456,6 +473,11 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
             await db.set_claude_session_id(cid, None)
             log.info("PC_RESOLVE: cid=%s Modellwechsel per PATCH %r -> %r, "
                      "Claude-Session verworfen", cid, old_model, new_model)
+    if body.chat_effort is not None:
+        effort_value = body.chat_effort.strip().lower()
+        if effort_value and effort_value not in _CHAT_EFFORTS:
+            raise HTTPException(400, f"Unbekannte Denktiefe: {effort_value!r}")
+        await db.set_chat_effort(cid, effort_value, user_id=user["id"])
     if body.locked is not None:
         # Sperren nur erlauben, wenn ein globaler PIN gesetzt ist — sonst hätte
         # der User einen gesperrten Chat, den er nicht mehr aufbekommt.
@@ -497,6 +519,7 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
         locked=bool(updated.get("locked", 0)),
         gem_id=updated.get("gem_id"),
         chat_model=updated.get("chat_model") or None,
+        chat_effort=updated.get("chat_effort") or None,
     )
 
 
@@ -699,16 +722,18 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
     # ausgeliefert.
     needs_title = (conv.get("title") == "Neuer Chat")
 
-    effort = (body.effort or "high").lower().strip()
-
-    # Gem-Auflösung: wenn der Chat „mit einem Gem" gestartet wurde, speist der
-    # Server dessen Instructions/Skills/Modell/Wissensdateien ein (server-
-    # autoritativ). Effort bleibt app-getrieben (die App lädt gem.effort als
-    # Startwert in den Chat-Picker).
-    # Effort: Gem-Default (falls gesetzt) gewinnt — ein Gem definiert seine
-    # Denktiefe wie ein GPT. Sonst der vom Client geschickte Wert.
-    if gem and (gem.get("effort") or "").strip():
-        effort = gem["effort"].strip().lower()
+    # Denktiefe. Die erste Quelle, die etwas sagt, gewinnt:
+    #   1. die Denktiefe dieses Chats. Ein Gem legt sie beim Start an, im Chat
+    #      umgestellt wird sie per PATCH ueberschrieben. So gilt sie auch fuer
+    #      aeltere Clients, die nur ihre Familien-Vorgabe mitschicken.
+    #   2. die Vorgabe des Gems fuer Gem-Chats, die vor `chat_effort` angelegt
+    #      wurden (bisheriges Verhalten)
+    #   3. was der Client mitschickt
+    effort = (
+        (conv.get("chat_effort") or "").strip()
+        or ((gem.get("effort") or "").strip() if gem else "")
+        or (body.effort or "high")
+    ).lower().strip()
 
     # System-Prompt: Gem-Instructions gewinnen. Sonst: Mode (Web-UI) bzw. roher
     # String (App). Sonst Server-Default (in claude_engine).
@@ -2856,19 +2881,50 @@ def _format_image_assistant_text(prompt: str, body: dict,
 
 # ---------- UI-Settings ----------
 
+# Oberflaechen-Einstellungen, die App und Web-UI teilen. Beide lesen und
+# schreiben dieselben Schluessel, deshalb hat ein Nutzer auf dem Handy und am
+# Desktop dieselben Einstellungen.
+#
+# Bewusst eine feste Liste: im selben KV-Bereich liegen auch PIN-Hash,
+# API-Schluessel und Anmeldemodus. Frueher gab GET alles davon an jeden Client
+# heraus, und PUT konnte es ueberschreiben.
+UI_SETTING_KEYS: frozenset[str] = frozenset({
+    "theme",               # system | light | dark
+    "paletteLight", "paletteDark",
+    "effort",              # Denktiefe fuer Claude (alter Einzelwert)
+    "effortByFamily",      # JSON {"claude": "high", "gemini": ...}
+    "chatModel",           # Vorauswahl fuer neue Chats, "" = Claude
+    "defaultModelByFamily",  # JSON {"claude": "opus", ...}
+    "spMode", "spCustom",  # System-Prompt-Modus und eigener Text
+    "ttsVoice", "ttsSpeed", "autoSpeak",
+    "autoSpeakByChat",     # JSON {"<cid>": true}
+    "collapseUserMsgs",
+    "autoSend", "autoSendSilenceMs",
+    "sidebar",             # nur Web: Seitenleiste eingeklappt
+})
+_UI_SETTING_MAX_LEN = 64_000
+
+
 @app.get("/ui-settings")
 async def get_ui_settings(user=Depends(require_user)):
-    """UI-Settings pro User — Theme, Effort, TTS-Voice etc."""
+    """Gemeinsame Oberflaechen-Einstellungen des Users (siehe UI_SETTING_KEYS)."""
     values = await db.kv_get_all(scope=user["id"])
-    return {"settings": values}
+    return {"settings": {k: v for k, v in values.items() if k in UI_SETTING_KEYS}}
 
 
 @app.put("/ui-settings")
 async def put_ui_settings(body: dict, user=Depends(require_user)):
-    """Merged UI-Settings (partial update). Pro User scoped."""
+    """Teil-Update: nur die mitgeschickten Schluessel aendern sich. Unbekannte
+    Schluessel werden ignoriert, damit ein neuerer Client mit einem alten
+    Server nicht scheitert."""
     if not isinstance(body, dict):
         raise HTTPException(400, "JSON-Objekt erwartet.")
-    flat = {str(k): str(v) for k, v in body.items() if v is not None}
+    flat = {
+        str(k): str(v) for k, v in body.items()
+        if v is not None and str(k) in UI_SETTING_KEYS
+    }
+    if any(len(v) > _UI_SETTING_MAX_LEN for v in flat.values()):
+        raise HTTPException(413, "Einstellung zu gross.")
     if flat:
         await db.kv_set_many(flat, scope=user["id"])
     return {"ok": True, "count": len(flat)}
@@ -3004,6 +3060,9 @@ def _user_public(u: dict) -> dict:
         "must_change_password": bool(u.get("must_change_password")),
         "has_password": bool(u.get("password_hash")),
         "created_at": u.get("created_at"),
+        # Aendert sich mit jedem neuen Profilbild; die Clients haengen ihn an
+        # die Bild-URL, damit kein altes Bild aus dem Cache kommt. None = keins.
+        "avatar_version": _avatar_version(u["id"]),
     }
 
 
@@ -3011,6 +3070,93 @@ def _user_public(u: dict) -> dict:
 async def get_me(user=Depends(require_user)):
     """Aktueller User-Info — App und Web-UI fragen das nach Login, um zu
     wissen, ob Admin-Features sichtbar gemacht werden sollen."""
+    return _user_public(user)
+
+
+# ---------- Profilbilder ----------
+#
+# Eine Datei pro User unter data/avatars/<user_id>. Verkleinert wird im Client
+# (Web-UI per Canvas auf 256 px), der Server prueft nur Format und Groesse und
+# braucht dafuer keine Bildbibliothek.
+
+_AVATAR_MAX_BYTES = 512 * 1024
+_AVATAR_DIR = settings.data_dir / "avatars"
+
+
+def _avatar_path(user_id: str):
+    # User-IDs sind serverseitig erzeugt ("usr_" + urlsafe), trotzdem nur
+    # harmlose Zeichen in einen Dateinamen lassen.
+    safe = "".join(c for c in user_id if c.isalnum() or c in "-_")
+    return _AVATAR_DIR / safe
+
+
+def _avatar_version(user_id: str) -> int | None:
+    try:
+        return int(_avatar_path(user_id).stat().st_mtime)
+    except OSError:
+        return None
+
+
+def _avatar_mime(data: bytes) -> str | None:
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+async def _store_avatar(user_id: str, file: UploadFile) -> None:
+    data = await file.read(_AVATAR_MAX_BYTES + 1)
+    if len(data) > _AVATAR_MAX_BYTES:
+        raise HTTPException(413, "Profilbild zu gross (hoechstens 512 KB).")
+    if _avatar_mime(data) is None:
+        raise HTTPException(415, "Profilbild muss PNG, JPEG oder WebP sein.")
+    _AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    target = _avatar_path(user_id)
+    tmp = target.with_suffix(".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(target)
+
+
+def _remove_avatar(user_id: str) -> None:
+    _avatar_path(user_id).unlink(missing_ok=True)
+
+
+@app.get("/users/{user_id}/avatar")
+async def get_avatar(
+    user_id: str,
+    token: str | None = None,  # noqa: ARG001 — wird von der Dep konsumiert
+    user=Depends(require_user_header_or_query),
+):
+    """Profilbild. Das eigene darf jeder sehen, fremde nur der Admin (fuer die
+    Benutzerliste). `?token=` wie bei Anhaengen, damit <img src> geht."""
+    if user_id != user["id"] and not user.get("is_admin"):
+        raise HTTPException(403, "Kein Zugriff.")
+    path = _avatar_path(user_id)
+    try:
+        data = path.read_bytes()
+    except OSError:
+        raise HTTPException(404, "Kein Profilbild.")
+    from fastapi.responses import Response
+    return Response(
+        content=data,
+        media_type=_avatar_mime(data) or "application/octet-stream",
+        # Die URL traegt die Version, also darf der Browser lange cachen.
+        headers={"Cache-Control": "private, max-age=31536000"},
+    )
+
+
+@app.put("/me/avatar")
+async def put_my_avatar(file: UploadFile = File(...), user=Depends(require_user)):
+    await _store_avatar(user["id"], file)
+    return _user_public(user)
+
+
+@app.delete("/me/avatar")
+async def delete_my_avatar(user=Depends(require_user)):
+    _remove_avatar(user["id"])
     return _user_public(user)
 
 
@@ -3635,6 +3781,46 @@ async def reset_user_password_endpoint(user_id: str, body: dict | None = None,
     }
 
 
+@app.patch("/users/{user_id}")
+async def patch_user_endpoint(user_id: str, body: dict, user=Depends(require_admin)):  # noqa: ARG001
+    """Admin benennt einen User um. Der Name ist zugleich der Anmeldename;
+    alles andere haengt an der ID, Sessions bleiben gueltig."""
+    target = await db.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(404, "User nicht gefunden.")
+    if "name" in body:
+        name = str(body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(400, "Name erforderlich.")
+        if len(name) > 60:
+            raise HTTPException(400, "Name zu lang (max 60).")
+        existing = await db.get_user_by_name(name)
+        if existing and existing["id"] != user_id:
+            raise HTTPException(409, f"Username '{name}' ist bereits vergeben.")
+        await db.rename_user(user_id, name)
+        target["name"] = name
+    return _user_public(target)
+
+
+@app.put("/users/{user_id}/avatar")
+async def put_user_avatar(user_id: str, file: UploadFile = File(...),
+                          user=Depends(require_admin)):  # noqa: ARG001
+    target = await db.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(404, "User nicht gefunden.")
+    await _store_avatar(user_id, file)
+    return _user_public(target)
+
+
+@app.delete("/users/{user_id}/avatar")
+async def delete_user_avatar(user_id: str, user=Depends(require_admin)):  # noqa: ARG001
+    target = await db.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(404, "User nicht gefunden.")
+    _remove_avatar(user_id)
+    return _user_public(target)
+
+
 @app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_endpoint(user_id: str, user=Depends(require_admin)):
     if user_id == user["id"]:
@@ -3645,6 +3831,7 @@ async def delete_user_endpoint(user_id: str, user=Depends(require_admin)):
     if target["is_admin"] and await db.count_admins() <= 1:
         raise HTTPException(400, "Cannot delete the last admin user.")
     await db.delete_user(user_id)
+    _remove_avatar(user_id)
     return JSONResponse(status_code=204, content=None)
 
 

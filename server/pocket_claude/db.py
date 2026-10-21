@@ -200,6 +200,11 @@ async def _ensure_columns(db: aiosqlite.Connection) -> None:
     # NULL bzw. leer = Claude (Standard).
     if "chat_model" not in conv_cols:
         await db.execute("ALTER TABLE conversations ADD COLUMN chat_model TEXT")
+    # Denktiefe, die nur fuer diesen Chat gilt. Ein Gem bringt sie beim Start
+    # mit, im Chat umgestellt wird sie hier gemerkt. NULL = die gemerkte
+    # Denktiefe der Modell-Familie aus den Einstellungen.
+    if "chat_effort" not in conv_cols:
+        await db.execute("ALTER TABLE conversations ADD COLUMN chat_effort TEXT")
     cur = await db.execute("PRAGMA table_info(attachments)")
     att_cols = {row[1] for row in await cur.fetchall()}
     if "user_id" not in att_cols:
@@ -407,13 +412,15 @@ async def get_db() -> AsyncIterator[aiosqlite.Connection]:
 
 async def create_conversation(
     title: str | None = None, user_id: str | None = None, gem_id: str | None = None,
+    chat_model: str | None = None, chat_effort: str | None = None,
 ) -> str:
     cid = _new_id("conv")
     async with get_db() as db:
         await db.execute(
-            "INSERT INTO conversations(id, title, created_at, user_id, gem_id) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (cid, title or "Neuer Chat", _now_iso(), user_id, gem_id),
+            "INSERT INTO conversations(id, title, created_at, user_id, gem_id, "
+            "chat_model, chat_effort) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (cid, title or "Neuer Chat", _now_iso(), user_id, gem_id,
+             (chat_model or "").strip() or None, (chat_effort or "").strip() or None),
         )
         await db.commit()
     return cid
@@ -433,6 +440,7 @@ async def list_conversations(user_id: str | None = None) -> list[dict]:
             SELECT
                 c.id, c.title, c.created_at, c.last_message_at, c.total_tokens,
                 c.claude_session_id, c.pinned, c.locked, c.user_id, c.gem_id, c.chat_model,
+                c.chat_effort,
                 (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msg_count
             FROM conversations c
             {where}
@@ -477,6 +485,20 @@ async def set_chat_model(cid: str, model_key: str | None,
     """
     value = (model_key or "").strip() or None
     sql = "UPDATE conversations SET chat_model = ? WHERE id = ?"
+    params: tuple = (value, cid)
+    if user_id is not None:
+        sql += " AND user_id = ?"
+        params = params + (user_id,)
+    async with get_db() as db:
+        await db.execute(sql, params)
+        await db.commit()
+
+
+async def set_chat_effort(cid: str, effort: str | None,
+                          user_id: str | None = None) -> None:
+    """Setzt die Denktiefe dieses Chats. Leer = wieder die der Modell-Familie."""
+    value = (effort or "").strip().lower() or None
+    sql = "UPDATE conversations SET chat_effort = ? WHERE id = ?"
     params: tuple = (value, cid)
     if user_id is not None:
         sql += " AND user_id = ?"
@@ -1192,6 +1214,14 @@ async def create_user(name: str, password: str, is_admin: bool = False,
         "must_change_password": 1 if must_change_password else 0,
         "is_admin": 1 if is_admin else 0, "created_at": created_at,
     }
+
+
+async def rename_user(user_id: str, name: str) -> None:
+    """Aendert den Anzeige- und Anmeldenamen. Alles andere haengt an der ID,
+    Sessions bleiben gueltig. Doppelte Namen verhindert der Unique-Index."""
+    async with get_db() as db:
+        await db.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+        await db.commit()
 
 
 async def set_must_change_password(user_id: str, value: bool) -> None:
