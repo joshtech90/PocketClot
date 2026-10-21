@@ -845,6 +845,7 @@
     <string name="gem_model_global_default">全局默认</string>
     <string name="gem_effort_label">思考强度</string>
     <string name="gem_effort_chat_default">聊天默认</string>
+    <string name="gem_defaults_hint">与此 Gem 的每个新对话都将以此设置开始。你可以在聊天中随时更改这两项。</string>
     <string name="gem_skills_label">功能</string>
     <string name="gem_skill_web_search">网页搜索</string>
     <string name="gem_skill_web_fetch">读取网页</string>

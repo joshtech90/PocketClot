@@ -845,6 +845,7 @@
     <string name="gem_model_global_default">Padrão global</string>
     <string name="gem_effort_label">Nível de raciocínio</string>
     <string name="gem_effort_chat_default">Padrão do chat</string>
+    <string name="gem_defaults_hint">Todo novo chat com este Gem começa com esses ajustes. Você pode mudar ambos a qualquer momento no chat.</string>
     <string name="gem_skills_label">Capacidades</string>
     <string name="gem_skill_web_search">Busca na web</string>
     <string name="gem_skill_web_fetch">Ler páginas web</string>

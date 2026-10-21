@@ -848,6 +848,7 @@
     <string name="gem_model_global_default">Global default</string>
     <string name="gem_effort_label">Reasoning effort</string>
     <string name="gem_effort_chat_default">Chat default</string>
+    <string name="gem_defaults_hint">Every new chat with this Gem starts with these settings. You can change both in the chat at any time.</string>
     <string name="gem_skills_label">Capabilities</string>
     <string name="gem_skill_web_search">Web search</string>
     <string name="gem_skill_web_fetch">Read web pages</string>

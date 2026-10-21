@@ -845,6 +845,7 @@
     <string name="gem_model_global_default">Défaut global</string>
     <string name="gem_effort_label">Niveau de réflexion</string>
     <string name="gem_effort_chat_default">Défaut du chat</string>
+    <string name="gem_defaults_hint">Chaque nouveau chat avec ce Gem démarre avec ces réglages. Tu peux modifier les deux à tout moment dans le chat.</string>
     <string name="gem_skills_label">Capacités</string>
     <string name="gem_skill_web_search">Recherche web</string>
     <string name="gem_skill_web_fetch">Lire des pages web</string>

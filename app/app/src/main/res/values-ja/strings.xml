@@ -845,6 +845,7 @@
     <string name="gem_model_global_default">グローバルデフォルト</string>
     <string name="gem_effort_label">思考の深さ</string>
     <string name="gem_effort_chat_default">チャットのデフォルト</string>
+    <string name="gem_defaults_hint">このGemとの新しいチャットはすべてこの設定で始まります。チャット内ではいつでも両方を変更できます。</string>
     <string name="gem_skills_label">機能</string>
     <string name="gem_skill_web_search">ウェブ検索</string>
     <string name="gem_skill_web_fetch">ウェブページを読む</string>

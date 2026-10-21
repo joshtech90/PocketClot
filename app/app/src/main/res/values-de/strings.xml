@@ -848,6 +848,7 @@
     <string name="gem_model_global_default">Globaler Standard</string>
     <string name="gem_effort_label">Denktiefe (Effort)</string>
     <string name="gem_effort_chat_default">Chat-Standard</string>
+    <string name="gem_defaults_hint">Damit startet jeder neue Chat mit diesem Gem. Im Chat kannst du beides jederzeit umstellen.</string>
     <string name="gem_skills_label">Fähigkeiten</string>
     <string name="gem_skill_web_search">Websuche</string>
     <string name="gem_skill_web_fetch">Webseiten lesen</string>
