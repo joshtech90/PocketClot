@@ -83,7 +83,7 @@ const state = {
   gateways:   [],
   spMode:    localStorage.getItem(LS.spMode)   || 'STANDARD',
   spCustom:  localStorage.getItem(LS.spCustom) || '',
-  ttsVoice:  localStorage.getItem(LS.ttsVoice) || 'edge-de-DE-KatjaNeural',
+  ttsVoice:  localStorage.getItem(LS.ttsVoice) || 'grok-leo',
   ttsSpeed:  parseFloat(localStorage.getItem(LS.ttsSpeed) || '1.0') || 1.0,
   autoSpeak: localStorage.getItem(LS.autoSpeak) === 'true',
   // Vorlese-Anbieter vom Server (GET /tts/status). Bei Gemini Web regelt der

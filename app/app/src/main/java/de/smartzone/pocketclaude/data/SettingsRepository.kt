@@ -37,6 +37,10 @@ const val DEFAULT_PALETTE_ID = DEFAULT_PALETTE_ID_DARK
  *  Muss zu `DEFAULT_CLAUDE_MODEL` in claude_engine.py passen. */
 const val DEFAULT_CLAUDE_MODEL = "opus"
 
+/** Vorgabe-Stimme: Grok Leo (seit 21.10.2026). Springt ein anderer Anbieter
+ *  ein, nimmt der Server dessen Vorgabe. */
+const val DEFAULT_TTS_VOICE = "grok-leo"
+
 enum class ThemeMode {
     SYSTEM, LIGHT, DARK;
 
@@ -88,7 +92,7 @@ data class AppSettings(
      *  Setup liefert der Server via /tts/status einen passenden Default
      *  (chirp3hd-Algenib bzw. gemini-Algenib), und beim Provider-Switch in
      *  der App wird die Voice automatisch nachgezogen. */
-    val ttsVoice: String = "edge-de-DE-KatjaNeural",
+    val ttsVoice: String = DEFAULT_TTS_VOICE,
     val ttsAutoSpeak: Boolean = false,
     /** Wiedergabegeschwindigkeit [0.25 .. 2.0], Default 1.0. */
     val ttsSpeed: Float = 1.0f,
@@ -296,7 +300,7 @@ class SettingsRepository(
             themeMode = ThemeMode.fromString(prefs[keyThemeMode]),
             paletteIdLight = resolvePalette(prefs, keyPaletteIdLight, DEFAULT_PALETTE_ID_LIGHT),
             paletteIdDark = resolvePalette(prefs, keyPaletteIdDark, DEFAULT_PALETTE_ID_DARK),
-            ttsVoice = prefs[keyTtsVoice].orEmpty().ifBlank { "edge-de-DE-KatjaNeural" },
+            ttsVoice = prefs[keyTtsVoice].orEmpty().ifBlank { DEFAULT_TTS_VOICE },
             ttsAutoSpeak = (prefs[keyTtsAutoSpeak] ?: "false").toBooleanStrictOrNull() ?: false,
             ttsSpeed = (prefs[keyTtsSpeed] ?: 1.0f).coerceIn(0.25f, 2.0f),
             effort = prefs[keyEffort]?.takeIf { it.isNotBlank() } ?: DEFAULT_EFFORT,
@@ -645,7 +649,7 @@ class SettingsRepository(
             paletteId = resolvePalette(prefs, keyPaletteIdDark, DEFAULT_PALETTE_ID_DARK),
             paletteIdLight = resolvePalette(prefs, keyPaletteIdLight, DEFAULT_PALETTE_ID_LIGHT),
             paletteIdDark = resolvePalette(prefs, keyPaletteIdDark, DEFAULT_PALETTE_ID_DARK),
-            ttsVoice = prefs[keyTtsVoice].orEmpty().ifBlank { "edge-de-DE-KatjaNeural" },
+            ttsVoice = prefs[keyTtsVoice].orEmpty().ifBlank { DEFAULT_TTS_VOICE },
             ttsAutoSpeak = (prefs[keyTtsAutoSpeak] ?: "false").toBooleanStrictOrNull() ?: false,
             ttsSpeed = (prefs[keyTtsSpeed] ?: 1.0f).coerceIn(0.25f, 2.0f),
             effort = prefs[keyEffort]?.takeIf { it.isNotBlank() } ?: DEFAULT_EFFORT,
@@ -821,9 +825,13 @@ class SettingsRepository(
             val firstSync = profileId !in (prefs[keyUiSyncedProfiles] ?: emptySet())
             // Was hier gerade geaendert und noch nicht bestaetigt ist, bleibt.
             val fresh = remote.filterKeys { it !in protectedKeys }
-            val take = if (firstSync) fresh.filterKeys { it !in local } else fresh
+            // Modell, Denktiefe und Stimme hat der Server am 21.10.2026 fuer
+            // alle Konten neu gesetzt (Opus Hoch, Grok Leo). Die gelten auch
+            // beim ersten Abgleich, sonst schoebe jede App ihre alte Wahl hoch.
+            val serverFirst = setOf("chatModel", "effort", "effortByFamily", "ttsVoice")
+            val take = if (firstSync) fresh.filterKeys { it !in local || it in serverFirst } else fresh
             applyShared(prefs, take)
-            upload = if (firstSync) local.filter { (k, v) -> remote[k] != v }
+            upload = if (firstSync) local.filter { (k, v) -> remote[k] != v && !(k in serverFirst && k in remote) }
                      else local.filterKeys { it !in remote }
         }
         return upload

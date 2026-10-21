@@ -825,7 +825,7 @@
       const ok = await showConfirm({ title: t('settings_import_title'), text: t('settings_import_confirm'), okLabel: t('backup_import') });
       if (!ok) return;
       const req = { schema_version: server.schema_version || 1 };
-      for (const k of ['tts_provider', 'tts_model', 'tts_chunking_enabled', 'tts_api_keys', 'image_api_key', 'skills_defaults', 'extra_kv']) {
+      for (const k of ['tts_provider', 'tts_chunking_enabled', 'image_api_key', 'skills_defaults', 'extra_kv']) {
         if (server[k] !== undefined && server[k] !== null) req[k] = server[k];
       }
       const r = await api('POST', '/settings/import', req);

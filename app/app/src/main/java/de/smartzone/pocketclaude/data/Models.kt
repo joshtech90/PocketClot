@@ -231,7 +231,7 @@ data class AppSettingsExportDto(
     @SerialName("palette_id_dark") val paletteIdDark: String = "",
     // Default muss zu AppSettings.ttsVoice passen — sonst überschreibt der
     // Import bei fehlendem Feld die User-Wahl mit einer alten Voice.
-    @SerialName("tts_voice") val ttsVoice: String = "edge-de-DE-KatjaNeural",
+    @SerialName("tts_voice") val ttsVoice: String = DEFAULT_TTS_VOICE,
     @SerialName("tts_auto_speak") val ttsAutoSpeak: Boolean = false,
     @SerialName("tts_speed") val ttsSpeed: Float = 1.0f,
     val effort: String = DEFAULT_EFFORT,
