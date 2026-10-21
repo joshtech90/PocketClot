@@ -195,6 +195,9 @@ class ChatRepository(
     suspend fun setChatModel(cid: String, modelKey: String): ConversationDto =
         api.setChatModel(cid, modelKey)
 
+    suspend fun setChatEffort(cid: String, effort: String): ConversationDto =
+        api.setChatEffort(cid, effort)
+
     /** Springt zu einer frueheren Antwort zurueck, optional mit Modellwechsel. */
     suspend fun rewind(cid: String, messageId: Long, chatModel: String? = null): RewindResponse =
         api.rewindConversation(cid, messageId, chatModel)

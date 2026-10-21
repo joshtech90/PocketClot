@@ -107,6 +107,9 @@ data class ChatUiState(
     // (zuletzt benutzt), sonst greift die globale Wahl. Wer im Sheet umschaltet,
     // ändert beides, damit auch neue Chats das gewählte Modell erben.
     val modelKey: String = "",
+    // Denktiefe nur fuer DIESEN Chat: ein Gem bringt sie mit, und wer sie im
+    // Chat umstellt, aendert nur sie. null = Denktiefe der Modell-Familie.
+    val chatEffort: String? = null,
     val models: List<ChatModelOption> = emptyList(),
     val gateways: List<GatewayStatusDto> = emptyList(),
     val modelsLoading: Boolean = false,
@@ -348,6 +351,12 @@ class ChatViewModel(
         cachedSettings?.effortFor(family) ?: DEFAULT_EFFORT
 
     fun setEffort(family: String, effort: String) = viewModelScope.launch {
+        if (_state.value.chatEffort != null) {
+            _state.update { it.copy(chatEffort = effort) }
+            runCatching { repo.setChatEffort(cid, effort) }
+                .onFailure { Log.w("PC_NET", "chat effort not saved: ${it::class.java.simpleName}") }
+            return@launch
+        }
         settingsRepo.setEffortForFamily(family, effort)
     }
 
@@ -442,16 +451,34 @@ class ChatViewModel(
                 locked = detail.locked,
                 gemId = detail.gemId,
                 // Der Server ist die Quelle für „was lief zuletzt in diesem
-                // Chat". Nur wenn er nichts weiß, greift die globale Wahl.
-                modelKey = detail.chatModel?.takeIf { m -> m.isNotBlank() } ?: it.modelKey,
+                // Chat". Nur wenn er nichts weiß, greift die Vorgabe des Gems
+                // und danach die globale Wahl.
+                modelKey = detail.chatModel?.takeIf { m -> m.isNotBlank() }
+                    ?: gemDefaults(detail.gemId)?.first
+                    ?: it.modelKey,
+                chatEffort = detail.chatEffort?.takeIf { e -> e.isNotBlank() }
+                    ?: gemDefaults(detail.gemId)?.second,
             )
         }
+        detailHadModel = !detail.chatModel.isNullOrBlank()
+        detailHadEffort = !detail.chatEffort.isNullOrBlank()
         loadGemMeta(detail.gemId)
     }
 
     // Zuletzt geladenes Gem — verhindert Refetch bei jedem refresh() (die gem_id
     // eines Chats ändert sich nie).
     private var lastGemMetaId: String? = null
+
+    // Modell und Denktiefe des Gems. Neue Gem-Chats bekommen beides vom Server
+    // schon mitgegeben; Gem-Chats von vorher rechnet der Server noch mit der
+    // Vorgabe des Gems, und die Anzeige soll dasselbe zeigen.
+    private var lastGemModel: String? = null
+    private var lastGemEffort: String? = null
+    private var detailHadModel = false
+    private var detailHadEffort = false
+
+    private fun gemDefaults(gemId: String?): Pair<String?, String?>? =
+        if (gemId != null && gemId == lastGemMetaId) lastGemModel to lastGemEffort else null
 
     /** Lädt Emoji/Name/Beschreibung/Starter des gebundenen Gems (Header + leerer Chat). */
     private fun loadGemMeta(gemId: String?) {
@@ -467,12 +494,16 @@ class ChatViewModel(
         viewModelScope.launch {
             runCatching { repo.getGem(gemId) }
                 .onSuccess { g ->
+                    lastGemModel = g.model?.takeIf { it.isNotBlank() }
+                    lastGemEffort = g.effort?.takeIf { it.isNotBlank() }
                     _state.update {
                         it.copy(
                             gemEmoji = g.emoji,
                             gemName = g.name,
                             gemDescription = g.description,
                             gemStarters = g.conversationStarters,
+                            modelKey = if (!detailHadModel && lastGemModel != null) lastGemModel!! else it.modelKey,
+                            chatEffort = if (!detailHadEffort && lastGemEffort != null) lastGemEffort else it.chatEffort,
                         )
                     }
                 }
@@ -637,7 +668,7 @@ class ChatViewModel(
             // Familien-Vorgabe. So geht genau die Stufe raus, die das Sheet auch
             // anzeigt.
             val selected = _state.value.models.firstOrNull { it.key == modelKey }
-            val effort = s.effortForModelKey(modelKey, selected)
+            val effort = s.effortForModelKey(modelKey, selected, _state.value.chatEffort)
             repo.stream(
                 cid,
                 text,

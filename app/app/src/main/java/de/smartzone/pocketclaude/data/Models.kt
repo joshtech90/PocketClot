@@ -35,6 +35,9 @@ data class ConversationDto(
     @SerialName("gem_id") val gemId: String? = null,
     /** Zuletzt in diesem Chat benutztes Modell. Leer/null = Claude. */
     @SerialName("chat_model") val chatModel: String? = null,
+    /** Denktiefe nur fuer diesen Chat (vom Gem mitgebracht oder im Chat
+     *  umgestellt). null = die gemerkte Denktiefe der Modell-Familie. */
+    @SerialName("chat_effort") val chatEffort: String? = null,
 )
 
 @Serializable
@@ -71,6 +74,8 @@ data class ConversationDetailDto(
     @SerialName("gem_id") val gemId: String? = null,
     /** Zuletzt in diesem Chat benutztes Modell. Leer/null = Claude. */
     @SerialName("chat_model") val chatModel: String? = null,
+    /** Siehe [ConversationDto.chatEffort]. */
+    @SerialName("chat_effort") val chatEffort: String? = null,
     val messages: List<MessageDto> = emptyList(),
     @SerialName("mid_summary") val midSummary: String? = null,
     @SerialName("long_summary") val longSummary: String? = null,
@@ -118,6 +123,8 @@ data class PatchConversationRequest(
     val locked: Boolean? = null,
     /** "" setzt den Chat zurück auf Claude, null lässt den Wert unverändert. */
     @SerialName("chat_model") val chatModel: String? = null,
+    /** "" gibt die Denktiefe an die Familien-Vorgabe ab, null laesst sie. */
+    @SerialName("chat_effort") val chatEffort: String? = null,
 )
 
 // ---------- Chat-Sperre (globaler PIN) ----------
@@ -699,6 +706,13 @@ data class MeDto(
     @SerialName("is_admin") val isAdmin: Boolean = false,
     @SerialName("must_change_password") val mustChangePassword: Boolean = false,
     @SerialName("has_password") val hasPassword: Boolean = true,
+    /** Aendert sich mit jedem neuen Profilbild. null = keins hinterlegt. */
+    @SerialName("avatar_version") val avatarVersion: Long? = null,
+)
+
+@Serializable
+data class UiSettingsDto(
+    val settings: Map<String, String> = emptyMap(),
 )
 
 @Serializable

@@ -154,6 +154,14 @@ class AppContainer(context: Context) {
 
     val chatRepository: ChatRepository = ChatRepository(apiClient, context)
 
+    /** Lebt so lange wie der Prozess; Fehler einzelner Abgleiche bleiben lokal. */
+    private val appScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+    )
+
+    /** Gleicht die Oberflaechen-Einstellungen mit dem Server ab (App = Web). */
+    val settingsSync: SettingsSync = SettingsSync(settingsRepository, apiClient, appScope)
+
     val audioController: AudioController = AudioController(context, streamingHttpClient)
 
     /** Voice-Input (Mic → Groq Whisper). Eine globale Instanz reicht — es

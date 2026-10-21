@@ -509,7 +509,7 @@ fun ChatScreen(
                         icon = PocketIcons.Speed,
                         description = stringResource(de.smartzone.pocketclaude.R.string.model_sheet_title),
                         onClick = { modelSheetOpen = true },
-                        tint = effortTint(appSettings.effortFor(familyForKey(state.modelKey))),
+                        tint = effortTint(state.chatEffort ?: appSettings.effortFor(familyForKey(state.modelKey))),
                     )
                     HeaderIcon(
                         icon = PocketIcons.NewChat,
@@ -954,7 +954,7 @@ fun ChatScreen(
             models = state.models,
             gateways = state.gateways,
             selectedKey = state.modelKey,
-            effortForModel = { key, option -> appSettings.effortForModelKey(key, option) },
+            effortForModel = { key, option -> appSettings.effortForModelKey(key, option, state.chatEffort) },
             availableEfforts = { family, option -> appSettings.availableEffortsFor(family, option) },
             loading = state.modelsLoading,
             errorText = state.modelsError,

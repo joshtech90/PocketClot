@@ -189,6 +189,14 @@ class ApiClient(
 
     suspend fun me(): MeDto = get("/me")
 
+    /** Gemeinsame Oberflaechen-Einstellungen (geteilt mit der Web-UI). */
+    suspend fun getUiSettings(): UiSettingsDto = get("/ui-settings")
+
+    /** Teil-Update: nur die mitgeschickten Schluessel aendern sich. */
+    suspend fun putUiSettings(values: Map<String, String>) {
+        putJson<Map<String, String>, kotlinx.serialization.json.JsonObject>("/ui-settings", values)
+    }
+
     // ---------- Claude auth mode (Pro/Max | API key | Bedrock) ----------
 
     suspend fun getClaudeAuth(): ClaudeAuthDto = get("/me/claude-auth")
@@ -309,6 +317,9 @@ class ApiClient(
     /** Merkt das gewählte Modell am Chat. Leerer String = zurück auf Claude. */
     suspend fun setChatModel(id: String, modelKey: String): ConversationDto =
         patchJson("/conversations/$id", PatchConversationRequest(chatModel = modelKey))
+
+    suspend fun setChatEffort(id: String, effort: String): ConversationDto =
+        patchJson("/conversations/$id", PatchConversationRequest(chatEffort = effort))
 
     /** Springt im Chat zu einer frueheren Antwort zurueck. */
     suspend fun rewindConversation(

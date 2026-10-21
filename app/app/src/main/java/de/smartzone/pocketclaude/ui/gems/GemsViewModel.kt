@@ -5,6 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.smartzone.pocketclaude.data.AppContainer
+import de.smartzone.pocketclaude.data.ChatModelFamilies
+import de.smartzone.pocketclaude.data.ChatModelOption
+import de.smartzone.pocketclaude.data.ClaudeModels
+import de.smartzone.pocketclaude.data.EFFORT_LEVELS
+import de.smartzone.pocketclaude.data.clampEffort
+import de.smartzone.pocketclaude.data.familyForKey
 import de.smartzone.pocketclaude.data.ChatRepository
 import de.smartzone.pocketclaude.data.GemDto
 import de.smartzone.pocketclaude.data.GemFileDto
@@ -33,7 +39,8 @@ data class GemEditorState(
     val description: String = "",
     val instructions: String = "",
     val starters: List<String> = emptyList(),
-    /** null = globaler Standard. Sonst volle Modell-ID. */
+    /** null = globaler Standard. Sonst ein Modell-Key wie im Chat
+     *  (`opus` oder `gw:<gateway>:<modell>`). */
     val model: String? = null,
     /** null = Chat-Standard. Sonst Effort-Level. */
     val effort: String? = null,
@@ -56,6 +63,42 @@ class GemsViewModel(
 
     private val _editor = MutableStateFlow(GemEditorState())
     val editor: StateFlow<GemEditorState> = _editor.asStateFlow()
+
+    /** Alle Modelle wie im Modell-Sheet des Chats: Claude plus Gemini und GPT,
+     *  soweit ein Gateway antwortet. Ohne Server bleiben die Claude-Familien. */
+    private val _models = MutableStateFlow(
+        ClaudeModels.all.map { ChatModelOption(it.id, ChatModelFamilies.CLAUDE, it.label, EFFORT_LEVELS) },
+    )
+    val models: StateFlow<List<ChatModelOption>> = _models.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            runCatching { chatRepo.getChatModels(false, include = "") }
+                .onSuccess { dto ->
+                    if (dto.models.isNotEmpty()) {
+                        _models.value = dto.models.map { m ->
+                            ChatModelOption(
+                                key = m.key, family = m.family, label = m.label,
+                                efforts = m.efforts, defaultEffort = m.defaultEffort,
+                                supportsVision = m.supportsVision, gatewayLabel = m.gatewayLabel,
+                            )
+                        }
+                    }
+                }
+        }
+    }
+
+    /** Denktiefen, die das Modell kann; ohne Modell die von Claude. */
+    fun effortsFor(modelKey: String?): List<String> {
+        if (modelKey.isNullOrBlank()) return EFFORT_LEVELS
+        val option = _models.value.firstOrNull { it.key == modelKey }
+        val family = option?.family ?: familyForKey(modelKey)
+        return when {
+            family == ChatModelFamilies.CLAUDE -> EFFORT_LEVELS
+            option != null -> option.efforts
+            else -> EFFORT_LEVELS.filter { it != "off" }
+        }
+    }
 
     /** Lädt ein Gem zum Bearbeiten, oder setzt den Editor für ein neues Gem zurück. */
     fun loadForEdit(gemId: String?) = viewModelScope.launch {
@@ -105,7 +148,13 @@ class GemsViewModel(
     fun setEmoji(v: String) = _editor.update { it.copy(emoji = capEmoji(v)) }
     fun setDescription(v: String) = _editor.update { it.copy(description = v) }
     fun setInstructions(v: String) = _editor.update { it.copy(instructions = v) }
-    fun setModel(id: String?) = _editor.update { it.copy(model = id?.takeIf { s -> s.isNotBlank() }) }
+    fun setModel(id: String?) = _editor.update {
+        val model = id?.takeIf { s -> s.isNotBlank() }
+        // Eine Denktiefe, die das neue Modell nicht kann, auf die naechste ziehen.
+        val efforts = effortsFor(model)
+        val effort = it.effort?.let { e -> if (efforts.isEmpty()) null else clampEffort(e, efforts) }
+        it.copy(model = model, effort = effort)
+    }
     fun setEffort(level: String?) = _editor.update { it.copy(effort = level?.takeIf { s -> s.isNotBlank() }) }
     fun setWebSearch(on: Boolean) = _editor.update { it.copy(skills = it.skills.copy(webSearch = on)) }
     fun setWebFetch(on: Boolean) = _editor.update { it.copy(skills = it.skills.copy(webFetch = on)) }

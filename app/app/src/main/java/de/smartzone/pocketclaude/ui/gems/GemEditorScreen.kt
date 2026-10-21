@@ -58,8 +58,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.smartzone.pocketclaude.R
+import de.smartzone.pocketclaude.data.ChatModelFamilies
+import de.smartzone.pocketclaude.data.ChatModelOption
 import de.smartzone.pocketclaude.data.ClaudeModels
-import de.smartzone.pocketclaude.data.EFFORT_LEVELS
 import de.smartzone.pocketclaude.ui.components.PocketBackdrop
 import de.smartzone.pocketclaude.ui.components.PocketIconButton
 import de.smartzone.pocketclaude.ui.components.PocketScreenTitle
@@ -227,30 +228,42 @@ fun GemEditorScreen(
                 }
             }
 
-            // Model picker
+            // Modell und Denktiefe: damit startet jeder neue Chat mit diesem Gem,
+            // im Chat laesst sich beides umstellen. Alle Modelle wie im Chat.
+            val models by vm.models.collectAsState()
+            fun modelText(m: ChatModelOption) =
+                if (m.gatewayLabel.isNotBlank()) "${m.label} · ${m.gatewayLabel}" else m.label
             LabeledDropdown(
                 label = stringResource(R.string.gem_model_label),
-                currentLabel = ClaudeModels.labelFor(st.model)
+                currentLabel = models.firstOrNull { it.key == st.model }?.let(::modelText)
+                    ?: ClaudeModels.labelFor(st.model)
                     ?: stringResource(R.string.gem_model_global_default),
                 enabled = !st.isBuiltin,
                 entries = buildList {
                     add(null to stringResource(R.string.gem_model_global_default))
-                    ClaudeModels.all.forEach { add(it.id to it.label) }
+                    ChatModelFamilies.order.forEach { fam ->
+                        models.filter { it.family == fam }.forEach { add(it.key to modelText(it)) }
+                    }
                 },
                 onSelect = vm::setModel,
             )
 
-            // Effort picker
+            val efforts = vm.effortsFor(st.model)
             LabeledDropdown(
                 label = stringResource(R.string.gem_effort_label),
                 currentLabel = st.effort?.replaceFirstChar { it.uppercase() }
                     ?: stringResource(R.string.gem_effort_chat_default),
-                enabled = !st.isBuiltin,
+                enabled = !st.isBuiltin && efforts.isNotEmpty(),
                 entries = buildList {
                     add(null to stringResource(R.string.gem_effort_chat_default))
-                    EFFORT_LEVELS.forEach { add(it to it.replaceFirstChar { c -> c.uppercase() }) }
+                    efforts.forEach { add(it to it.replaceFirstChar { c -> c.uppercase() }) }
                 },
                 onSelect = vm::setEffort,
+            )
+            Text(
+                stringResource(R.string.gem_defaults_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             // Skills

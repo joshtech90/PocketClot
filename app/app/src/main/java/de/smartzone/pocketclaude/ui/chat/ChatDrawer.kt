@@ -95,6 +95,19 @@ internal fun ChatDrawerContent(
         runCatching { container.chatRepository.imagesConfig() }
             .onSuccess { cfg -> imageGenAvailable = cfg.configured }
     }
+    // Profilbild statt Zahnrad unten rechts, wenn eines hinterlegt ist (wie
+    // in der Web-UI). Die Version in der URL haelt den Bild-Cache aktuell.
+    var avatarUrl by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(open) {
+        if (!open) return@LaunchedEffect
+        runCatching { container.chatRepository.me() }.onSuccess { me ->
+            val s = container.settingsRepository.current()
+            avatarUrl = me.avatarVersion?.let { v ->
+                "${s.serverUrl}/users/${android.net.Uri.encode(me.id)}/avatar" +
+                    "?v=$v&token=${android.net.Uri.encode(s.serverToken)}"
+            }
+        }
+    }
 
     var query by remember { mutableStateOf("") }
     // Treffer merken sich ihren Suchbegriff: alte Volltexttreffer duerfen nicht
@@ -221,6 +234,7 @@ internal fun ChatDrawerContent(
             DrawerBottomBar(
                 onNewChat = onNewChat,
                 onSettings = onSettings,
+                avatarUrl = avatarUrl,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -365,7 +379,12 @@ private fun DrawerSection(text: String) {
  * runde Einstellungen-Knopf. Ein Verlauf blendet die Liste darunter aus.
  */
 @Composable
-private fun DrawerBottomBar(onNewChat: () -> Unit, onSettings: () -> Unit, modifier: Modifier) {
+private fun DrawerBottomBar(
+    onNewChat: () -> Unit,
+    onSettings: () -> Unit,
+    modifier: Modifier,
+    avatarUrl: String? = null,
+) {
     val bg = MaterialTheme.colorScheme.surfaceContainerLowest
     Row(
         modifier = modifier
@@ -402,11 +421,20 @@ private fun DrawerBottomBar(onNewChat: () -> Unit, onSettings: () -> Unit, modif
             modifier = Modifier.size(48.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    PocketIcons.Settings,
-                    contentDescription = stringResource(R.string.title_settings),
-                    modifier = Modifier.size(PocketIconSize.Regular),
-                )
+                if (avatarUrl != null) {
+                    coil3.compose.AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = stringResource(R.string.title_settings),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                } else {
+                    Icon(
+                        PocketIcons.Settings,
+                        contentDescription = stringResource(R.string.title_settings),
+                        modifier = Modifier.size(PocketIconSize.Regular),
+                    )
+                }
             }
         }
     }

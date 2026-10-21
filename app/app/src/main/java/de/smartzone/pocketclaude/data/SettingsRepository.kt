@@ -3,8 +3,10 @@ package de.smartzone.pocketclaude.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -181,11 +183,16 @@ data class AppSettings(
      * Stufen stehen fest (inklusive „aus") und duerfen nicht davon abhaengen,
      * ob der Server gerade eine Stufenliste mitgeschickt hat.
      */
-    fun effortForModelKey(modelKey: String, option: ChatModelOption?): String {
+    fun effortForModelKey(
+        modelKey: String,
+        option: ChatModelOption?,
+        chatEffort: String? = null,
+    ): String {
         val family = option?.family ?: familyForKey(modelKey)
         val available = availableEffortsFor(family, option)
         if (available.isEmpty()) return ""
-        return clampEffort(effortFor(family), available)
+        // Hat der Chat eine eigene Denktiefe (vom Gem), gilt die statt der Familie.
+        return clampEffort(chatEffort?.takeIf { it.isNotBlank() } ?: effortFor(family), available)
     }
 
     /**
@@ -242,6 +249,9 @@ class SettingsRepository(
     private val keyDefaultModelByFamily = stringPreferencesKey("default_model_by_family_json")
     private val keyImageDefaultSize = stringPreferencesKey("image_default_size")
     private val keyImageDefaultAspect = stringPreferencesKey("image_default_aspect")
+    /** Profile, deren Einstellungen schon einmal mit dem Server abgeglichen
+     *  wurden. Beim ERSTEN Abgleich gewinnt, was die App schon hat. */
+    private val keyUiSyncedProfiles = stringSetPreferencesKey("ui_synced_profiles")
 
     /** Liest eine JSON-Map aus den Preferences. Kaputtes JSON gilt als leer,
      *  damit ein beschaedigter Eintrag nicht die ganzen Settings blockiert. */
@@ -310,6 +320,7 @@ class SettingsRepository(
             if (value.isBlank()) prefs.remove(keyChatModelKey)
             else prefs[keyChatModelKey] = value
         }
+        localChanged("chatModel")
     }
 
     /** Merkt sich das Standardmodell einer Familie. Leerer Wert loescht den
@@ -321,6 +332,7 @@ class SettingsRepository(
             if (map.isEmpty()) prefs.remove(keyDefaultModelByFamily)
             else prefs[keyDefaultModelByFamily] = json.encodeToString(map)
         }
+        localChanged("defaultModelByFamily")
     }
 
     /** Merkt sich die Denktiefe pro Familie. Für Claude wird zusätzlich das alte
@@ -332,6 +344,7 @@ class SettingsRepository(
             map[family] = value
             prefs[keyEffortByFamily] = json.encodeToString(map)
         }
+        localChanged("effort", "effortByFamily")
     }
 
     suspend fun setImageDefaultSize(value: String) {
@@ -348,14 +361,17 @@ class SettingsRepository(
 
     suspend fun setCollapseLongUserMessages(value: Boolean) {
         dataStore.edit { it[keyCollapseLongUserMessages] = value.toString() }
+        localChanged("collapseUserMsgs")
     }
 
     suspend fun setAutoSendEnabled(value: Boolean) {
         dataStore.edit { it[keyAutoSendEnabled] = value.toString() }
+        localChanged("autoSend")
     }
 
     suspend fun setAutoSendSilenceMs(value: Long) {
         dataStore.edit { it[keyAutoSendSilenceMs] = value.coerceIn(500L, 10_000L).toString() }
+        localChanged("autoSendSilenceMs")
     }
 
     // ---------- Image-Generation-History (App-lokal) ----------
@@ -516,38 +532,47 @@ class SettingsRepository(
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[keyThemeMode] = mode.name }
+        localChanged("theme")
     }
 
     suspend fun setPaletteIdLight(value: String) {
         dataStore.edit { it[keyPaletteIdLight] = value }
+        localChanged("paletteLight")
     }
 
     suspend fun setPaletteIdDark(value: String) {
         dataStore.edit { it[keyPaletteIdDark] = value }
+        localChanged("paletteDark")
     }
 
     suspend fun setTtsVoice(value: String) {
         dataStore.edit { it[keyTtsVoice] = value }
+        localChanged("ttsVoice")
     }
 
     suspend fun setTtsAutoSpeak(value: Boolean) {
         dataStore.edit { it[keyTtsAutoSpeak] = value.toString() }
+        localChanged("autoSpeak")
     }
 
     suspend fun setTtsSpeed(value: Float) {
         dataStore.edit { it[keyTtsSpeed] = value.coerceIn(0.25f, 2.0f) }
+        localChanged("ttsSpeed")
     }
 
     suspend fun setEffort(value: String) {
         dataStore.edit { it[keyEffort] = value }
+        localChanged("effort", "effortByFamily")
     }
 
     suspend fun setSystemPromptMode(mode: SystemPromptMode) {
         dataStore.edit { it[keySystemPromptMode] = mode.name }
+        localChanged("spMode")
     }
 
     suspend fun setCustomSystemPrompt(value: String) {
         dataStore.edit { it[keyCustomSystemPrompt] = value }
+        localChanged("spCustom")
     }
 
     /** Merkt sich die zuletzt offene Chat-cid, damit die App nach Process Death
@@ -591,6 +616,7 @@ class SettingsRepository(
             if (map.isEmpty()) prefs.remove(keyTtsAutoSpeakPerChat)
             else prefs[keyTtsAutoSpeakPerChat] = json.encodeToString(map)
         }
+        localChanged("autoSpeakByChat")
     }
 
     // ---------- Settings Export / Import (App-Anteil) ----------
@@ -653,5 +679,132 @@ class SettingsRepository(
                 prefs[keyTtsAutoSpeakPerChat] = json.encodeToString(s.ttsAutoSpeakPerChat)
             }
         }
+        localChanged(*SHARED_UI_KEYS.toTypedArray())
+    }
+
+    // ---------- Abgleich mit dem Server (GET/PUT /ui-settings) ----------
+    //
+    // App und Web-UI teilen ihre Oberflaechen-Einstellungen ueber den Server,
+    // mit denselben Schluesseln wie die Web-UI. Lokal bleibt alles im
+    // DataStore: die App startet auch offline mit dem letzten Stand.
+    // Geraetebezogenes bleibt draussen (Server-Profile, Fingerabdruck,
+    // Bilder-Verlauf, Sprache).
+
+    /** Wird bei jeder lokalen Aenderung mit den geaenderten Server-Werten
+     *  gerufen; [SettingsSync] schickt sie an den Server. */
+    @Volatile
+    var onLocalChange: ((Map<String, String>) -> Unit)? = null
+
+    private suspend fun localChanged(vararg remoteKeys: String) {
+        val listener = onLocalChange ?: return
+        val values = sharedValues(dataStore.data.first())
+        // Ein geleerter Wert steht lokal gar nicht mehr da; der Server muss
+        // ihn trotzdem erfahren, sonst kaeme der alte Wert beim Abgleich zurueck.
+        val changed = remoteKeys.associateWith { key -> values[key] ?: CLEARED_VALUES[key] }
+            .filterValues { it != null }
+            .mapValues { it.value!! }
+        if (changed.isNotEmpty()) listener(changed)
+    }
+
+    private companion object {
+        val CLEARED_VALUES = mapOf(
+            "chatModel" to "",
+            "autoSpeakByChat" to "{}",
+            "defaultModelByFamily" to "{}",
+        )
+    }
+
+    /** Die geteilten Einstellungen als Server-Werte, nur was lokal gesetzt ist. */
+    private fun sharedValues(prefs: Preferences): Map<String, String> = buildMap {
+        prefs[keyThemeMode]?.let { put("theme", it.lowercase()) }
+        (prefs[keyPaletteIdLight] ?: prefs[keyPaletteId])?.takeIf { it.isNotBlank() }
+            ?.let { put("paletteLight", it) }
+        (prefs[keyPaletteIdDark] ?: prefs[keyPaletteId])?.takeIf { it.isNotBlank() }
+            ?.let { put("paletteDark", it) }
+        prefs[keyTtsVoice]?.takeIf { it.isNotBlank() }?.let { put("ttsVoice", it) }
+        prefs[keyTtsSpeed]?.let { put("ttsSpeed", it.toString()) }
+        prefs[keyTtsAutoSpeak]?.let { put("autoSpeak", it) }
+        prefs[keyTtsAutoSpeakPerChat]?.let { put("autoSpeakByChat", it) }
+        prefs[keyCollapseLongUserMessages]?.let { put("collapseUserMsgs", it) }
+        prefs[keyAutoSendEnabled]?.let { put("autoSend", it) }
+        prefs[keyAutoSendSilenceMs]?.let { put("autoSendSilenceMs", it) }
+        prefs[keySystemPromptMode]?.let { put("spMode", it) }
+        prefs[keyCustomSystemPrompt]?.let { put("spCustom", it) }
+        prefs[keyChatModelKey]?.let { put("chatModel", it) }
+        prefs[keyDefaultModelByFamily]?.let { put("defaultModelByFamily", it) }
+        val claudeEffort = prefs[keyEffort]?.takeIf { it.isNotBlank() }
+        claudeEffort?.let { put("effort", it) }
+        val byFamily = parseStringMap(prefs[keyEffortByFamily]).toMutableMap()
+        // Die Web-UI fuehrt Claude in derselben Liste, die App im alten Feld.
+        if (claudeEffort != null) byFamily[ChatModelFamilies.CLAUDE] = claudeEffort
+        if (byFamily.isNotEmpty()) put("effortByFamily", json.encodeToString(byFamily.toMap()))
+    }
+
+    /** Uebernimmt Werte vom Server. Unbrauchbare Werte werden uebersprungen,
+     *  ein kaputter Eintrag darf die anderen nicht blockieren. */
+    private fun applyShared(prefs: MutablePreferences, remote: Map<String, String>) {
+        remote["theme"]?.uppercase()?.takeIf { v -> ThemeMode.entries.any { it.name == v } }
+            ?.let { prefs[keyThemeMode] = it }
+        remote["paletteLight"]?.takeIf { it.isNotBlank() }?.let { prefs[keyPaletteIdLight] = it }
+        remote["paletteDark"]?.takeIf { it.isNotBlank() }?.let { prefs[keyPaletteIdDark] = it }
+        remote["ttsVoice"]?.takeIf { it.isNotBlank() }?.let { prefs[keyTtsVoice] = it }
+        remote["ttsSpeed"]?.toFloatOrNull()?.let { prefs[keyTtsSpeed] = it.coerceIn(0.25f, 2.0f) }
+        remote["autoSpeak"]?.toBooleanStrictOrNull()?.let { prefs[keyTtsAutoSpeak] = it.toString() }
+        remote["autoSpeakByChat"]?.let { raw ->
+            runCatching { json.decodeFromString<Map<String, Boolean>>(raw) }.getOrNull()
+                ?.let { prefs[keyTtsAutoSpeakPerChat] = json.encodeToString(it) }
+        }
+        remote["collapseUserMsgs"]?.toBooleanStrictOrNull()
+            ?.let { prefs[keyCollapseLongUserMessages] = it.toString() }
+        remote["autoSend"]?.toBooleanStrictOrNull()?.let { prefs[keyAutoSendEnabled] = it.toString() }
+        remote["autoSendSilenceMs"]?.toLongOrNull()
+            ?.let { prefs[keyAutoSendSilenceMs] = it.coerceIn(500L, 10_000L).toString() }
+        remote["spMode"]?.takeIf { v -> SystemPromptMode.entries.any { it.name == v } }
+            ?.let { prefs[keySystemPromptMode] = it }
+        remote["spCustom"]?.let { prefs[keyCustomSystemPrompt] = it }
+        remote["chatModel"]?.let { prefs[keyChatModelKey] = it }
+        remote["defaultModelByFamily"]?.let { raw ->
+            runCatching { json.decodeFromString<Map<String, String>>(raw) }.getOrNull()
+                ?.let { prefs[keyDefaultModelByFamily] = json.encodeToString(it) }
+        }
+        val byFamily = remote["effortByFamily"]?.let { raw ->
+            runCatching { json.decodeFromString<Map<String, String>>(raw) }.getOrNull()
+        }
+        if (byFamily != null) prefs[keyEffortByFamily] = json.encodeToString(byFamily)
+        // Claude: die Liste ist genauer als das alte Einzelfeld, denn die
+        // Web-UI schreibt dort die zuletzt gewaehlte Stufe JEDER Familie hinein.
+        (byFamily?.get(ChatModelFamilies.CLAUDE) ?: remote["effort"])
+            ?.takeIf { it.isNotBlank() }?.let { prefs[keyEffort] = it }
+    }
+
+    /**
+     * Gleicht mit dem Stand vom Server ab und liefert, was die App ihrerseits
+     * hochladen soll.
+     *
+     * Beim ersten Abgleich eines Profils gewinnt, was die App schon hat: sonst
+     * wuerden die Werte eines kaum benutzten Browsers die eingerichtete App
+     * ueberschreiben. Danach gilt der Server, die App laedt nur hoch, was dort
+     * noch fehlt.
+     */
+    suspend fun syncWithRemote(profileId: String, remote: Map<String, String>): Map<String, String> {
+        var upload: Map<String, String> = emptyMap()
+        dataStore.edit { prefs ->
+            val local = sharedValues(prefs)
+            val firstSync = profileId !in (prefs[keyUiSyncedProfiles] ?: emptySet())
+            val take = if (firstSync) remote.filterKeys { it !in local } else remote
+            applyShared(prefs, take)
+            upload = if (firstSync) local.filter { (k, v) -> remote[k] != v }
+                     else local.filterKeys { it !in remote }
+            prefs[keyUiSyncedProfiles] = (prefs[keyUiSyncedProfiles] ?: emptySet()) + profileId
+        }
+        return upload
     }
 }
+
+/** Schluessel, die App und Web-UI ueber den Server teilen (wie
+ *  `UI_SETTING_KEYS` in server.py, ohne die reinen Web-Schluessel). */
+val SHARED_UI_KEYS: List<String> = listOf(
+    "theme", "paletteLight", "paletteDark", "ttsVoice", "ttsSpeed", "autoSpeak",
+    "autoSpeakByChat", "collapseUserMsgs", "autoSend", "autoSendSilenceMs",
+    "spMode", "spCustom", "chatModel", "defaultModelByFamily", "effort", "effortByFamily",
+)
