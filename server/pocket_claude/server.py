@@ -122,6 +122,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     import asyncio as _asyncio
     _asyncio.create_task(_tts_prewarm())
     _asyncio.create_task(_migrate_tts_to_gemini_web())
+    _asyncio.create_task(_migrate_defaults_opus_high())
     from pocket_claude import wissen_export as _wissen_export
     app.state.wissen_export = _asyncio.create_task(_wissen_export.schleife())
     yield
@@ -174,6 +175,48 @@ async def _migrate_tts_to_gemini_web() -> None:
                      umgestellt, len(users))
     except Exception as exc:  # noqa: BLE001 - darf den Start nie verhindern
         log.warning("TTS-Umstellung fehlgeschlagen (nicht kritisch): %s", exc)
+
+
+_KV_DEFAULTS_OPUS_MIGRATED = "defaults_opus_high_migrated"
+
+
+async def _migrate_defaults_opus_high() -> None:
+    """Setzt einmalig fuer jeden Nutzer die Vorauswahl neuer Chats auf Opus
+    (die Familie, der Server nimmt die neueste Generation) mit Denktiefe Hoch.
+
+    Joschas Entscheidung vom 21.10.2026, fuer alle Konten. Der Merker sorgt
+    dafuer, dass eine spaeter getroffene eigene Wahl beim naechsten Start
+    nicht wieder ueberschrieben wird. Andere Familien bleiben, wie sie sind.
+    """
+    try:
+        users = await db.list_users()
+        umgestellt = 0
+        for u in users:
+            uid = u.get("id")
+            if not uid:
+                continue
+            kv = await db.kv_get_all(scope=uid)
+            if (kv.get(_KV_DEFAULTS_OPUS_MIGRATED) or "").strip() == "1":
+                continue
+            try:
+                by_family = json.loads(kv.get("effortByFamily") or "{}")
+            except json.JSONDecodeError:
+                by_family = {}
+            if not isinstance(by_family, dict):
+                by_family = {}
+            by_family["claude"] = "high"
+            await db.kv_set_many({
+                "chatModel": claude_engine.DEFAULT_CLAUDE_MODEL,
+                "effort": "high",
+                "effortByFamily": json.dumps(by_family, separators=(",", ":")),
+                auth_modes.KV_DEFAULT_MODEL: claude_engine.DEFAULT_CLAUDE_MODEL,
+                _KV_DEFAULTS_OPUS_MIGRATED: "1",
+            }, scope=uid)
+            umgestellt += 1
+        if umgestellt:
+            log.info("Vorauswahl Opus/Hoch fuer %d von %d Nutzern gesetzt", umgestellt, len(users))
+    except Exception as exc:  # noqa: BLE001 - darf den Start nie verhindern
+        log.warning("Umstellung auf Opus/Hoch fehlgeschlagen (nicht kritisch): %s", exc)
 
 
 async def _tts_prewarm() -> None:

@@ -28,10 +28,15 @@ android {
     // weiter "pocketclaude": das sieht niemand ausser dem Code selbst, und ein
     // Umbenennen wuerde jede Datei der App anfassen.
     applicationId = "de.smartzone.pocketclot"
+    // Nur fuer Geraete, auf denen noch die alte App mit der Kennung
+    // "de.smartzone.pocketclaude" liegt: `./gradlew assembleDebug -PlegacyAppId`
+    // baut dieselbe App unter der alten Kennung, damit sie sich ohne
+    // Neuinstallation darueber aktualisiert.
+    if (project.hasProperty("legacyAppId")) applicationId = "de.smartzone.pocketclaude"
         minSdk = 31
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.4.3"
+        versionCode = 8
+        versionName = "0.5.0"
 
         vectorDrawables { useSupportLibrary = true }
     }
