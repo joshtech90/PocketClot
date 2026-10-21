@@ -139,15 +139,16 @@ async def _migrate_tts_to_grok() -> None:
                     uid = u.get("id")
                     if not uid:
                         continue
-                    kv = await db.kv_get_all(scope=uid)
-                    if (kv.get(_KV_TTS_GROK_MIGRATED) or "").strip() == "1":
-                        continue
-                    await db.kv_set_many({
-                        _KV_TTS_PROVIDER: tts.PROVIDER_GROK,
-                        # Die Clients merken sich die Stimme im selben Speicher.
-                        "ttsVoice": tts.DEFAULT_VOICE_GROK,
-                        _KV_TTS_GROK_MIGRATED: "1",
-                    }, scope=uid)
+                    async with _settings_lock(uid):
+                        kv = await db.kv_get_all(scope=uid)
+                        if (kv.get(_KV_TTS_GROK_MIGRATED) or "").strip() == "1":
+                            continue
+                        await db.kv_set_many({
+                            _KV_TTS_PROVIDER: tts.PROVIDER_GROK,
+                            # Die Clients merken sich die Stimme im selben Speicher.
+                            "ttsVoice": tts.DEFAULT_VOICE_GROK,
+                            _KV_TTS_GROK_MIGRATED: "1",
+                        }, scope=uid)
                     umgestellt += 1
                 if umgestellt:
                     log.info("TTS-Umstellung auf Grok Leo: %d von %d Nutzern", umgestellt, len(users))
@@ -174,23 +175,24 @@ async def _migrate_defaults_opus_high() -> None:
             uid = u.get("id")
             if not uid:
                 continue
-            kv = await db.kv_get_all(scope=uid)
-            if (kv.get(_KV_DEFAULTS_OPUS_MIGRATED) or "").strip() == "1":
-                continue
-            try:
-                by_family = json.loads(kv.get("effortByFamily") or "{}")
-            except json.JSONDecodeError:
-                by_family = {}
-            if not isinstance(by_family, dict):
-                by_family = {}
-            by_family["claude"] = "high"
-            await db.kv_set_many({
-                "chatModel": claude_engine.DEFAULT_CLAUDE_MODEL,
-                "effort": "high",
-                "effortByFamily": json.dumps(by_family, separators=(",", ":")),
-                auth_modes.KV_DEFAULT_MODEL: claude_engine.DEFAULT_CLAUDE_MODEL,
-                _KV_DEFAULTS_OPUS_MIGRATED: "1",
-            }, scope=uid)
+            async with _settings_lock(uid):
+                kv = await db.kv_get_all(scope=uid)
+                if (kv.get(_KV_DEFAULTS_OPUS_MIGRATED) or "").strip() == "1":
+                    continue
+                try:
+                    by_family = json.loads(kv.get("effortByFamily") or "{}")
+                except json.JSONDecodeError:
+                    by_family = {}
+                if not isinstance(by_family, dict):
+                    by_family = {}
+                by_family["claude"] = "high"
+                await db.kv_set_many({
+                    "chatModel": claude_engine.DEFAULT_CLAUDE_MODEL,
+                    "effort": "high",
+                    "effortByFamily": json.dumps(by_family, separators=(",", ":")),
+                    auth_modes.KV_DEFAULT_MODEL: claude_engine.DEFAULT_CLAUDE_MODEL,
+                    _KV_DEFAULTS_OPUS_MIGRATED: "1",
+                }, scope=uid)
             umgestellt += 1
         if umgestellt:
             log.info("Vorauswahl Opus/Hoch fuer %d von %d Nutzern gesetzt", umgestellt, len(users))
@@ -1013,9 +1015,10 @@ async def _pregen_tts(
             return
         import io as _io
         buf = _io.BytesIO()
+        # strict: bricht ein spaeteres Stueck ab, nichts zwischenspeichern.
         async for chunk_bytes in tts.synthesize_chunked(
             row["content"], voice, rate, provider,
-            chunking_enabled=chunking_enabled,
+            chunking_enabled=chunking_enabled, strict=True,
         ):
             buf.write(chunk_bytes)
         audio = buf.getvalue()
@@ -1268,9 +1271,10 @@ async def tts_set_provider(body: TtsProviderRequest, user=Depends(require_user))
                                   f"Allowed: {sorted(tts.VALID_PROVIDERS)}")
     # Die Umstellungs-Merker gleich mitsetzen: wer selbst waehlt, soll beim
     # naechsten Serverstart nicht wieder umgestellt werden.
-    await db.kv_set_many({
-        _KV_TTS_PROVIDER: prov, _KV_TTS_WEB_MIGRATED: "1", _KV_TTS_GROK_MIGRATED: "1",
-    }, scope=user["id"])
+    async with _settings_lock(user["id"]):
+        await db.kv_set_many({
+            _KV_TTS_PROVIDER: prov, _KV_TTS_WEB_MIGRATED: "1", _KV_TTS_GROK_MIGRATED: "1",
+        }, scope=user["id"])
     log.info("TTS-Provider von user=%s auf %s gesetzt", user["id"], prov)
     return await _build_tts_status(user["id"])
 
@@ -1348,12 +1352,44 @@ async def tts_message_audio(
             },
         )
 
+    # Das erste Stueck abwarten, bevor die Antwort beginnt: scheitert der
+    # Anbieter gleich zu Beginn (Sitzung eben abgelaufen, Dienst weg), springt
+    # der naechste ein. Nach dem ersten Byte geht das nicht mehr, MP3 und Ogg
+    # lassen sich nicht mischen.
+    avail = await _available_providers()
+    order = [provider] + [p for p in (tts.PROVIDER_GROK, tts.PROVIDER_GEMINI_WEB, tts.PROVIDER_EDGE_TTS)
+                          if p != provider and avail.get(p)]
+    gen = None
+    first = b""
+    for candidate in order:
+        gen = tts.synthesize_chunked(
+            content, chosen_voice, chosen_rate, candidate,
+            chunking_enabled=chunking_enabled if candidate == provider else False,
+        )
+        try:
+            first = await gen.__anext__()
+        except StopAsyncIteration:
+            first = b""
+        except (tts.TtsSessionExpiredError, tts.TtsTransientError) as e:
+            if isinstance(e, tts.TtsSessionExpiredError):
+                tts.mark_unavailable(candidate)
+            log.warning("TTS: %s scheitert (%s), versuche den naechsten Anbieter",
+                        candidate, str(e)[:160])
+            gen = None
+            continue
+        if candidate != provider:
+            log.info("TTS: %s springt fuer %s ein", candidate, provider)
+            provider = candidate
+            stream_media_type = tts.media_type_for(provider)
+        break
+    if gen is None:
+        raise HTTPException(503, "Gerade kann kein Vorlese-Anbieter vorlesen. Bitte gleich nochmal versuchen.")
+
     async def audio_stream():
         try:
-            async for audio_chunk in tts.synthesize_chunked(
-                content, chosen_voice, chosen_rate, provider,
-                chunking_enabled=chunking_enabled,
-            ):
+            if first:
+                yield first
+            async for audio_chunk in gen:
                 yield audio_chunk
         except tts.TtsSessionExpiredError as e:
             log.warning("TTS-Stream beendet: Sitzung des Vorlese-Dienstes (%s) fehlt "
@@ -1922,6 +1958,13 @@ _UI_MAP_KEYS = frozenset({"effortByFamily", "defaultModelByFamily", "autoSpeakBy
 _UI_SETTINGS_LOCKS: dict[str, asyncio.Lock] = {}
 
 
+def _settings_lock(user_id: str) -> asyncio.Lock:
+    """Eine Sperre pro Nutzer fuer alles, was Einstellungen liest und dann
+    schreibt: Abgleich, Anbieterwahl, Import und die einmaligen Umstellungen.
+    Sonst koennte eine Umstellung eine gleichzeitig getroffene Wahl ueberschreiben."""
+    return _UI_SETTINGS_LOCKS.setdefault(user_id, asyncio.Lock())
+
+
 @app.get("/ui-settings")
 async def get_ui_settings(user=Depends(require_user)):
     """Gemeinsame Oberflaechen-Einstellungen des Users (siehe UI_SETTING_KEYS)."""
@@ -1936,8 +1979,7 @@ async def put_ui_settings(body: dict, user=Depends(require_user)):
     Server nicht scheitert."""
     if not isinstance(body, dict):
         raise HTTPException(400, "JSON-Objekt erwartet.")
-    lock = _UI_SETTINGS_LOCKS.setdefault(user["id"], asyncio.Lock())
-    async with lock:
+    async with _settings_lock(user["id"]):
         return await _put_ui_settings_locked(body, user)
 
 
@@ -3009,7 +3051,8 @@ async def settings_import(body: SettingsImportRequest,
             updates[k] = str(v)
 
     if updates:
-        await db.kv_set_many(updates, scope=user_id)
+        async with _settings_lock(user_id):
+            await db.kv_set_many(updates, scope=user_id)
 
     log.info("Settings-Import von user=%s: %d KV-Updates", user_id, len(updates))
     return SettingsImportResponse(

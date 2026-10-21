@@ -83,3 +83,62 @@ class AusweichenTest(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(tts, "grok_available", return_value=False), \
              mock.patch.object(tts, "gemini_web_available", return_value=False):
             self.assertEqual(await server._resolve_provider_with_kv({"tts_provider": "grok"}), "edge_tts")
+
+
+class SicherheitsnetzTest(unittest.IsolatedAsyncioTestCase):
+    async def test_strict_gibt_bei_spaeterem_fehler_keinen_halben_stream(self):
+        aufrufe = {"n": 0}
+
+        def fake(text, voice, rate, provider):
+            aufrufe["n"] += 1
+            if aufrufe["n"] == 1:
+                return MP3
+            raise tts.TtsSessionExpiredError("weg")
+
+        lang = "Ein Satz, der lang genug ist. " * 40
+        with mock.patch.object(tts, "synthesize", side_effect=fake), \
+             mock.patch.object(tts, "MAX_CONCURRENT_TTS_REQUESTS", 1):
+            # Ohne strict: was raus ist, bleibt, der Stream endet sauber.
+            teile = [b async for b in tts.synthesize_chunked(lang, "grok-leo", 1.0, "grok", chunking_enabled=True)]
+            self.assertEqual(teile, [MP3])
+            aufrufe["n"] = 0
+            with self.assertRaises(tts.TtsSessionExpiredError):
+                [b async for b in tts.synthesize_chunked(lang, "grok-leo", 1.0, "grok",
+                                                         chunking_enabled=True, strict=True)]
+
+    async def test_abgelaufene_sitzung_markiert_dienst_als_weg(self):
+        with mock.patch.object(tts.httpx, "get", return_value=Antwort(200, payload={"ok": True})):
+            self.assertTrue(tts.grok_available(force=True))
+        tts.mark_unavailable("grok")
+        with mock.patch.object(tts.httpx, "get", side_effect=AssertionError("nicht erneut fragen")):
+            self.assertFalse(tts.grok_available())
+
+
+class EndpunktAusweichenTest(unittest.TestCase):
+    def test_grok_scheitert_beim_vorlesen_edge_springt_ein(self):
+        import asyncio
+        import uuid
+        from fastapi.testclient import TestClient
+        from pocket_claude import db, server
+        with TestClient(server.app) as c:
+            name = "Vorleser" + uuid.uuid4().hex[:6]
+            u = asyncio.run(db.create_user(name, "passwort-9", must_change_password=False))
+            tok = c.post("/auth/login", json={"username": name, "password": "passwort-9"}).json()["token"]
+            h = {"Authorization": f"Bearer {tok}"}
+            cid = asyncio.run(db.create_conversation("T", user_id=u["id"]))
+            mid = asyncio.run(db.add_message(cid, "assistant", "Hallo Welt."))
+
+            def fake(text, voice, rate, provider):
+                if provider == "grok":
+                    raise tts.TtsSessionExpiredError("abgelaufen")
+                return MP3
+
+            with mock.patch.object(tts, "grok_available", return_value=True), \
+                 mock.patch.object(tts, "gemini_web_available", return_value=False), \
+                 mock.patch.object(tts, "synthesize", side_effect=fake), \
+                 mock.patch.object(tts, "mark_unavailable") as weg:
+                r = c.get(f"/messages/{mid}/audio?voice=grok-leo&rate=1.0", headers=h)
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.content, MP3)
+            self.assertEqual(r.headers["x-pocket-claude-provider"], "edge_tts")
+            weg.assert_called_with("grok")

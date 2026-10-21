@@ -479,6 +479,18 @@ def _synthesize_grok(text: str, voice: str, speaking_rate: float) -> bytes:
     return audio
 
 
+def mark_unavailable(provider: str) -> None:
+    """Ein Dienst hat gerade eine abgelaufene Sitzung gemeldet: bis zur
+    naechsten Pruefung als nicht nutzbar fuehren, statt noch bis zu einer
+    Minute dem alten "ja" zu glauben."""
+    import time as _t
+    global _WEB_TTS_CACHE, _GROK_TTS_CACHE
+    if provider == PROVIDER_GROK:
+        _GROK_TTS_CACHE = (_t.monotonic(), False)
+    elif provider == PROVIDER_GEMINI_WEB:
+        _WEB_TTS_CACHE = (_t.monotonic(), False)
+
+
 def _max_chars_for(provider: str) -> int:
     if provider == PROVIDER_GEMINI_WEB:
         return GEMINI_WEB_MAX_CHARS
@@ -920,12 +932,17 @@ async def synthesize_chunked(
     provider: str = DEFAULT_PROVIDER,
     max_chunks: int | None = None,
     chunking_enabled: bool = False,
+    strict: bool = False,
 ) -> AsyncIterator[bytes]:
     """Liefert Audio-Bytes als Stream.
 
     Mit Stueckeln wird der Text geteilt, alle Teile laufen parallel, und die
     Bytes kommen in Reihenfolge. Das geht nur mit MP3 (Edge, Grok); bei
     Gemini Web ist es hart abgeschaltet.
+
+    Scheitert ein spaeteres Stueck, endet der Stream normalerweise nach dem,
+    was schon raus ist. Mit `strict=True` gibt es stattdessen den Fehler: die
+    Vorab-Erzeugung darf ein halbes Audio nicht als fertig zwischenspeichern.
     """
     if provider not in VALID_PROVIDERS:
         raise ValueError(f"Unbekannter TTS-Provider: {provider!r}")
@@ -997,7 +1014,7 @@ async def synthesize_chunked(
                 log.warning("TTS-Stream: Stueck %d/%d fehlgeschlagen (%s) — Ende bei %d Stuecken.",
                             i + 1, len(tasks), str(e)[:160], i)
                 await _cleanup(tasks[i + 1:])
-                if i == 0:
+                if i == 0 or strict:
                     raise
                 return
             yield audio_bytes
