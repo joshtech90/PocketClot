@@ -99,11 +99,12 @@ class SicherheitsnetzTest(unittest.IsolatedAsyncioTestCase):
         with mock.patch.object(tts, "synthesize", side_effect=fake), \
              mock.patch.object(tts, "MAX_CONCURRENT_TTS_REQUESTS", 1):
             # Ohne strict: was raus ist, bleibt, der Stream endet sauber.
-            teile = [b async for b in tts.synthesize_chunked(lang, "grok-leo", 1.0, "grok", chunking_enabled=True)]
+            # Eigenes Stueckeln gibt es nur noch fuer Edge (Grok teilt selbst).
+            teile = [b async for b in tts.synthesize_chunked(lang, "edge-de-DE-KatjaNeural", 1.0, "edge_tts", chunking_enabled=True)]
             self.assertEqual(teile, [MP3])
             aufrufe["n"] = 0
             with self.assertRaises(tts.TtsSessionExpiredError):
-                [b async for b in tts.synthesize_chunked(lang, "grok-leo", 1.0, "grok",
+                [b async for b in tts.synthesize_chunked(lang, "edge-de-DE-KatjaNeural", 1.0, "edge_tts",
                                                          chunking_enabled=True, strict=True)]
 
     async def test_abgelaufene_sitzung_markiert_dienst_als_weg(self):
@@ -128,17 +129,69 @@ class EndpunktAusweichenTest(unittest.TestCase):
             cid = asyncio.run(db.create_conversation("T", user_id=u["id"]))
             mid = asyncio.run(db.add_message(cid, "assistant", "Hallo Welt."))
 
-            def fake(text, voice, rate, provider):
-                if provider == "grok":
-                    raise tts.TtsSessionExpiredError("abgelaufen")
-                return MP3
+            async def grok_weg(*a, **k):
+                raise tts.TtsSessionExpiredError("abgelaufen")
+                yield b""  # noqa: unreachable - macht daraus einen Generator
 
             with mock.patch.object(tts, "grok_available", return_value=True), \
                  mock.patch.object(tts, "gemini_web_available", return_value=False), \
-                 mock.patch.object(tts, "synthesize", side_effect=fake), \
+                 mock.patch.object(tts, "_stream_grok", grok_weg), \
+                 mock.patch.object(tts, "synthesize", return_value=MP3), \
                  mock.patch.object(tts, "mark_unavailable") as weg:
                 r = c.get(f"/messages/{mid}/audio?voice=grok-leo&rate=1.0", headers=h)
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r.content, MP3)
             self.assertEqual(r.headers["x-pocket-claude-provider"], "edge_tts")
             weg.assert_called_with("grok")
+
+
+class StreamTest(unittest.IsolatedAsyncioTestCase):
+    """Grok-Audio wird durchgereicht, sobald es ankommt."""
+
+    def _client(self, handler):
+        echt = tts.httpx.AsyncClient
+        return mock.patch.object(tts.httpx, "AsyncClient",
+                                 lambda **kw: echt(transport=tts.httpx.MockTransport(handler), **kw))
+
+    async def test_stuecke_kommen_einzeln_und_mit_stream_true(self):
+        gesehen = {}
+
+        class Teile(tts.httpx.AsyncByteStream):
+            async def __aiter__(self):
+                for t in (MP3[:10], MP3[10:], b"weiter"):
+                    yield t
+
+        def handler(request):
+            import json as _j
+            gesehen["body"] = _j.loads(request.content)
+            return tts.httpx.Response(200, stream=Teile())
+
+        with self._client(handler):
+            teile = [t async for t in tts.synthesize_chunked("Hallo Welt", "grok-eve", 1.25, "grok")]
+        self.assertEqual(b"".join(teile), MP3 + b"weiter")
+        self.assertTrue(gesehen["body"]["stream"])
+        self.assertEqual(gesehen["body"]["voice"], "eve")
+        self.assertEqual(gesehen["body"]["speed"], 1.25)
+
+    async def test_503_heisst_sitzung_weg(self):
+        with self._client(lambda r: tts.httpx.Response(503, json={"error": "session_expired"})):
+            with self.assertRaises(tts.TtsSessionExpiredError):
+                [t async for t in tts.synthesize_chunked("Hallo", "grok-leo", 1.0, "grok")]
+
+    async def test_abbruch_mittendrin_ist_fehler_nicht_ende(self):
+        class Abbruch(tts.httpx.AsyncByteStream):
+            async def __aiter__(self):
+                yield MP3
+                raise tts.httpx.RemoteProtocolError("Verbindung ohne Schlussstueck beendet")
+
+        with self._client(lambda r: tts.httpx.Response(200, stream=Abbruch())):
+            teile = []
+            with self.assertRaises(tts.TtsTransientError):
+                async for t in tts.synthesize_chunked("Hallo", "grok-leo", 1.0, "grok"):
+                    teile.append(t)
+        self.assertEqual(teile, [MP3])
+
+    async def test_kein_mp3_wird_abgewiesen(self):
+        with self._client(lambda r: tts.httpx.Response(200, content=b'{"ok":false}')):
+            with self.assertRaises(tts.TtsTransientError):
+                [t async for t in tts.synthesize_chunked("Hallo", "grok-leo", 1.0, "grok")]

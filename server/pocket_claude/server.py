@@ -1219,7 +1219,10 @@ async def _resolve_provider_with_kv(kv: dict) -> str:
 
 
 def _resolve_chunking_from_kv(kv: dict, provider: str) -> bool:
-    """"1" an, "0" aus, sonst die Vorgabe des Anbieters."""
+    """"1" an, "0" aus, sonst die Vorgabe des Anbieters. Grok teilt selbst und
+    Gemini Web kann es nicht: dort ist es immer aus."""
+    if provider in (tts.PROVIDER_GROK, tts.PROVIDER_GEMINI_WEB):
+        return False
     raw = (kv.get(_KV_TTS_CHUNKING_ENABLED) or "").strip()
     if raw == "1":
         return True

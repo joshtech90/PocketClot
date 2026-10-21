@@ -1668,36 +1668,9 @@ private fun TtsSection(
             }
             PocketStatusLine(text = hint.first, kind = hint.second)
 
-            // Stueckeln nur bei Grok: Edge stueckelt intern selbst, und das Ogg
-            // von Gemini Web laesst sich gar nicht aneinanderhaengen.
-            if (isGrok) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                val chunkOn = ttsStatus?.chunkingEnabled ?: false
-                val chunkingExplicit = ttsStatus?.chunkingExplicit ?: false
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_label),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Text(
-                            stringResource(de.smartzone.pocketclaude.R.string.settings_tts_chunking_info_intro),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = chunkOn,
-                        onCheckedChange = { v -> vm.setTtsChunking(v) },
-                        enabled = !ttsBusy,
-                    )
-                }
-                if (chunkingExplicit) {
-                    TextButton(onClick = { vm.setTtsChunking(null) }, enabled = !ttsBusy) {
-                        Text(stringResource(de.smartzone.pocketclaude.R.string.settings_tts_back_to_default))
-                    }
-                }
-            }
+            // Kein Schalter fuers Stueckeln mehr: Grok teilt lange Texte selbst
+            // und streamt (erstes Audio nach rund 0,5 s), Edge stueckelt intern,
+            // und das Ogg von Gemini Web laesst sich nicht aneinanderhaengen.
         }
 
         if (!settings.isConfigured) {

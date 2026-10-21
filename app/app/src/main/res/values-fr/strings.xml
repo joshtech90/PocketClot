@@ -518,9 +518,6 @@
     <string name="settings_tts_voice_web_fixed">Gemini Web a exactement une voix. L\'appel de lecture de Google ne comporte tout simplement aucun paramètre pour cela.</string>
     <string name="settings_tts_provider_edge_label">Microsoft Edge (sans connexion) :</string>
     <string name="settings_tts_provider_edge_body">Voix de lecture à voix haute de Microsoft Edge. Gratuit et sans connexion, mais le rendu est plus mécanique que Grok et Gemini.</string>
-    <string name="settings_tts_chunking_label">Segmentation (synthèse audio parallèle)</string>
-    <string name="settings_tts_chunking_info_intro">Les longues réponses sont divisées en segments et envoyées en parallèle à l\'API TTS. L\'audio démarre plus vite car le premier segment est lu pendant que les autres sont encore en cours de synthèse.</string>
-    <string name="settings_tts_back_to_default">Revenir à la valeur auto par défaut</string>
     <string name="settings_tts_status_edge_active">Edge actif : gratuit, sans connexion, voix Microsoft.</string>
     <string name="settings_tts_need_server_config">Veuillez d\'abord enregistrer l\'URL du serveur et le jeton, puis vous pourrez téléverser le JSON TTS.</string>
     <string name="settings_voice_label">Voix</string>

@@ -518,9 +518,6 @@
     <string name="settings_tts_voice_web_fixed">Gemini Web の音声は1種類のみです。Google の読み上げ呼び出しには、そのためのパラメーターが存在しません。</string>
     <string name="settings_tts_provider_edge_label">Microsoft Edge（ログイン不要）:</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edge の読み上げ音声。無料かつログイン不要ですが、Grok や Gemini よりも機械的に聞こえます。</string>
-    <string name="settings_tts_chunking_label">チャンク化（並列音声合成）</string>
-    <string name="settings_tts_chunking_info_intro">長い返信はチャンクに分割され、並列でTTS APIに送信されます。最初のチャンクが他のチャンクが合成中の間に再生されるため、音声開始が高速になります。</string>
-    <string name="settings_tts_back_to_default">自動デフォルトに戻す</string>
     <string name="settings_tts_status_edge_active">Edge 有効：無料、ログイン不要、Microsoft の音声。</string>
     <string name="settings_tts_need_server_config">まずサーバーURLとトークンを保存してから、TTSのJSONをアップロードできます。</string>
     <string name="settings_voice_label">音声</string>

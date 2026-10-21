@@ -60,7 +60,9 @@ GROK_TTS_URL = os.environ.get("GROK_TTS_URL", "http://127.0.0.1:8812").rstrip("/
 # Die Dienste deckeln selbst (Gemini 20.000, Grok 10.000 Zeichen); hier etwas
 # darunter bleiben, damit die Kuerzung bei uns passiert und nicht dort scheitert.
 GEMINI_WEB_MAX_CHARS = 18000
-GROK_MAX_CHARS = 9500
+# Der Grok-Dienst teilt lange Texte selbst in Abschnitte (6 parallel) und
+# streamt; er nimmt bis zu 20.000 Zeichen.
+GROK_MAX_CHARS = 19000
 
 # Vorgabe, wenn ein Nutzer nichts gewaehlt hat und der Server nicht nachsehen
 # kann, was laeuft. Die eigentliche Auswahl macht server._resolve_provider_with_kv.
@@ -165,8 +167,8 @@ def chunking_default_for(provider: str | None) -> bool:
     """Stueckeln ist bei allen drei Anbietern standardmaessig aus.
 
     - edge_tts: eine WebSocket-Sitzung pro Aufruf, Stueckeln bringt nichts.
-    - grok: ein Aufruf schafft bis zu 10.000 Zeichen, und die Stimme soll
-      ueber die ganze Antwort gleich klingen.
+    - grok: der Dienst teilt lange Texte selbst (an Absaetzen, nie mitten im
+      Satz) und streamt; ein zweites Stueckeln hier waere nur langsamer.
     - gemini_web: Pflicht, nicht Abwaegung. Ogg-Stroeme lassen sich nicht
       aneinanderhaengen; gestueckelt kaeme nur der erste Teil an.
     """
@@ -441,16 +443,74 @@ def grok_available(force: bool = False) -> bool:
     return ok
 
 
-def _synthesize_grok(text: str, voice: str, speaking_rate: float) -> bytes:
-    """Synthese ueber den lokalen Grok-Dienst. MP3, das Tempo rechnet der
-    Dienst ein (deshalb gehoert es bei Grok in den Cache-Schluessel)."""
-    api_voice = _normalize_voice_for_grok(voice)
+def _grok_body(text: str, voice: str, speaking_rate: float, stream: bool) -> dict:
     speed = min(max(speaking_rate, GROK_MIN_SPEED), MAX_SPEED)
-    log.info("grok-tts: synthesizing %d chars voice=%s speed=%.2f", len(text), api_voice, speed)
+    return {"text": text, "voice": _normalize_voice_for_grok(voice), "lang": "de",
+            "speed": speed, "format": "mp3", "stream": stream}
+
+
+def _looks_like_mp3(head: bytes) -> bool:
+    return head.startswith(b"ID3") or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0)
+
+
+async def _stream_grok(text: str, voice: str, speaking_rate: float) -> AsyncIterator[bytes]:
+    """Reicht das MP3 des Grok-Dienstes Stueck fuer Stueck durch, sobald es
+    ankommt: das erste Audio ist nach rund einer halben Sekunde da, egal wie
+    lang der Text ist (gemessen auf Paradies: 5.220 Zeichen, erstes Audio nach
+    0,6 s, fertig nach 7 s; gepuffert waren es bei 2.476 Zeichen 13 s Stille).
+
+    Fehler vor dem ersten Byte kommen mit Status (503 = Sitzung weg). Bricht
+    der Dienst danach ab, fehlt das Schlussstueck der Uebertragung; httpx meldet
+    das, und daraus wird ein TtsTransientError, damit niemand ein halbes Audio
+    fuer fertig haelt.
+    """
+    body = _grok_body(text, voice, speaking_rate, stream=True)
+    log.info("grok-tts: streaming %d chars voice=%s speed=%.2f", len(text), body["voice"], body["speed"])
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=5.0)) as client:
+            async with client.stream("POST", f"{GROK_TTS_URL}/tts", json=body) as resp:
+                if resp.status_code == 503:
+                    await resp.aread()
+                    raise TtsSessionExpiredError(
+                        "Die Grok-Sitzung des Vorlese-Dienstes fehlt oder ist abgelaufen. "
+                        "Auf dem Server neu anmelden: ~/grok-tts/README.md")
+                if resp.status_code != 200:
+                    kurz = (await resp.aread())[:200].decode("utf-8", "replace").replace("\n", " ")
+                    raise TtsTransientError(
+                        api_key="", message=f"Grok-Vorlesedienst antwortete mit HTTP {resp.status_code}: {kurz}",
+                        kind="5xx")
+                kopf = b""
+                async for teil in resp.aiter_bytes():
+                    if not teil:
+                        continue
+                    if kopf is not None:
+                        kopf += teil
+                        if len(kopf) < 3:
+                            continue
+                        if not _looks_like_mp3(kopf):
+                            raise TtsTransientError(
+                                api_key="", message=f"Grok-Vorlesedienst lieferte kein MP3 ({len(kopf)} Bytes)",
+                                kind="5xx")
+                        teil, kopf = kopf, None
+                    yield teil
+                if kopf:   # sehr kurzer Rest, der nie die Pruefgroesse erreichte
+                    yield kopf
+    except httpx.HTTPError as exc:
+        raise TtsTransientError(
+            api_key="", message=f"Grok-Vorlesedienst abgebrochen ({GROK_TTS_URL}): {exc}", kind="5xx",
+        ) from exc
+
+
+def _synthesize_grok(text: str, voice: str, speaking_rate: float) -> bytes:
+    """Synthese ueber den lokalen Grok-Dienst als fertige Datei. MP3, das Tempo
+    rechnet der Dienst ein (deshalb gehoert es bei Grok in den Cache-Schluessel).
+    Fuers Vorlesen im Chat wird stattdessen `_stream_grok` benutzt."""
+    body = _grok_body(text, voice, speaking_rate, stream=False)
+    log.info("grok-tts: synthesizing %d chars voice=%s speed=%.2f", len(text), body["voice"], body["speed"])
     try:
         resp = httpx.post(
             f"{GROK_TTS_URL}/tts",
-            json={"text": text, "voice": api_voice, "lang": "de", "speed": speed, "format": "mp3"},
+            json=body,
             timeout=httpx.Timeout(120.0, connect=5.0),
         )
     except httpx.RequestError as exc:
@@ -472,7 +532,7 @@ def _synthesize_grok(text: str, voice: str, speaking_rate: float) -> bytes:
     audio = resp.content
     # MP3 beginnt mit einem ID3-Kopf oder direkt mit einem Frame (0xFFE…).
     # Eine JSON-Fehlermeldung mit 200 waere sonst eine stumme Wiedergabe.
-    if not (audio.startswith(b"ID3") or (len(audio) > 1 and audio[0] == 0xFF and audio[1] & 0xE0 == 0xE0)):
+    if not _looks_like_mp3(audio):
         raise TtsTransientError(
             api_key="", message=f"Grok-Vorlesedienst lieferte kein MP3 ({len(audio)} Bytes)", kind="5xx",
         )
@@ -953,6 +1013,25 @@ async def synthesize_chunked(
     if len(cleaned) > MAX_TOTAL_CHARS:
         cleaned = cleaned[:MAX_TOTAL_CHARS] + " … Rest gekürzt."
         log.warning("TTS-Stream: Text auf %d chars gekappt (Sicherheitsgrenze)", MAX_TOTAL_CHARS)
+
+    # Grok streamt und teilt selbst: Bytes durchreichen, sobald sie da sind.
+    # Ein Neuversuch nur, solange noch nichts geliefert ist.
+    if provider == PROVIDER_GROK:
+        if len(cleaned) > GROK_MAX_CHARS:
+            cleaned = cleaned[:GROK_MAX_CHARS] + " … Rest gekürzt."
+        rate = _clamp_speed(speaking_rate)
+        for attempt in range(2):
+            geliefert = False
+            try:
+                async for teil in _stream_grok(cleaned, voice, rate):
+                    geliefert = True
+                    yield teil
+                return
+            except TtsTransientError as e:
+                if geliefert or attempt == 1:
+                    raise
+                log.warning("Grok-Stream transient vor dem ersten Byte: %s — neuer Versuch", str(e)[:120])
+                await asyncio.sleep(0.5)
 
     # Ogg-Stroeme lassen sich nicht aneinanderhaengen: harte Sperre, keine
     # Voreinstellung, sonst erzeugt ein von Hand eingeschalteter Schalter

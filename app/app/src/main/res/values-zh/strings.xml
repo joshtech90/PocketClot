@@ -518,9 +518,6 @@
     <string name="settings_tts_voice_web_fixed">Gemini Web 只有一种声音。Google 的朗读调用根本没有提供相关参数。</string>
     <string name="settings_tts_provider_edge_label">Microsoft Edge（无需登录）:</string>
     <string name="settings_tts_provider_edge_body">Microsoft Edge 的朗读声音。免费且无需登录，但听起来比 Grok 和 Gemini 更生硬。</string>
-    <string name="settings_tts_chunking_label">分块(并行音频合成)</string>
-    <string name="settings_tts_chunking_info_intro">长回复会被拆分为多个块,并并行发送到 TTS API。音频开始更快,因为第一块在其他块仍在合成时就已经播放。</string>
-    <string name="settings_tts_back_to_default">回到自动默认</string>
     <string name="settings_tts_status_edge_active">Edge 已激活：免费，无需登录，Microsoft 声音。</string>
     <string name="settings_tts_need_server_config">请先保存服务器地址和令牌,然后才能上传 TTS JSON。</string>
     <string name="settings_voice_label">语音</string>

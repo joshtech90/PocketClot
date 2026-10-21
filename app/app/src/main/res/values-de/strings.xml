@@ -521,9 +521,6 @@
     <string name="settings_tts_voice_web_fixed">Gemini Web hat genau eine Stimme. Der Vorlese-Aufruf von Google kennt dafür schlicht keinen Parameter.</string>
     <string name="settings_tts_provider_edge_label">Microsoft Edge (ohne Anmeldung):</string>
     <string name="settings_tts_provider_edge_body">Vorlese-Stimmen von Microsoft Edge. Kostenlos und ohne Anmeldung, klingt aber mechanischer als Grok und Gemini.</string>
-    <string name="settings_tts_chunking_label">Chunking (parallele Audio-Synthese)</string>
-    <string name="settings_tts_chunking_info_intro">Lange Antworten werden in Chunks geteilt und parallel an die TTS-API geschickt. Audio startet schneller, weil der erste Chunk abgespielt wird, während die anderen noch synthetisiert werden.</string>
-    <string name="settings_tts_back_to_default">Zurück zum Auto-Default</string>
     <string name="settings_tts_status_edge_active">Edge aktiv: kostenlos, ohne Anmeldung, Microsoft-Stimmen.</string>
     <string name="settings_tts_need_server_config">Bitte zuerst Server-URL und Token speichern, dann kannst du die TTS-JSON hochladen.</string>
     <string name="settings_voice_label">Stimme</string>

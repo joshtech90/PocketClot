@@ -297,8 +297,9 @@
     ttsSpeed.value = state.ttsSpeed;
     ttsSpeedLabel.textContent = state.ttsSpeed.toFixed(2) + '×';
     autoSpeakBox.checked = state.autoSpeak;
-    // Stueckeln geht nur mit MP3 (Grok, Edge), nie mit dem Ogg von Gemini Web.
-    $('tts-chunking-row').classList.toggle('hidden', chosenProvider(s) === 'gemini_web');
+    // Stueckeln nur bei Edge: Grok teilt und streamt selbst, und das Ogg von
+    // Gemini Web laesst sich gar nicht aneinanderhaengen.
+    $('tts-chunking-row').classList.toggle('hidden', chosenProvider(s) !== 'edge_tts');
     chunkBox.checked = !!s.chunking_enabled;
   }
   async function loadTts() {

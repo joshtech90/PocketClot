@@ -521,9 +521,6 @@
     <string name="settings_tts_voice_web_fixed">Gemini Web has exactly one voice. Google\'s read-aloud call simply has no parameter for it.</string>
     <string name="settings_tts_provider_edge_label">Microsoft Edge (no login required):</string>
     <string name="settings_tts_provider_edge_body">Read-aloud voices from Microsoft Edge. Free and no login required, but sounds more mechanical than Grok and Gemini.</string>
-    <string name="settings_tts_chunking_label">Chunking (parallel audio synthesis)</string>
-    <string name="settings_tts_chunking_info_intro">Long replies are split into chunks and sent to the TTS API in parallel. Audio starts faster because the first chunk plays while the others are still being synthesized.</string>
-    <string name="settings_tts_back_to_default">Back to auto-default</string>
     <string name="settings_tts_status_edge_active">Edge active: free, no login required, Microsoft voices.</string>
     <string name="settings_tts_need_server_config">Please save the server URL and token first, then you can upload the TTS JSON.</string>
     <string name="settings_voice_label">Voice</string>
