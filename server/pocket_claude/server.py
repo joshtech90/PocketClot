@@ -1026,22 +1026,11 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
         # mitgeschickt hat, synthetisieren wir die Antwort jetzt im
         # Hintergrund — der nächste Vorlesen-Tap ist dann Cache-Hit.
         if assistant_msg_id and body.tts_voice:
-            # Provider + Key des Users ermitteln. Nur pre-generieren wenn
-            # der gewählte Provider auch wirklich einsatzbereit ist.
-            provider, api_key, model_id, chunking_enabled = (
-                await _resolve_tts_provider_model_and_key(user["id"])
-            )
-            # Wenn Cloud-TTS gerade als „nicht nutzbar" markiert ist (jüngster
-            # BILLING_DISABLED o.ä.), nicht pre-generieren — würde nur Logs
-            # spammen und ist eh garantiert Cache-Miss beim Tap.
-            cloud_tts_blocked = (
-                provider == tts.PROVIDER_CLOUD_TTS and
-                _time.monotonic() < _CLOUD_TTS_UNAVAILABLE_UNTIL
-            )
-            ready = (not cloud_tts_blocked) and (
-                (provider == tts.PROVIDER_CLOUD_TTS and tts.is_configured()) or
-                (provider == tts.PROVIDER_GEMINI_API and bool(api_key)) or
-                (provider == tts.PROVIDER_EDGE_TTS)
+            # Nur fuer Grok und Edge: Gemini Web ist so schnell, dass sich das
+            # Vorab-Erzeugen nicht lohnt. Grok nur, wenn der Dienst angemeldet ist.
+            provider, chunking_enabled = await _resolve_tts_provider(user["id"])
+            ready = provider == tts.PROVIDER_EDGE_TTS or (
+                provider == tts.PROVIDER_GROK and await _asyncio_to_thread(tts.grok_available)
             )
             if ready:
                 import asyncio as _asyncio
@@ -1050,13 +1039,15 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
                     body.tts_voice,
                     body.tts_rate or tts.DEFAULT_SPEED,
                     provider,
-                    api_key,
-                    user_id=user["id"],
-                    model_id=model_id,
                     chunking_enabled=chunking_enabled,
                 ))
 
     return EventSourceResponse(event_gen())
+
+
+async def _asyncio_to_thread(fn, *args):
+    import asyncio as _asyncio
+    return await _asyncio.to_thread(fn, *args)
 
 
 async def _pregen_tts(
@@ -1064,18 +1055,11 @@ async def _pregen_tts(
     voice: str,
     rate: float,
     provider: str,
-    api_key: str | None,
-    user_id: str | None = None,
-    model_id: str | None = None,
-    chunking_enabled: bool = True,
+    chunking_enabled: bool = False,
 ) -> None:
-    """Generiert die Audio für eine fertige Assistant-Message im Hintergrund
-    und legt sie in den TTS-Cache. Fehler werden geloggt, nicht propagiert
-    (der User merkt nichts — er bekommt höchstens Cache-Miss beim Tap).
-
-    Wenn `user_id` und Provider=gemini_api: lädt den Multi-Key-Pool und
-    nutzt Round-Robin + Rate-Limiter über alle Keys.
-    """
+    """Erzeugt das Audio einer fertigen Antwort im Hintergrund und legt es in
+    den Zwischenspeicher. Fehler werden nur geloggt: schlimmstenfalls wird
+    beim Antippen frisch erzeugt."""
     try:
         from pocket_claude.db import get_db
         async with get_db() as conn:
@@ -1085,34 +1069,14 @@ async def _pregen_tts(
             row = await cur.fetchone()
         if not row or not row["content"]:
             return
-        # Multi-Key-Pool für Gemini-API + Pool-aware max_chunks
-        picker = None
-        max_chunks: int | None = None
-        if provider == tts.PROVIDER_GEMINI_API and user_id:
-            pool = await _load_tts_api_keys(user_id)
-            pool_size = len(pool)
-            if pool_size > 1:
-                pool_keys = [e["key"] for e in pool]
-                async def picker() -> str | None:  # type: ignore[no-redef]
-                    return await acquire_tts_key_for_call(pool_keys)
-            effective_pool = max(1, pool_size)
-            max_chunks = effective_pool * MAX_REQUESTS_PER_KEY_PER_MINUTE
         import io as _io
         buf = _io.BytesIO()
         async for chunk_bytes in tts.synthesize_chunked(
-            row["content"], voice, rate, provider, api_key,
-            key_picker=picker,
-            max_chunks=max_chunks,
-            user_id=user_id,
-            model_id=model_id,
+            row["content"], voice, rate, provider,
             chunking_enabled=chunking_enabled,
         ):
             buf.write(chunk_bytes)
         audio = buf.getvalue()
-        # Für gemini_api: WAV-Header von fake-length auf echte Länge fixen,
-        # damit das gecachte File eine korrekte Dauer anzeigt.
-        if provider == tts.PROVIDER_GEMINI_API:
-            audio = tts.fix_wav_header_length(audio)
         media_type = tts.media_type_for(provider)
         await tts_cache.put(message_id, voice, rate, provider, audio, media_type)
         log.info(
