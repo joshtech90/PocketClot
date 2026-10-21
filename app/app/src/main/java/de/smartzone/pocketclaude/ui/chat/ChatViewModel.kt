@@ -351,10 +351,21 @@ class ChatViewModel(
         cachedSettings?.effortFor(family) ?: DEFAULT_EFFORT
 
     fun setEffort(family: String, effort: String) = viewModelScope.launch {
-        if (_state.value.chatEffort != null) {
+        val before = _state.value.chatEffort
+        if (before != null) {
             _state.update { it.copy(chatEffort = effort) }
+            // Der Server rechnet mit der Denktiefe am Chat. Klappt das Speichern
+            // nicht, gilt weiter die alte, und die Anzeige muss das auch sagen.
             runCatching { repo.setChatEffort(cid, effort) }
-                .onFailure { Log.w("PC_NET", "chat effort not saved: ${it::class.java.simpleName}") }
+                .onFailure { e ->
+                    Log.w("PC_NET", "chat effort not saved: ${e::class.java.simpleName}")
+                    _state.update {
+                        if (it.chatEffort == effort) it.copy(
+                            chatEffort = before,
+                            errorMessage = e.message ?: e::class.java.simpleName,
+                        ) else it
+                    }
+                }
             return@launch
         }
         settingsRepo.setEffortForFamily(family, effort)
@@ -451,34 +462,18 @@ class ChatViewModel(
                 locked = detail.locked,
                 gemId = detail.gemId,
                 // Der Server ist die Quelle für „was lief zuletzt in diesem
-                // Chat". Nur wenn er nichts weiß, greift die Vorgabe des Gems
-                // und danach die globale Wahl.
-                modelKey = detail.chatModel?.takeIf { m -> m.isNotBlank() }
-                    ?: gemDefaults(detail.gemId)?.first
-                    ?: it.modelKey,
-                chatEffort = detail.chatEffort?.takeIf { e -> e.isNotBlank() }
-                    ?: gemDefaults(detail.gemId)?.second,
+                // Chat" (bei Gem-Chats: Vorgabe des Gems, bis man umstellt).
+                // Nur wenn er nichts weiß, greift die globale Wahl.
+                modelKey = detail.chatModel?.takeIf { m -> m.isNotBlank() } ?: it.modelKey,
+                chatEffort = detail.chatEffort?.takeIf { e -> e.isNotBlank() },
             )
         }
-        detailHadModel = !detail.chatModel.isNullOrBlank()
-        detailHadEffort = !detail.chatEffort.isNullOrBlank()
         loadGemMeta(detail.gemId)
     }
 
     // Zuletzt geladenes Gem — verhindert Refetch bei jedem refresh() (die gem_id
     // eines Chats ändert sich nie).
     private var lastGemMetaId: String? = null
-
-    // Modell und Denktiefe des Gems. Neue Gem-Chats bekommen beides vom Server
-    // schon mitgegeben; Gem-Chats von vorher rechnet der Server noch mit der
-    // Vorgabe des Gems, und die Anzeige soll dasselbe zeigen.
-    private var lastGemModel: String? = null
-    private var lastGemEffort: String? = null
-    private var detailHadModel = false
-    private var detailHadEffort = false
-
-    private fun gemDefaults(gemId: String?): Pair<String?, String?>? =
-        if (gemId != null && gemId == lastGemMetaId) lastGemModel to lastGemEffort else null
 
     /** Lädt Emoji/Name/Beschreibung/Starter des gebundenen Gems (Header + leerer Chat). */
     private fun loadGemMeta(gemId: String?) {
@@ -494,16 +489,12 @@ class ChatViewModel(
         viewModelScope.launch {
             runCatching { repo.getGem(gemId) }
                 .onSuccess { g ->
-                    lastGemModel = g.model?.takeIf { it.isNotBlank() }
-                    lastGemEffort = g.effort?.takeIf { it.isNotBlank() }
                     _state.update {
                         it.copy(
                             gemEmoji = g.emoji,
                             gemName = g.name,
                             gemDescription = g.description,
                             gemStarters = g.conversationStarters,
-                            modelKey = if (!detailHadModel && lastGemModel != null) lastGemModel!! else it.modelKey,
-                            chatEffort = if (!detailHadEffort && lastGemEffort != null) lastGemEffort else it.chatEffort,
                         )
                     }
                 }

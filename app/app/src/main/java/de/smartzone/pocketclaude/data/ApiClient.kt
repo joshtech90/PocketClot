@@ -193,8 +193,10 @@ class ApiClient(
     suspend fun getUiSettings(): UiSettingsDto = get("/ui-settings")
 
     /** Teil-Update: nur die mitgeschickten Schluessel aendern sich. */
-    suspend fun putUiSettings(values: Map<String, String>) {
-        putJson<Map<String, String>, kotlinx.serialization.json.JsonObject>("/ui-settings", values)
+    suspend fun putUiSettings(values: Map<String, kotlinx.serialization.json.JsonElement>) {
+        putJson<kotlinx.serialization.json.JsonObject, kotlinx.serialization.json.JsonObject>(
+            "/ui-settings", kotlinx.serialization.json.JsonObject(values),
+        )
     }
 
     // ---------- Claude auth mode (Pro/Max | API key | Bedrock) ----------

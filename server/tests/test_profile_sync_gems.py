@@ -3,6 +3,7 @@ Startwerte von Gems (Modell und Denktiefe) ueber die echte FastAPI-App."""
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import tempfile
 import uuid
@@ -125,3 +126,38 @@ def test_gem_seeds_chat_model_and_effort(ctx):
     # Gem ohne Vorgaben legt nichts fest
     plain = c.post("/conversations", headers=h, json={"gem_id": _gem(c, h)}).json()
     assert plain["chat_model"] is None and plain["chat_effort"] is None
+
+
+def test_ui_settings_map_entries_merge(ctx):
+    c, h = ctx["client"], ctx["user_h"]
+    c.put("/ui-settings", headers=h, json={"effortByFamily": '{"claude":"high","gemini":"high"}'})
+    # Ein Geraet aendert nur Gemini, ein anderes nur Claude: beide bleiben.
+    c.put("/ui-settings", headers=h, json={"effortByFamily": {"gemini": "low"}})
+    c.put("/ui-settings", headers=h, json={"effortByFamily": {"claude": "max"}})
+    got = c.get("/ui-settings", headers=h).json()["settings"]["effortByFamily"]
+    assert json.loads(got) == {"claude": "max", "gemini": "low"}
+    # null entfernt einen Eintrag
+    c.put("/ui-settings", headers=h, json={"autoSpeakByChat": {"c1": True, "c2": False}})
+    c.put("/ui-settings", headers=h, json={"autoSpeakByChat": {"c1": None}})
+    got = c.get("/ui-settings", headers=h).json()["settings"]["autoSpeakByChat"]
+    assert json.loads(got) == {"c2": False}
+    # Objekte nur fuer die Listen-Schluessel
+    assert c.put("/ui-settings", headers=h, json={"theme": {"x": 1}}).status_code == 400
+
+
+def test_migration_pins_existing_gem_chats(ctx):
+    c, h, uid = ctx["client"], ctx["user_h"], ctx["user"]["id"]
+    gid = _gem(c, h, model="sonnet", effort="medium")
+    old = asyncio.run(db.create_conversation("Alt", user_id=uid, gem_id=gid))
+
+    async def downgrade_and_migrate():
+        # Zustand vor dem Update: keine Spalte chat_effort, kein Modell am Chat
+        async with db.get_db() as conn:
+            await conn.execute("UPDATE conversations SET chat_model = NULL WHERE id = ?", (old,))
+            await conn.execute("ALTER TABLE conversations DROP COLUMN chat_effort")
+            await conn.commit()
+        await db.init_db()
+
+    asyncio.run(downgrade_and_migrate())
+    detail = c.get(f"/conversations/{old}", headers=h).json()
+    assert detail["chat_model"] == "sonnet" and detail["chat_effort"] == "medium"

@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Haelt die Oberflaechen-Einstellungen der App mit dem Server abgleich, damit
@@ -18,8 +21,10 @@ import kotlinx.coroutines.sync.withLock
  *   den Vordergrund kommt (hoechstens alle 30 s).
  * - Senden: jede Aenderung in der App, kurz gesammelt.
  *
- * Bei gleichzeitigen Aenderungen gewinnt die zuletzt gesendete, je Schluessel.
- * Ohne Netz bleibt alles lokal; Ausstehendes geht beim naechsten Versuch raus.
+ * Bei gleichzeitigen Aenderungen gewinnt die zuletzt gesendete, je Schluessel
+ * bzw. je Eintrag der Listen pro Familie und Chat. Ohne Netz bleibt alles
+ * lokal; Ausstehendes geht beim naechsten Versuch raus und wird bis dahin von
+ * keinem Abgleich ueberschrieben.
  */
 class SettingsSync(
     private val settings: SettingsRepository,
@@ -27,13 +32,19 @@ class SettingsSync(
     private val scope: CoroutineScope,
 ) {
     private val mutex = Mutex()
-    private val pending = mutableMapOf<String, String>()
+
+    // Noch nicht bestaetigte Aenderungen, immer fuer genau EIN Profil. Wechselt
+    // das Profil, wird verworfen statt sie ins falsche Konto zu schicken.
+    private val lock = Any()
+    private var pendingProfile: String? = null
+    private val pending = mutableMapOf<String, JsonElement>()
+
     private var pushJob: Job? = null
     private var lastPullAt = 0L
 
     init {
-        settings.onLocalChange = { changed ->
-            synchronized(pending) { pending.putAll(changed) }
+        settings.onLocalChange = { profileId, changed ->
+            addPending(profileId, changed, newerWins = true)
             schedulePush()
         }
         // Login und Profilwechsel: die Einstellungen gehoeren zum Konto.
@@ -50,6 +61,24 @@ class SettingsSync(
         scope.launch { pull(force = false) }
     }
 
+    /** `newerWins = false`: nur nachtragen, eine neuere Aenderung bleibt. */
+    private fun addPending(profileId: String, changed: Map<String, JsonElement>, newerWins: Boolean) =
+        synchronized(lock) {
+            if (pendingProfile != profileId) {
+                pending.clear()
+                pendingProfile = profileId
+            }
+            for ((key, value) in changed) {
+                val old = pending[key]
+                pending[key] = when {
+                    old is JsonObject && value is JsonObject ->
+                        JsonObject(if (newerWins) old + value else value + old)
+                    old == null || newerWins -> value
+                    else -> old
+                }
+            }
+        }
+
     private fun schedulePush() {
         pushJob?.cancel()
         pushJob = scope.launch {
@@ -59,13 +88,19 @@ class SettingsSync(
     }
 
     private suspend fun push() = mutex.withLock {
-        val batch = synchronized(pending) { pending.toMap().also { pending.clear() } }
-        if (batch.isEmpty() || !settings.current().isConfigured) return@withLock
+        val active = settings.current()
+        val (profile, batch) = synchronized(lock) {
+            (pendingProfile to pending.toMap()).also { pending.clear() }
+        }
+        if (batch.isEmpty() || profile == null) return@withLock
+        if (profile != active.activeProfileId || !active.isConfigured) {
+            Log.i("PC_NET", "ui-settings: ${batch.size} changes of an inactive profile dropped")
+            return@withLock
+        }
         runCatching { api.putUiSettings(batch) }
             .onFailure { e ->
                 Log.w("PC_NET", "ui-settings push failed: ${e::class.java.simpleName}")
-                // Neuere Aenderungen derselben Schluessel nicht ueberschreiben.
-                synchronized(pending) { batch.forEach { (k, v) -> pending.putIfAbsent(k, v) } }
+                addPending(profile, batch, newerWins = false)
             }
     }
 
@@ -74,8 +109,7 @@ class SettingsSync(
         if (!force && now - lastPullAt < 30_000) return
         val current = settings.current()
         if (!current.isConfigured) return
-        // Erst eigene, noch nicht gesendete Aenderungen raus, sonst holt der
-        // Abgleich den alten Server-Wert zurueck.
+        // Erst eigene, noch nicht gesendete Aenderungen raus.
         pushJob?.cancel()
         push()
         mutex.withLock {
@@ -83,12 +117,23 @@ class SettingsSync(
                 .onFailure { Log.w("PC_NET", "ui-settings pull failed: ${it::class.java.simpleName}") }
                 .getOrNull() ?: return@withLock
             lastPullAt = now
-            val upload = settings.syncWithRemote(current.activeProfileId, remote)
-            if (upload.isNotEmpty()) {
-                runCatching { api.putUiSettings(upload) }
-                    .onFailure { Log.w("PC_NET", "ui-settings upload failed: ${it::class.java.simpleName}") }
+            // Was waehrend des Abrufs geaendert wurde oder nicht gesendet werden
+            // konnte, ist neuer als die Antwort und wird nicht ueberschrieben.
+            val dirty = synchronized(lock) {
+                if (pendingProfile == current.activeProfileId) pending.keys.toSet() else emptySet()
             }
-            Log.i("PC_NET", "ui-settings synced: ${remote.size} from server, ${upload.size} up")
+            val upload = settings.syncWithRemote(current.activeProfileId, remote, dirty)
+            if (upload.isNotEmpty()) {
+                val asJson = upload.mapValues { JsonPrimitive(it.value) as JsonElement }
+                runCatching { api.putUiSettings(asJson) }
+                    .onFailure {
+                        Log.w("PC_NET", "ui-settings upload failed: ${it::class.java.simpleName}")
+                        // Beim naechsten Mal erneut, und bis dahin geschuetzt.
+                        addPending(current.activeProfileId, asJson, newerWins = false)
+                        schedulePush()
+                    }
+            }
+            Log.i("PC_NET", "ui-settings synced: ${remote.size} from server, ${upload.size} up, ${dirty.size} kept")
         }
     }
 }
