@@ -1,21 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
-  Monochromer Statusbar-Notification-Icon. Android tintet das System-seitig
-  auf Theme-Color, deshalb hier weißer Pfad auf transparentem Hintergrund.
-  Sprechblasen-Form mit kleinem Sternenkreuz — passt zum App-Icon, aber
-  drastisch vereinfacht, damit's auf 24x24 dp lesbar bleibt.
+  Statusleisten-Symbol: Silhouette des Klumpens "Nordic Soft", erzeugt von
+  Animation/export_nordic_icons.py aus derselben Kontur wie die
+  Denk-Animation. Android faerbt es selbst ein, deshalb reines Weiss ohne
+  android:tint (sonst sucht aapt2 nach colorControlNormal in den
+  App-Themes, was bei reinen Compose-Themes nicht aufgeloest wird).
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!--
-      Statusbar-Notification-Icon. Android tintet das automatisch monochrom
-      (auf weiß bei dunkelm Statusbar-Theme), deshalb hier rein-weiße Pfade
-      ohne `android:tint` (sonst sucht aapt2 nach colorControlNormal in den
-      App-Themes, was bei pure-Compose-Themes nicht aufgelöst werden kann).
-    -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M4,4h16a2,2 0 0 1 2,2v10a2,2 0 0 1 -2,2H8l-4,4V6a2,2 0 0 1 2,-2z" />
+        android:pathData="M21.59,12.18 C21.69,12.79 22.35,13.41 22.48,14.05 C22.62,14.68 22.57,15.39 22.4,16 C22.24,16.61 21.89,17.22 21.47,17.7 C21.05,18.18 20.51,18.64 19.88,18.87 C19.25,19.1 18.3,18.93 17.7,19.08 C17.1,19.22 16.69,19.38 16.28,19.74 C15.86,20.09 15.63,20.78 15.19,21.19 C14.76,21.6 14.22,21.97 13.68,22.19 C13.13,22.41 12.5,22.51 11.91,22.5 C11.33,22.49 10.71,22.33 10.16,22.11 C9.62,21.88 9.16,21.41 8.65,21.14 C8.15,20.86 7.72,20.61 7.13,20.46 C6.55,20.31 5.77,20.43 5.15,20.24 C4.54,20.04 3.92,19.71 3.43,19.3 C2.94,18.89 2.51,18.34 2.23,17.77 C1.95,17.2 1.72,16.53 1.76,15.88 C1.8,15.22 2.31,14.46 2.46,13.85 C2.62,13.23 2.82,12.76 2.68,12.18 C2.53,11.6 1.77,10.99 1.57,10.36 C1.38,9.73 1.38,9.01 1.52,8.4 C1.65,7.79 1.98,7.16 2.38,6.68 C2.79,6.2 3.35,5.76 3.96,5.51 C4.57,5.25 5.43,5.32 6.02,5.16 C6.61,4.99 7.05,4.85 7.49,4.51 C7.92,4.18 8.18,3.56 8.62,3.14 C9.06,2.73 9.57,2.3 10.12,2.02 C10.67,1.75 11.31,1.56 11.91,1.5 C12.52,1.44 13.19,1.48 13.76,1.69 C14.34,1.9 14.91,2.29 15.34,2.76 C15.77,3.23 15.92,4.13 16.34,4.51 C16.76,4.9 17.26,4.93 17.88,5.07 C18.49,5.22 19.43,5.11 20.03,5.37 C20.64,5.63 21.15,6.13 21.51,6.64 C21.87,7.15 22.15,7.8 22.22,8.43 C22.28,9.06 22.01,9.8 21.9,10.42 C21.8,11.05 21.5,11.58 21.59,12.18Z" />
 </vector>
