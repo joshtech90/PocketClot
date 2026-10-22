@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import sqlite3
 import tempfile
 import zipfile
 
@@ -23,11 +24,19 @@ def _corrupt_db(zf: zipfile.ZipFile) -> None:
     zf.writestr(backup.DB_FILENAME, b"keine sqlite-datei" * 100)
 
 
+def _db_without_users(zf: zipfile.ZipFile) -> None:
+    # Lesbar, aber ohne Benutzer: danach koennte sich niemand mehr anmelden.
+    path = os.path.join(tempfile.mkdtemp(), "x.db")
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE conversations (id TEXT)")
+    zf.write(path, backup.DB_FILENAME)
+
+
 def _escaping_upload(zf: zipfile.ZipFile) -> None:
     zf.writestr("uploads/../ausbruch.txt", b"boese")
 
 
-@pytest.mark.parametrize("verderben", [_escaping_upload, _corrupt_db])
+@pytest.mark.parametrize("verderben", [_escaping_upload, _corrupt_db, _db_without_users])
 def test_rejected_replace_keeps_live_data(verderben):
     asyncio.run(db.init_db())
     cid = asyncio.run(db.create_conversation("Bleibt"))
@@ -40,7 +49,7 @@ def test_rejected_replace_keeps_live_data(verderben):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         for info in src.infolist():
-            if not (verderben is _corrupt_db and info.filename == backup.DB_FILENAME):
+            if not (verderben is not _escaping_upload and info.filename == backup.DB_FILENAME):
                 zf.writestr(info, src.read(info))
         verderben(zf)
 
@@ -54,3 +63,17 @@ def test_rejected_replace_keeps_live_data(verderben):
                  if p.name.startswith((".uploads-import-", ".uploads-old-"))
                  or p.suffix == ".import-tmp"]
     assert leftovers == []
+
+
+def test_valid_backup_replaces_cleanly():
+    # Die Pruefung darf ein normales Backup nicht abweisen, auch kein
+    # Backup eines einzelnen Kontos.
+    asyncio.run(db.init_db())
+    uid = asyncio.run(db.create_user(f"Rueck{os.getpid()}", "passwort-9",
+                                     must_change_password=False))["id"]
+    cid = asyncio.run(db.create_conversation("Gesichert", user_id=uid))
+    for zip_bytes in (asyncio.run(backup.create_backup_zip()),
+                      asyncio.run(backup.create_backup_zip(user_id=uid))):
+        result = backup.import_backup(zip_bytes, "replace")
+        assert result.conversations_added >= 1
+        assert asyncio.run(db.get_conversation(cid)) is not None

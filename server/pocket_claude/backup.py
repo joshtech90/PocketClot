@@ -446,21 +446,11 @@ async def create_backup_zip(
         user_name=user_name,
     )
 
-    # Welche Attachment-Pfade gehören mit ins ZIP?
-    allowed_paths: Optional[set[str]] = None
-    if user_id is not None:
-        async with aiosqlite.connect(settings.db_path) as conn:
-            cur = await conn.execute(
-                "SELECT path FROM attachments WHERE user_id = ?", (user_id,),
-            )
-            allowed_paths = {row[0] for row in await cur.fetchall()}
-
     # Kopieren, Filtern, Packen und Aufraeumen in EINEM Thread: synchron im
     # Event-Loop stand sonst der ganze Server, solange ein grosses Backup
     # entsteht. Und nur so raeumt der Thread seine Kopie selbst weg, auch wenn
     # der Aufrufer unterdessen abbricht.
-    buf = await asyncio.to_thread(
-        _build_zip_sync, manifest, password, user_id, allowed_paths)
+    buf = await asyncio.to_thread(_build_zip_sync, manifest, password, user_id)
 
     scope = f"user={user_name or user_id}" if user_id else "global"
     encrypted_note = " [AES-256]" if password else ""
@@ -475,7 +465,6 @@ def _build_zip_sync(
     manifest: "BackupManifest",
     password: Optional[str],
     user_id: Optional[str],
-    allowed_paths: Optional[set[str]],
 ) -> io.BytesIO:
     # DB sauber kopieren (kein Lock-Konflikt mit dem laufenden Server).
     # Eindeutiger Name (zwei Exporte in derselben Sekunde) und Aufraeumen in
@@ -492,6 +481,13 @@ def _build_zip_sync(
             _filter_db_to_user(tmp_db, user_id)
         else:
             _strip_sessions(tmp_db)
+
+        # Welche Attachment-Pfade gehören mit ins ZIP? Aus der Kopie gelesen,
+        # damit DB und Dateien im Backup zusammenpassen.
+        allowed_paths: Optional[set[str]] = None
+        if user_id is not None:
+            with contextlib.closing(sqlite3.connect(str(tmp_db))) as conn:
+                allowed_paths = {row[0] for row in conn.execute("SELECT path FROM attachments")}
 
         buf = io.BytesIO()
         with _open_zip_for_write(buf, password) as zf:
@@ -662,6 +658,18 @@ def _replace_db_and_uploads(zf) -> tuple[int, int, int]:  # noqa: ANN001
     return conv, msg, att_count
 
 
+# Ohne diese Tabellen und Spalten kann sich nach dem Einspielen niemand mehr
+# anmelden oder keinen Chat oeffnen. Neuere Tabellen (Gems usw.) legt der
+# Serverstart selbst an, die muessen in alten Backups nicht vorkommen.
+_REQUIRED_SCHEMA = {
+    "users": {"id", "name", "password_hash"},
+    "conversations": {"id"},
+    "messages": {"id", "conversation_id"},
+    "attachments": {"id", "path"},
+    "kv_settings": {"scope", "key", "value"},
+}
+
+
 def _check_import_db(path: Path) -> tuple[int, int]:
     """Prueft eine Backup-DB vor dem Einspielen und liefert (Chats, Nachrichten)."""
     try:
@@ -669,9 +677,15 @@ def _check_import_db(path: Path) -> tuple[int, int]:
             ok = conn.execute("PRAGMA quick_check").fetchone()
             if not ok or ok[0] != "ok":
                 raise ValueError("Backup-Datenbank ist beschädigt.")
+            for table, needed in _REQUIRED_SCHEMA.items():
+                cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+                missing = needed - cols
+                if missing:
+                    raise ValueError(
+                        f"Backup-Datenbank passt nicht: {table} fehlt "
+                        f"{'ganz' if not cols else ', '.join(sorted(missing))}.")
             conv = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
             msg = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-            conn.execute("SELECT COUNT(*) FROM attachments").fetchone()
     except sqlite3.DatabaseError as exc:
         raise ValueError(f"Backup-Datenbank ist nicht lesbar: {exc}") from exc
     return int(conv), int(msg)

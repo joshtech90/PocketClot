@@ -1306,6 +1306,7 @@ async function openChat(cid, opts = {}) {
   }
 }
 let _loadSeq = 0;
+let _newChatSeq = 0;
 function applyDetail(detail) {
   state.title = detail.title;
   state.pinned = !!detail.pinned;
@@ -1346,10 +1347,13 @@ async function newChat(opts = {}) {
   // spaeten Antwort nicht zurueckgerissen. Erst bei Erfolg die Generation
   // erhoehen: ein noch laufendes openChat darf diesen Chat dann nicht mehr
   // ueberschreiben, scheitert das Anlegen aber, laedt es ungestoert fertig.
+  // Eigene Zaehlung fuer "Neuer Chat": bei zwei schnellen Klicks gewinnt der
+  // juengste, auch wenn der aeltere zuerst antwortet.
   const startGen = _loadSeq;
+  const mine = ++_newChatSeq;
   try {
     const c = await api('POST', '/conversations', opts.gemId ? { gem_id: opts.gemId } : {});
-    if (startGen !== _loadSeq) return;
+    if (mine !== _newChatSeq || startGen !== _loadSeq) return;
     _loadSeq++;
     state.chatLoading = false;
     state.chatLoadFailed = false;
