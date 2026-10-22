@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
-from typing import Iterable
 
 from pocket_claude.db import get_db
 

@@ -21,6 +21,7 @@ mehr direkt importierbar sind.
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -194,6 +195,20 @@ def _extract_uploads_safely(zf, uploads_dir: Path, *, skip_existing: bool) -> in
         shutil.rmtree(staging, ignore_errors=True)
 
     return moved
+
+
+def _copy_limited(src, dst, name: str) -> None:  # noqa: ANN001
+    """Kopiert einen ZIP-Eintrag mit derselben Obergrenze wie Uploads. Die DB
+    lief vorher ungebremst durch: eine stark gepackte Riesen-DB fuellte die Platte."""
+    written = 0
+    while True:
+        chunk = src.read(_COPY_CHUNK)
+        if not chunk:
+            return
+        written += len(chunk)
+        if written > _MAX_SINGLE_UNCOMPRESSED:
+            raise BackupUnsafeEntryError(f"Eintrag überschreitet Limit beim Lesen: {name!r}")
+        dst.write(chunk)
 
 
 # --------------------------------------------------------------------- ZIP-HELPER
@@ -431,45 +446,52 @@ async def create_backup_zip(
     )
 
     # DB sauber kopieren (kein Lock-Konflikt mit dem laufenden Server)
-    tmp_db = settings.data_dir / f".backup-snapshot-{int(time.time())}.db"
-    _vacuum_to(tmp_db)
-    # Bei per-User-Export: die Kopie auf die User-Daten reduzieren (entfernt
-    # dabei auch die sessions-Tabelle). Beim globalen Admin-Export läuft der
-    # Filter nicht — sessions dort separat komplett entfernen, sonst würden ALLE
-    # aktiven Bearer-Tokens im Klartext im Backup landen.
-    if user_id is not None:
-        _filter_db_to_user(tmp_db, user_id)
-    else:
-        _strip_sessions(tmp_db)
-
-    # Welche Attachment-Pfade gehören mit ins ZIP?
-    allowed_paths: Optional[set[str]] = None
-    if user_id is not None:
-        async with aiosqlite.connect(settings.db_path) as conn:
-            cur = await conn.execute(
-                "SELECT path FROM attachments WHERE user_id = ?", (user_id,),
-            )
-            allowed_paths = {row[0] for row in await cur.fetchall()}
-
-    buf = io.BytesIO()
-    with _open_zip_for_write(buf, password) as zf:
-        zf.writestr(MANIFEST_FILENAME, json.dumps(manifest.to_dict(), indent=2))
-        zf.write(tmp_db, arcname=DB_FILENAME)
-        uploads_dir = settings.data_dir / "uploads"
-        if uploads_dir.exists():
-            for f in uploads_dir.rglob("*"):
-                if not f.is_file():
-                    continue
-                # Bei per-User: nur die Files mit registriertem path
-                if allowed_paths is not None and str(f) not in allowed_paths:
-                    continue
-                arcname = f"{UPLOADS_DIR}/{f.relative_to(uploads_dir)}"
-                zf.write(f, arcname=arcname)
-
+    # Eindeutiger Name (zwei Exporte in derselben Sekunde) und Aufraeumen in
+    # jedem Fall: scheiterte der Export unterwegs, blieb sonst eine Kopie der
+    # Chat-Datenbank im Datenordner liegen.
+    tmp_db = settings.data_dir / f".backup-snapshot-{int(time.time())}-{uuid.uuid4().hex[:8]}.db"
     try:
-        tmp_db.unlink()
-    except OSError:
-        pass
+        # Kopieren und Packen laufen im Thread: synchron im Event-Loop stand
+        # sonst der ganze Server, solange ein grosses Backup entsteht.
+        await asyncio.to_thread(_vacuum_to, tmp_db)
+        # Bei per-User-Export: die Kopie auf die User-Daten reduzieren (entfernt
+        # dabei auch die sessions-Tabelle). Beim globalen Admin-Export läuft der
+        # Filter nicht — sessions dort separat komplett entfernen, sonst würden ALLE
+        # aktiven Bearer-Tokens im Klartext im Backup landen.
+        if user_id is not None:
+            await asyncio.to_thread(_filter_db_to_user, tmp_db, user_id)
+        else:
+            await asyncio.to_thread(_strip_sessions, tmp_db)
+
+        # Welche Attachment-Pfade gehören mit ins ZIP?
+        allowed_paths: Optional[set[str]] = None
+        if user_id is not None:
+            async with aiosqlite.connect(settings.db_path) as conn:
+                cur = await conn.execute(
+                    "SELECT path FROM attachments WHERE user_id = ?", (user_id,),
+                )
+                allowed_paths = {row[0] for row in await cur.fetchall()}
+
+        def _write_zip() -> io.BytesIO:
+            buf = io.BytesIO()
+            with _open_zip_for_write(buf, password) as zf:
+                zf.writestr(MANIFEST_FILENAME, json.dumps(manifest.to_dict(), indent=2))
+                zf.write(tmp_db, arcname=DB_FILENAME)
+                uploads_dir = settings.data_dir / "uploads"
+                if uploads_dir.exists():
+                    for f in uploads_dir.rglob("*"):
+                        if not f.is_file():
+                            continue
+                        # Bei per-User: nur die Files mit registriertem path
+                        if allowed_paths is not None and str(f) not in allowed_paths:
+                            continue
+                        arcname = f"{UPLOADS_DIR}/{f.relative_to(uploads_dir)}"
+                        zf.write(f, arcname=arcname)
+            return buf
+
+        buf = await asyncio.to_thread(_write_zip)
+    finally:
+        tmp_db.unlink(missing_ok=True)
 
     scope = f"user={user_name or user_id}" if user_id else "global"
     encrypted_note = " [AES-256]" if password else ""
@@ -582,23 +604,32 @@ def _replace_db_and_uploads(zf) -> tuple[int, int, int]:  # noqa: ANN001
     target_db = settings.data_dir / DB_FILENAME
     uploads_dir = settings.data_dir / "uploads"
 
-    # Alte uploads weg
-    if uploads_dir.exists():
-        shutil.rmtree(uploads_dir)
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-
-    # Neue DB rüber — erst in eine Temp-Datei im selben Verzeichnis schreiben,
-    # dann atomar per os.replace tauschen. So bleiben evtl. noch offene
-    # aiosqlite-Handles auf dem alten Inode statt unter ihnen Bytes zu zerstören.
+    # Erst ALLES neben dem Live-Stand vorbereiten und pruefen, dann tauschen.
+    # Vorher wurden die Uploads zuerst geloescht und die DB ersetzt; ein
+    # kaputtes oder abgelehntes Backup hinterliess dann einen halben Stand.
     if DB_FILENAME not in zf.namelist():
         raise ValueError(f"Backup enthält keine {DB_FILENAME}.")
+    tag = uuid.uuid4().hex[:12]
     tmp_db = target_db.with_suffix(".import-tmp")
-    with zf.open(DB_FILENAME) as src, open(tmp_db, "wb") as dst:
-        shutil.copyfileobj(src, dst)
-    os.replace(tmp_db, target_db)
+    new_uploads = settings.data_dir / f".uploads-import-{tag}"
+    old_uploads = settings.data_dir / f".uploads-old-{tag}"
+    try:
+        with zf.open(DB_FILENAME) as src, open(tmp_db, "wb") as dst:
+            _copy_limited(src, dst, DB_FILENAME)
+        # Uploads sicher extrahieren (Zip-Slip-/Zip-Bomb-Schutz, BR-008).
+        att_count = _extract_uploads_safely(zf, new_uploads, skip_existing=False)
+    except BaseException:
+        tmp_db.unlink(missing_ok=True)
+        shutil.rmtree(new_uploads, ignore_errors=True)
+        raise
 
-    # Uploads sicher extrahieren (Zip-Slip-/Zip-Bomb-Schutz, BR-008).
-    att_count = _extract_uploads_safely(zf, uploads_dir, skip_existing=False)
+    # DB atomar per os.replace tauschen. So bleiben evtl. noch offene
+    # aiosqlite-Handles auf dem alten Inode statt unter ihnen Bytes zu zerstören.
+    os.replace(tmp_db, target_db)
+    if uploads_dir.exists():
+        os.replace(uploads_dir, old_uploads)
+    os.replace(new_uploads, uploads_dir)
+    shutil.rmtree(old_uploads, ignore_errors=True)
 
     # Counts aus neuer DB ziehen
     with sqlite3.connect(str(target_db)) as conn:
@@ -624,7 +655,7 @@ def _merge_db_and_uploads(zf) -> tuple[int, int, int, int]:  # noqa: ANN001
     backup_db_path = tmp_dir / "backup.db"
     try:
         with zf.open(DB_FILENAME) as src, open(backup_db_path, "wb") as dst:
-            shutil.copyfileobj(src, dst)
+            _copy_limited(src, dst, DB_FILENAME)
 
         added = 0
         skipped = 0

@@ -134,7 +134,10 @@ async def _load_references(
 
     raw: list[tuple[str, bytes]] = []
     for aid in attachment_ids:
-        if len(raw) >= image_engine.MAX_REFERENCE_IMAGES:
+        # Nicht bei vier Bildern aufhoeren: usable_references() sortiert noch
+        # HEIC und Uebergroesse aus, dann fehlten brauchbare Bilder dahinter.
+        # Die Obergrenze hier haelt nur den Speicher im Zaum.
+        if len(raw) >= image_engine.MAX_REFERENCE_IMAGES * 3:
             break
         try:
             att = await db.get_attachment(aid, user_id=user_id)
@@ -142,6 +145,8 @@ async def _load_references(
                 continue
             mime = str(att.get("mime_type") or "").lower()
             if not mime.startswith("image/"):
+                continue
+            if int(att.get("size_bytes") or 0) > image_engine.MAX_REFERENCE_BYTES:
                 continue
             path = att.get("path")
             if not path:

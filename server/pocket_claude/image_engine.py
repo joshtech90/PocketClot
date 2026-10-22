@@ -267,12 +267,18 @@ async def generate(
         # Die gewuenschte Anzahl gilt fuer das ERGEBNIS, nicht je Anbieter.
         # Sonst wuerden aus "vier Varianten" acht Bilder und die doppelte
         # Wartezeit, ohne dass irgendwo danach gefragt wurde.
-        per_provider = max(1, min(int(count), MAX_CANDIDATES) // len(order))
+        # Ein Rest geht an die vorderen Anbieter: aus drei Varianten wurden
+        # mit reinem Abrunden sonst nur zwei Bilder. Jeder zeichnet mindestens eins.
+        wanted = min(int(count), MAX_CANDIDATES)
+        per_kind = {
+            kind: max(1, wanted // len(order) + (1 if i < wanted % len(order) else 0))
+            for i, kind in enumerate(order)
+        }
         tasks = {
             asyncio.create_task(
                 _run_provider(kind, gw=gpt_gw, prompt=prompt, model=model,
                               aspect_ratio=aspect_ratio, image_size=image_size,
-                              count=per_provider, references=references,
+                              count=per_kind[kind], references=references,
                               timeout=timeout)
             ): kind
             for kind in order
@@ -340,9 +346,9 @@ async def generate(
                     f"({type(first_error).__name__}: {first_error})."
                 )
             raise ImageGenError("Kein Anbieter hat rechtzeitig ein Bild geliefert.")
-        if len(images) < len(order) * per_provider:
+        if len(images) < sum(per_kind.values()):
             log.info("image-gen: nur %d von %d Bildern, ein Anbieter fiel aus",
-                     len(images), len(order) * per_provider)
+                     len(images), sum(per_kind.values()))
         return images
 
     last_error: ImageGenError | None = None
