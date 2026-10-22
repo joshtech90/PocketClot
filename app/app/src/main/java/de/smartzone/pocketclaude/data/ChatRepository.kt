@@ -203,11 +203,16 @@ class ChatRepository(
     ): ImageCompressor.Result =
         withContext(Dispatchers.IO) {
             val resolver = context.contentResolver
+            val displayName = queryDisplayName(uri)
+            // Kennt der Anbieter keinen Typ, die Endung aus dem Anzeigenamen
+            // nehmen: das letzte URI-Segment ist meist nur eine ID ("…/12345").
+            val mimeMap = MimeTypeMap.getSingleton()
             val rawMime = resolver.getType(uri)
-                ?: MimeTypeMap.getSingleton()
-                    .getMimeTypeFromExtension(uri.lastPathSegment?.substringAfterLast('.').orEmpty())
+                ?: displayName?.substringAfterLast('.', "")?.lowercase()
+                    ?.let { mimeMap.getMimeTypeFromExtension(it) }
+                ?: mimeMap.getMimeTypeFromExtension(uri.lastPathSegment?.substringAfterLast('.').orEmpty())
                 ?: "application/octet-stream"
-            val rawName = queryDisplayName(uri) ?: "upload_${System.currentTimeMillis()}"
+            val rawName = displayName ?: "upload_${System.currentTimeMillis()}"
             val rawBytes = resolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: error("Anhang nicht lesbar.")
             // Bei Bildern clientseitig runterskalieren + JPEG-recodieren — spart

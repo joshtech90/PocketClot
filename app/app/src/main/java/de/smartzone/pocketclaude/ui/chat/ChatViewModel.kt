@@ -341,8 +341,9 @@ class ChatViewModel(
                 // Der Server kann den Rücksprung ausgeführt haben und erst die
                 // Antwort verloren gegangen sein. Dann zeigte die App weiter
                 // Nachrichten, die es nicht mehr gibt. Also in jedem Fall neu
-                // laden und den Serverstand übernehmen.
-                refresh()
+                // laden und den Serverstand übernehmen, ohne die Meldung
+                // gleich wieder zu loeschen.
+                refresh(keepError = true)
             }
     }
 
@@ -444,8 +445,9 @@ class ChatViewModel(
             }
     }
 
-    fun refresh() = viewModelScope.launch {
-        _state.update { it.copy(isLoading = true, errorMessage = null) }
+    /** `keepError`: eine eben gesetzte Fehlermeldung stehen lassen (Ruecksprung). */
+    fun refresh(keepError: Boolean = false) = viewModelScope.launch {
+        _state.update { it.copy(isLoading = true, errorMessage = if (keepError) it.errorMessage else null) }
         runCatching { repo.detail(cid) }
             .onSuccess { applyDetail(it) }
             .onFailure { e ->
@@ -787,12 +789,21 @@ class ChatViewModel(
                 // Auto-Speak: per-Chat-Override (falls gesetzt) hat Vorrang,
                 // sonst globaler ttsAutoSpeak. Im Auto-Modus IMMER vorlesen —
                 // ohne TTS-Schritt wäre der Loop nutzlos.
+                // Bis der Player "laedt" meldet, kann es dauern (Provider-
+                // Abfrage beim Server). So lange haelt speakPending den
+                // Auto-Modus davon ab, schon das Mikrofon zu oeffnen und die
+                // eigene Sprachausgabe mitzuschneiden.
+                speakPending = true
                 viewModelScope.launch {
-                    val s = settingsRepo.current()
-                    val override = _state.value.autoSpeakOverride
-                    val shouldSpeak = _state.value.autoMode || (override ?: s.ttsAutoSpeak)
-                    if (shouldSpeak) {
-                        speak(ev.assistantMessageId)
+                    try {
+                        val s = settingsRepo.current()
+                        val override = _state.value.autoSpeakOverride
+                        val shouldSpeak = _state.value.autoMode || (override ?: s.ttsAutoSpeak)
+                        if (shouldSpeak) {
+                            speak(ev.assistantMessageId).join()
+                        }
+                    } finally {
+                        speakPending = false
                     }
                 }
             }
@@ -1029,7 +1040,15 @@ class ChatViewModel(
         // voiceState sofort auf Transcribing — der teure VoiceRecorder.stop()
         // (thread.join + MediaCodec-EOS-Drain + muxer.stop/release) darf NICHT
         // auf dem Main-Thread laufen (ANR-Risiko), daher off-thread in der Coroutine.
-        _state.update { it.copy(voiceState = VoiceState.Transcribing) }
+        // Nur EIN Stopp gewinnt: VAD und ein Tipp aufs Mikrofon koennen fast
+        // gleichzeitig hier landen. Der Verlierer bekaeme von stop() null und
+        // setzte sonst mitten in die laufende Transkription "Idle".
+        var wasRecording = false
+        _state.update {
+            wasRecording = it.voiceState == VoiceState.Recording
+            if (wasRecording) it.copy(voiceState = VoiceState.Transcribing) else it
+        }
+        if (!wasRecording) return
         viewModelScope.launch {
             val file = withContext(Dispatchers.IO) { voiceRecorder.stop() }
             if (file == null) {
@@ -1234,7 +1253,8 @@ class ChatViewModel(
                 // aufgebaut hat, dann auf Idle pollen.
                 delay(400)
                 while (_state.value.autoMode &&
-                       (audio.state.value.loadingMessageId != null ||
+                       (speakPending ||
+                        audio.state.value.loadingMessageId != null ||
                         audio.state.value.playingMessageId != null)) {
                     delay(300)
                 }
@@ -1264,6 +1284,7 @@ class ChatViewModel(
             val settled =
                 s.voiceState == VoiceState.Idle &&
                 !s.isStreaming &&
+                !speakPending &&
                 a.loadingMessageId == null &&
                 a.playingMessageId == null
             if (settled) return
@@ -1272,6 +1293,9 @@ class ChatViewModel(
     }
 
     private val uploadSlots = Semaphore(2)
+
+    /** Vorlesen nach einer Antwort ist angestossen, der Player weiss es noch nicht. */
+    @Volatile private var speakPending = false
 
     companion object {
         private const val MAX_ATTACHMENT_BYTES = 50L * 1024 * 1024

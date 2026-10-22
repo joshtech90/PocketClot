@@ -67,7 +67,13 @@ class AppContainer(context: Context) {
     // wesentlich einfacher (vorher musste man im Server raten was die App
     // gerade versucht). BASIC zeigt URL + Method + Response-Code + Dauer —
     // keine Header oder Bodies, also auch keine Token-Leaks im Log.
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+    // BASIC loggt die volle URL. Backup-Passwort (`?password=`) und der
+    // Vorlese-Token (`?token=`) stehen dort im Klartext, also vor dem Loggen
+    // schwaerzen (wie der Server es in seinen Access-Logs macht).
+    private val secretQuery = Regex("(?i)([?&](?:token|password|api_key|key)=)[^&\\s]+")
+    private val loggingInterceptor = HttpLoggingInterceptor { message ->
+        android.util.Log.i("OkHttp", message.replace(secretQuery, "$1***"))
+    }.apply {
         level = HttpLoggingInterceptor.Level.BASIC
         // Vorsorglich, falls jemand den Level hochdreht: Schluessel nie ins Log
         redactHeader("Authorization")

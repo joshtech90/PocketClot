@@ -76,6 +76,7 @@ class AudioController(
             pending.addListener({
                 val c = controller
                 if (c != null) onReady(c)
+                else _state.value = State(error = "Audio-Service nicht erreichbar")
             }, MoreExecutors.directExecutor())
             return
         }
@@ -93,6 +94,11 @@ class AudioController(
                 }
                 onReady(controller ?: c)
             } catch (e: Exception) {
+                // Gescheitertes Future vergessen, sonst haengt jedes weitere
+                // play() an genau diesem Fehlschlag und verbindet nie neu.
+                synchronized(this) {
+                    if (controllerFuture === future) controllerFuture = null
+                }
                 _state.value = State(error = "Audio-Service nicht erreichbar: ${e.message}")
             }
         }, MoreExecutors.directExecutor())

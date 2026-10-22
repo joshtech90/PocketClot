@@ -677,7 +677,17 @@ class ApiClient(
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                val msg = t?.message ?: response?.message ?: "Verbindung verloren"
+                // `response.message` ist bei HTTP/2 (Tailscale, Cloudflare) immer
+                // leer; dann kam ein leerer Fehlertext an. Der Server schreibt den
+                // Grund als JSON-`detail` in den Body.
+                val msg = t?.message ?: response?.let { r ->
+                    val body = runCatching { r.peekBody(4096).string() }.getOrDefault("")
+                    val detail = runCatching {
+                        (json.parseToJsonElement(body) as? kotlinx.serialization.json.JsonObject)
+                            ?.get("detail")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+                    }.getOrNull()
+                    "HTTP ${r.code}: " + (detail ?: r.message.ifBlank { body.take(200) })
+                } ?: "Verbindung verloren"
                 trySendBlocking(StreamEvent.ErrorEvent(msg))
                 close(t)
             }

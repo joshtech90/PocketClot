@@ -123,6 +123,7 @@ class VoiceRecorder(private val appContext: Context) {
         // --- MediaCodec AAC encoder + MediaMuxer setup ---
         val codec: MediaCodec
         val muxer: MediaMuxer
+        var createdCodec: MediaCodec? = null
         try {
             val format = MediaFormat.createAudioFormat(
                 MIME_AAC, SAMPLE_RATE, CHANNELS,
@@ -135,12 +136,17 @@ class VoiceRecorder(private val appContext: Context) {
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, CHUNK_BYTES * 2)
             }
             codec = MediaCodec.createEncoderByType(MIME_AAC).also {
+                createdCodec = it
                 it.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 it.start()
             }
             muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         } catch (t: Throwable) {
             runCatching { rec.release() }
+            // Ein schon gestarteter Hardware-Encoder muss frei werden, sonst
+            // fehlt er bis zum App-Neustart (Geraete haben nur wenige davon).
+            runCatching { createdCodec?.stop() }
+            runCatching { createdCodec?.release() }
             file.delete()
             throw IllegalStateException("AAC-Encoder/Muxer Setup fehlgeschlagen: ${t.message}", t)
         }
@@ -241,11 +247,18 @@ class VoiceRecorder(private val appContext: Context) {
         endOfStream: Boolean,
     ) {
         val timeoutUs = if (endOfStream) 10_000L else 0L
+        // Obergrenze fuers Ausdrainieren: Kommt das EOS-Flag nie (Encoder
+        // haengt, EOS liess sich nicht einreihen), lief die Schleife vorher
+        // endlos auf einem IO-Thread.
+        val deadline = System.currentTimeMillis() + EOS_DRAIN_TIMEOUT_MS
         while (true) {
             val outIdx = codec.dequeueOutputBuffer(info, timeoutUs)
             if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 if (!endOfStream) return
                 // bei EOS: weiterpollen bis BUFFER_FLAG_END_OF_STREAM da ist
+                if (System.currentTimeMillis() > deadline) {
+                    throw IllegalStateException("Encoder lieferte kein Ende-Signal")
+                }
                 continue
             }
             if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
@@ -309,21 +322,31 @@ class VoiceRecorder(private val appContext: Context) {
         var fileOk = false
         if (codec != null && muxer != null) {
             try {
-                val inIdx = codec.dequeueInputBuffer(10_000L)
-                if (inIdx >= 0) {
-                    codec.queueInputBuffer(
-                        inIdx, 0, 0, 0,
-                        MediaCodec.BUFFER_FLAG_END_OF_STREAM,
-                    )
+                // Sind gerade alle Eingabepuffer belegt, muss der Encoder erst
+                // Ausgabe loswerden; deshalb abwechselnd drainieren und warten.
+                val info = MediaCodec.BufferInfo()
+                var inIdx = -1
+                repeat(50) {
+                    if (inIdx < 0) {
+                        inIdx = codec.dequeueInputBuffer(10_000L)
+                        if (inIdx < 0) drainEncoder(codec, muxer, info, endOfStream = false)
+                    }
                 }
-                drainEncoder(codec, muxer, MediaCodec.BufferInfo(), endOfStream = true)
+                if (inIdx < 0) throw IllegalStateException("Kein Eingabepuffer fuer das Ende-Signal")
+                codec.queueInputBuffer(
+                    inIdx, 0, 0, 0,
+                    MediaCodec.BUFFER_FLAG_END_OF_STREAM,
+                )
+                drainEncoder(codec, muxer, info, endOfStream = true)
                 fileOk = muxerStarted
             } catch (t: Throwable) {
                 Log.w(TAG, "Stop/drain failed: $t")
             }
             runCatching { codec.stop() }
             runCatching { codec.release() }
-            runCatching { if (muxerStarted) muxer.stop() }
+            // Scheitert muxer.stop(), fehlt der moov-Block und die Datei ist
+            // unbrauchbar, obwohl sie Bytes enthaelt.
+            if (runCatching { if (muxerStarted) muxer.stop() }.isFailure) fileOk = false
             runCatching { muxer.release() }
         }
         muxerStarted = false
@@ -385,5 +408,6 @@ class VoiceRecorder(private val appContext: Context) {
          *  also matched das perfekt. */
         private const val CHUNK_SHORTS = 1024
         private const val CHUNK_BYTES = CHUNK_SHORTS * 2
+        private const val EOS_DRAIN_TIMEOUT_MS = 2_000L
     }
 }
