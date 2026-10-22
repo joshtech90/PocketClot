@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#100E14">
 <title>PocketClot</title>
-<link rel="icon" type="image/png" href="brand-mark.png?v=20261022b">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261022b">
+<link rel="icon" type="image/png" href="brand-mark.png?v=20261022d">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261022d">
 <script>
   /* Hell/Dunkel und Farbschema VOR dem ersten Zeichnen setzen. Ohne das blitzt
      beim Laden kurz das Standardschema auf, bis app.js laeuft. */
@@ -21,14 +21,14 @@
     } catch (e) { /* ohne localStorage gilt die Systemeinstellung */ }
   })();
 </script>
-<link rel="stylesheet" href="palettes.css?v=20261022c">
-<link rel="stylesheet" href="style.css?v=20261022b">
+<link rel="stylesheet" href="palettes.css?v=20261022d">
+<link rel="stylesheet" href="style.css?v=20261022d">
 <!-- Feste Versionen mit Pruefsumme, vom eigenen Server statt vom CDN: blockiert ein
      Browser das CDN, blieb die Seite sonst leer. DOMPurify schuetzt auch den
      Gedaechtnis-Schluessel im Browser. Quelle: marked 12.0.2, DOMPurify 3.4.16 (jsdelivr). -->
 <script src="vendor/marked.min.js?v=12.0.2" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"></script>
 <script src="vendor/purify.min.js?v=3.4.16" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"></script>
-<script src="i18n.js?v=20261022b"></script>
+<script src="i18n.js?v=20261022d"></script>
 </head>
 <body>
 
@@ -131,7 +131,7 @@
 <div id="login" class="login hidden">
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
-      <div class="login-logo"><img class="brand-mark" src="brand-mark.png?v=20261022b" alt=""></div>
+      <div class="login-logo"><img class="brand-mark" src="brand-mark.png?v=20261022d" alt=""></div>
       <h1 data-i18n="app_name">PocketClot</h1>
       <p data-i18n="login_subtitle">Mit Deinem Server verbinden.</p>
     </div>
@@ -191,7 +191,7 @@
   <aside id="sidebar" class="sidebar">
     <div class="sb-top">
       <button id="sb-brand" class="sb-brand" type="button" data-i18n-title="new_chat" title="Neuer Chat">
-        <img class="brand-mark" src="brand-mark.png?v=20261022b" alt="">
+        <img class="brand-mark" src="brand-mark.png?v=20261022d" alt="">
         <span data-i18n="app_name">PocketClot</span>
       </button>
       <div class="sb-top-actions">
@@ -374,17 +374,21 @@
 
         <!-- Sprachgespraech (Auto-Modus): ersetzt waehrend der Schleife das Eingabefeld -->
         <div id="voice-bar" class="voice-bar hidden" role="status" data-phase="idle">
-          <div class="voice-orb" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <!-- Klumpen im Ring (Entscheidung 22.10.2026): zeigt die Phase, keinen Pegel.
+               Der Stille-Countdown bleibt die Linie unten (#voice-silence). -->
+          <div class="voice-orb" aria-hidden="true"><img src="brand-mark.png?v=20261022d" alt=""></div>
           <div class="voice-bar-text">
             <span id="voice-bar-text" class="voice-bar-title">Ich höre zu…</span>
             <span id="voice-bar-hint" class="voice-bar-hint"></span>
+          </div>
+          <div class="voice-actions">
+            <button id="voice-bar-send" type="button" class="btn-primary" data-i18n="voice_send_now">Senden</button>
+            <button id="voice-bar-stop" type="button" class="btn-ghost" data-i18n="voice_end">Beenden</button>
           </div>
           <label class="voice-auto" title="Nach kurzer Stille automatisch senden" data-i18n-title="voice_auto_send_hint">
             <input id="voice-auto-send" type="checkbox" class="switch">
             <span data-i18n="voice_auto_send">Automatisch senden</span>
           </label>
-          <button id="voice-bar-send" type="button" class="btn-primary btn-sm" data-i18n="voice_send_now">Senden</button>
-          <button id="voice-bar-stop" type="button" class="btn-ghost btn-sm" data-i18n="voice_end">Beenden</button>
           <div id="voice-silence" class="voice-silence" aria-hidden="true"></div>
         </div>
 
@@ -961,7 +965,7 @@
       <section class="settings-pane" data-pane="about">
         <h2 data-i18n="settings_about">Über</h2>
         <div class="about-card">
-          <img class="about-logo" src="brand-mark.png?v=20261022b" alt="">
+          <img class="about-logo" src="brand-mark.png?v=20261022d" alt="">
           <div>
             <div class="about-name" data-i18n="app_name">PocketClot</div>
             <div class="set-hint" id="about-version">—</div>
@@ -1067,10 +1071,10 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden" role="status"></div>
-<script src="app.js?v=20261022b"></script>
-<script src="voice.js?v=20261022b"></script>
-<script src="gems.js?v=20261022b"></script>
-<script src="images.js?v=20261022b"></script>
-<script src="settings.js?v=20261022b"></script>
+<script src="app.js?v=20261022d"></script>
+<script src="voice.js?v=20261022d"></script>
+<script src="gems.js?v=20261022d"></script>
+<script src="images.js?v=20261022d"></script>
+<script src="settings.js?v=20261022d"></script>
 </body>
 </html>

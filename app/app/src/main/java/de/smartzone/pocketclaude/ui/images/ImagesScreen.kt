@@ -72,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -254,13 +255,22 @@ fun ImagesScreen(
                     }
                     if (state.history.isEmpty()) {
                         item(key = "empty") {
-                            Box(
+                            // Leerzustand mit Illustration (Klumpen vor Bildrahmen,
+                            // Entscheidung 22.10.2026). Nur hier, ohne Animation;
+                            // der Hinweistext bleibt, damit ein fehlender
+                            // Bildanbieter weiter erkennbar ist.
+                            Column(
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(220.dp)
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center,
+                                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
                             ) {
+                                Image(
+                                    painter = painterResource(R.drawable.img_empty_images),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(112.dp),
+                                )
                                 Text(
                                     stringResource(R.string.image_history_empty),
                                     style = MaterialTheme.typography.bodyMedium,

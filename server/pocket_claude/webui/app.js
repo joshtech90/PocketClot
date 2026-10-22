@@ -1780,7 +1780,7 @@ function renderMessages() {
       const first = (state.me?.name || '').split(/\s+/)[0];
       inner.innerHTML = `
         <div class="empty-hero">
-          <img class="e-logo brand-mark" src="brand-mark.png?v=20261022b" alt="">
+          <img class="e-logo brand-mark" src="brand-mark.png?v=20261022d" alt="">
           <h3>${escapeHtml(first ? t('greeting_named', first) : t('greeting'))}</h3>
         </div>`;
     }
@@ -1898,7 +1898,7 @@ function fillStreamingMessage(div) {
   if (thinking) div.appendChild(thinkingEl(thinking, !text));
   if (!text) {
     if (!thinking) {
-      div.insertAdjacentHTML('beforeend', `<div class="waiting"><img class="brand-mark brand-pulse" src="brand-mark.png?v=20261022b" alt="">
+      div.insertAdjacentHTML('beforeend', `<div class="waiting"><img class="brand-mark brand-pulse" src="brand-mark.png?v=20261022d" alt="">
         <span class="shimmer">${escapeHtml(t('bubble_thinking_live'))}</span></div>`);
     }
   } else {
@@ -2964,7 +2964,7 @@ function notifyDone(msg) {
   try {
     const body = (msg && msg.content ? msg.content : '').replace(/[#*_`>\[\]]/g, '').trim().slice(0, 160);
     const n = new Notification(state.title && state.title !== 'Neuer Chat' ? state.title : t('notify_title'), {
-      body, icon: 'brand-mark.png?v=20261022b', tag: 'pc-' + state.cid,
+      body, icon: 'brand-mark.png?v=20261022d', tag: 'pc-' + state.cid,
     });
     n.onclick = () => { window.focus(); n.close(); };
   } catch (_) { /* manche Browser erlauben Notification nur im Service Worker */ }

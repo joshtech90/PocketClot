@@ -685,7 +685,14 @@
     if (history.length === 0) {
       var emptyEl = document.createElement('div');
       emptyEl.className = 'img-empty';
-      emptyEl.textContent = t('image_history_empty_web');
+      // Illustration wie in der App (Entscheidung 22.10.2026), Text bleibt.
+      var emptyArt = document.createElement('img');
+      emptyArt.className = 'img-empty-art';
+      emptyArt.src = 'images-empty.webp?v=20261022d';
+      emptyArt.alt = '';
+      var emptyText = document.createElement('p');
+      emptyText.textContent = t('image_history_empty_web');
+      emptyEl.append(emptyArt, emptyText);
       historyContainer.appendChild(emptyEl);
       return;
     }

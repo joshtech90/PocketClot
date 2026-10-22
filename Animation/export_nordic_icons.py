@@ -12,7 +12,9 @@ entstehen:
 - Markenzeichen `ic_brand_mark` (96dp) fuer App-Kopf, Erststart und
   Ruhezustand der Denk-Animation.
 - Statusleisten-Symbol `drawable/ic_notification.xml` aus der vermessenen Kontur.
-- Web: `webui/brand-mark.png` (96 px, auch Favicon), `webui/apple-touch-icon.png`
+- Leerzustand Bilder-Bereich: `drawable-nodpi/img_empty_images.webp` und
+  `webui/images-empty.webp` aus `icons/nordic_soft/bilder_leer_master.png`.
+- Web: `webui/brand-mark.png` (192 px, auch Favicon), `webui/apple-touch-icon.png`
   (180 px) und `assets/logo.png` fuer die README.
 - Play-Store-Icon 512 px unter `Animation/icons/nordic_soft/`.
 
@@ -30,6 +32,10 @@ MASTER = os.path.join(ROOT, "Animation", "nordic_soft_master.png")
 RES = os.path.join(ROOT, "app", "app", "src", "main", "res")
 WEB_MARK = os.path.join(ROOT, "server", "pocket_claude", "webui", "brand-mark.png")
 WEB_TOUCH = os.path.join(ROOT, "server", "pocket_claude", "webui", "apple-touch-icon.png")
+# Leerzustand im Bilder-Bereich (Astra, Entscheidung 22.10.2026): 112dp breit.
+EMPTY_IMAGES_SRC = os.path.join(ROOT, "Animation", "icons", "nordic_soft", "bilder_leer_master.png")
+EMPTY_IMAGES_APP = os.path.join(RES, "drawable-nodpi", "img_empty_images.webp")
+EMPTY_IMAGES_WEB = os.path.join(ROOT, "server", "pocket_claude", "webui", "images-empty.webp")
 README_LOGO = os.path.join(ROOT, "assets", "logo.png")
 PLAYSTORE = os.path.join(ROOT, "Animation", "icons", "nordic_soft", "playstore_512.png")
 
@@ -200,7 +206,16 @@ def main() -> None:
             out.save(os.path.join(RES, f"mipmap-{dens}", name))
             written += 1
 
-    place(blob, 96, BRAND_FRACTION).save(WEB_MARK)
+    # 192 px: das Sprachgespraech zeigt das Zeichen in 64 CSS-px, auf
+    # Retina-Bildschirmen braucht das die doppelte Aufloesung.
+    place(blob, 192, BRAND_FRACTION).save(WEB_MARK)
+
+    empty = Image.open(EMPTY_IMAGES_SRC).convert("RGBA")
+    empty = empty.crop(empty.getbbox())
+    os.makedirs(os.path.dirname(EMPTY_IMAGES_APP), exist_ok=True)
+    place(empty, 448, 1.0).save(EMPTY_IMAGES_APP, "WEBP", quality=90, method=6)
+    place(empty, 224, 1.0).save(EMPTY_IMAGES_WEB, "WEBP", quality=90, method=6)
+    written += 2
     # Homescreen-Symbol fuer iOS/Android-Browser: volle Kachel, das System rundet.
     touch = gradient(180)
     touch.alpha_composite(place(blob, 180, LEGACY_BLOB_OF_TILE))
