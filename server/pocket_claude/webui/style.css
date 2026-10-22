@@ -816,8 +816,9 @@ img.avatar { object-fit: cover; background: var(--surface-2, var(--hover)); }
 
 /* Warten auf das erste Wort und Gedankengang */
 .waiting { display: flex; align-items: center; gap: 10px; height: 28px; }
-.waiting .brand-pulse { width: 22px; height: 22px; animation: brand-pulse 1.6s ease-in-out infinite; }
-@keyframes brand-pulse { 0%, 100% { transform: scale(0.86); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 1; } }
+/* "Sanftes Atmen" wie in der App: 3,6 s, 97 bis 103 %, +-2 Grad */
+.waiting .brand-pulse { width: 22px; height: 22px; animation: brand-pulse 3.6s ease-in-out infinite; }
+@keyframes brand-pulse { 0%, 100% { transform: scale(0.97) rotate(-2deg); } 50% { transform: scale(1.03) rotate(2deg); } }
 .shimmer {
   background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 40%, var(--text) 50%, var(--text-muted) 60%, var(--text-muted) 100%);
   background-size: 300% 100%;

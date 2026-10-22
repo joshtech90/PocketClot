@@ -29,23 +29,23 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * PocketThinkingBlob: 3D-Knetmassen Thinking-Animation mit exakten PocketClot-Original-Proportionen.
+ * PocketThinkingBlob: der PocketClot-Klumpen ("Nordic Soft", seit 22.10.2026), der beim Denken atmet.
  *
- * - Ruhezustand (isThinking = false): Exakt die 5 Boegen und Taeler der echten PocketClot-Silhouette.
- * - Reinfließen (isThinking -> true): Die 5 Boegen schwellen ueber 1200ms in organische 3D-Waber-Wellen an,
- *   die Glanzpunkte wandern dynamisch ueber die Knetmasse und die Ambient-Aura blueht weich auf.
- * - Zurueckfließen (isThinking -> false): Die 3D-Wellen klingen ueber 1400ms ab und die Masse fließt
- *   nahtlos zurueck in die exakte Original-Silhouette.
+ * - Ruhezustand (isThinking = false): das Markenzeichen `ic_brand_mark`, gleiche Silhouette mit 6 Lappen.
+ * - Reinfliessen (isThinking -> true): die Kontur geht ueber 1200 ms in ein ruhiges Morphen ueber.
+ * - Stil "Sanftes Atmen" (Joschas Wahl im Icon-Bogen): 3,6 s je Zyklus, Groesse 97 bis 103 %,
+ *   Drehung +-2 Grad, kleine Formaenderung.
+ * - Zurueckfliessen (isThinking -> false): klingt ueber 1400 ms ab, dann uebernimmt das statische Bild.
  */
 @Composable
 fun PocketThinkingBlob(
     modifier: Modifier = Modifier,
     size: Dp = 25.dp,
     isThinking: Boolean = true,
-    speedMultiplier: Float = 0.8f,
-    morphIntensity: Float = 0.20f,
-    specularShine: Float = 0.55f,
-    glowEnabled: Boolean = true,
+    speedMultiplier: Float = 1f,
+    morphIntensity: Float = 0.12f,
+    specularShine: Float = 0.45f,
+    glowEnabled: Boolean = false,
 ) {
     val transitionProgress by animateFloatAsState(
         targetValue = if (isThinking) 1f else 0f,
@@ -68,7 +68,7 @@ fun PocketThinkingBlob(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (2800 / speedMultiplier).toInt(), easing = LinearEasing),
+            animation = tween(durationMillis = (3600 / speedMultiplier).toInt(), easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "Phase1",
@@ -78,37 +78,31 @@ fun PocketThinkingBlob(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (3900 / speedMultiplier).toInt(), easing = LinearEasing),
+            animation = tween(durationMillis = (5000 / speedMultiplier).toInt(), easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "Phase2",
     )
 
-    val rawBreathingScale by transition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
+    // Ein Atemzug: hin und zurueck in 3,6 s. Groesse und Drehung laufen
+    // gemeinsam, wie in der Vorschau des Icon-Bogens.
+    val breath by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (1800 / speedMultiplier).toInt(), easing = LinearEasing),
+            animation = tween(durationMillis = (1800 / speedMultiplier).toInt(), easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
-        label = "BreathingScale",
+        label = "Breath",
     )
-
-    val rawWobbleAngle by transition.animateFloat(
-        initialValue = -3.5f,
-        targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (2400 / speedMultiplier).toInt(), easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "WobbleAngle",
-    )
+    val rawBreathingScale = 0.97f + 0.06f * breath
+    val rawWobbleAngle = -2f + 4f * breath
 
     val rawGlowAlpha by transition.animateFloat(
         initialValue = 0.20f,
         targetValue = 0.50f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = (1500 / speedMultiplier).toInt(), easing = LinearEasing),
+            animation = tween(durationMillis = (1800 / speedMultiplier).toInt(), easing = LinearEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "GlowAlpha",
@@ -123,8 +117,13 @@ fun PocketThinkingBlob(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
-            val center = Offset(this.size.width / 2f, this.size.height / 2f)
             val baseRadius = minOf(this.size.width, this.size.height) * 0.36f
+            // Schwerpunkt des Klumpens liegt nicht exakt in der Bildmitte des
+            // Markenzeichens; so deckt sich die Kontur mit dem Ruhebild.
+            val center = Offset(
+                this.size.width / 2f + baseRadius * CENTER_OFFSET_X,
+                this.size.height / 2f + baseRadius * CENTER_OFFSET_Y,
+            )
 
             rotate(degrees = currentWobbleAngle, pivot = center) {
                 scale(scale = currentBreathingScale, pivot = center) {
@@ -133,8 +132,8 @@ fun PocketThinkingBlob(
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFFFF9800).copy(alpha = currentGlowAlpha * 0.42f),
-                                    Color(0xFFFF5722).copy(alpha = currentGlowAlpha * 0.18f),
+                                    Color(0xFF7CB8EB).copy(alpha = currentGlowAlpha * 0.42f),
+                                    Color(0xFF1B649E).copy(alpha = currentGlowAlpha * 0.18f),
                                     Color.Transparent,
                                 ),
                                 center = center,
@@ -155,15 +154,15 @@ fun PocketThinkingBlob(
                         morphIntensity = morphIntensity,
                     )
 
-                    // 3. 3D-Knetmassen Gradient
-                    val lightSource = Offset(center.x - baseRadius * 0.35f, center.y - baseRadius * 0.35f)
+                    // 3. Satin-Verlauf, Farben am Icon abgenommen
+                    val lightSource = Offset(center.x - baseRadius * 0.35f, center.y - baseRadius * 0.45f)
                     val blobBrush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFFFDD043),
-                            Color(0xFFFFB300),
-                            Color(0xFFFF6D00),
-                            Color(0xFFD84315),
-                            Color(0xFFBF360C),
+                            Color(0xFFA6DAFF),
+                            Color(0xFF80C8FB),
+                            Color(0xFF3190E8),
+                            Color(0xFF1B5DC0),
+                            Color(0xFF263D87),
                         ),
                         center = lightSource,
                         radius = baseRadius * 1.55f,
@@ -196,23 +195,20 @@ fun PocketThinkingBlob(
     }
 }
 
-// 10 Kontrollpunkte: 5 Boegen + 5 Taeler exakt kalibriert aus dem PocketClot-Original
+// 12 Kontrollpunkte: 6 Lappen + 6 Taeler, vermessen am Masterbild
+// `Animation/nordic_soft_master.png` (Winkel im Uhrzeigersinn ab 3 Uhr,
+// Radien relativ zu baseRadius, skaliert wie ic_brand_mark mit 92 %).
 private val CONTROL_ANGLES = floatArrayOf(
-    (25.0 * PI / 180.0).toFloat(),  // Bogen 1 (Oben-Rechts)
-    (60.0 * PI / 180.0).toFloat(),  // Tal 1 (Reparierte Kante)
-    (92.0 * PI / 180.0).toFloat(),  // Bogen 2 (Unten-Rechts)
-    (112.0 * PI / 180.0).toFloat(), // Tal 2
-    (140.0 * PI / 180.0).toFloat(), // Bogen 3 (Unten)
-    (172.0 * PI / 180.0).toFloat(), // Tal 3
-    (205.0 * PI / 180.0).toFloat(), // Bogen 4 (Links)
-    (240.0 * PI / 180.0).toFloat(), // Tal 4
-    (280.0 * PI / 180.0).toFloat(), // Bogen 5 (Oben-Links)
-    (335.0 * PI / 180.0).toFloat(), // Tal 5
-)
+    23f, 56f, 89f, 115f, 147f, 176f, 204f, 237f, 274f, 303f, 333f, 357f,
+).map { (it * PI / 180.0).toFloat() }.toFloatArray()
 
 private val CONTROL_RADII = floatArrayOf(
-    1.233f, 0.944f, 1.134f, 1.078f, 1.230f, 0.990f, 1.157f, 0.944f, 1.177f, 1.033f
+    1.347f, 1.047f, 1.245f, 1.139f, 1.351f, 1.098f, 1.339f, 1.067f, 1.294f, 1.065f, 1.340f, 1.163f,
 )
+
+// Abstand Schwerpunkt zu Bildmitte des Markenzeichens, in baseRadius.
+private const val CENTER_OFFSET_X = -0.009f
+private const val CENTER_OFFSET_Y = 0.023f
 
 private fun create3DClayBlobPath(
     center: Offset,
@@ -220,7 +216,7 @@ private fun create3DClayBlobPath(
     phase1: Float,
     phase2: Float,
     morphProgress: Float,
-    morphIntensity: Float = 0.20f,
+    morphIntensity: Float = 0.12f,
 ): Path {
     val n = CONTROL_ANGLES.size
     val points = ArrayList<Offset>(n)

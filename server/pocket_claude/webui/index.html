@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#100E14">
 <title>PocketClot</title>
-<link rel="icon" type="image/png" href="brand-mark.png">
+<link rel="icon" type="image/png" href="brand-mark.png?v=20261022a">
 <script>
   /* Hell/Dunkel und Farbschema VOR dem ersten Zeichnen setzen. Ohne das blitzt
      beim Laden kurz das Standardschema auf, bis app.js laeuft. */
@@ -20,14 +20,14 @@
     } catch (e) { /* ohne localStorage gilt die Systemeinstellung */ }
   })();
 </script>
-<link rel="stylesheet" href="palettes.css?v=20261021g">
-<link rel="stylesheet" href="style.css?v=20261021g">
+<link rel="stylesheet" href="palettes.css?v=20261022a">
+<link rel="stylesheet" href="style.css?v=20261022a">
 <!-- Feste Versionen mit Pruefsumme, vom eigenen Server statt vom CDN: blockiert ein
      Browser das CDN, blieb die Seite sonst leer. DOMPurify schuetzt auch den
      Gedaechtnis-Schluessel im Browser. Quelle: marked 12.0.2, DOMPurify 3.4.16 (jsdelivr). -->
 <script src="vendor/marked.min.js?v=12.0.2" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"></script>
 <script src="vendor/purify.min.js?v=3.4.16" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"></script>
-<script src="i18n.js?v=20261021g"></script>
+<script src="i18n.js?v=20261022a"></script>
 </head>
 <body>
 
@@ -130,7 +130,7 @@
 <div id="login" class="login hidden">
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
-      <div class="login-logo"><img class="brand-mark" src="brand-mark.png" alt=""></div>
+      <div class="login-logo"><img class="brand-mark" src="brand-mark.png?v=20261022a" alt=""></div>
       <h1 data-i18n="app_name">PocketClot</h1>
       <p data-i18n="login_subtitle">Mit Deinem Server verbinden.</p>
     </div>
@@ -190,7 +190,7 @@
   <aside id="sidebar" class="sidebar">
     <div class="sb-top">
       <button id="sb-brand" class="sb-brand" type="button" data-i18n-title="new_chat" title="Neuer Chat">
-        <img class="brand-mark" src="brand-mark.png" alt="">
+        <img class="brand-mark" src="brand-mark.png?v=20261022a" alt="">
         <span data-i18n="app_name">PocketClot</span>
       </button>
       <div class="sb-top-actions">
@@ -960,7 +960,7 @@
       <section class="settings-pane" data-pane="about">
         <h2 data-i18n="settings_about">Über</h2>
         <div class="about-card">
-          <img class="about-logo" src="brand-mark.png" alt="">
+          <img class="about-logo" src="brand-mark.png?v=20261022a" alt="">
           <div>
             <div class="about-name" data-i18n="app_name">PocketClot</div>
             <div class="set-hint" id="about-version">—</div>
@@ -1066,10 +1066,10 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden" role="status"></div>
-<script src="app.js?v=20261021g"></script>
-<script src="voice.js?v=20261021g"></script>
-<script src="gems.js?v=20261021g"></script>
-<script src="images.js?v=20261021g"></script>
-<script src="settings.js?v=20261021g"></script>
+<script src="app.js?v=20261022a"></script>
+<script src="voice.js?v=20261022a"></script>
+<script src="gems.js?v=20261022a"></script>
+<script src="images.js?v=20261022a"></script>
+<script src="settings.js?v=20261022a"></script>
 </body>
 </html>
