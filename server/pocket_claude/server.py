@@ -245,20 +245,9 @@ def _row_to_conv_out(row: dict) -> ConversationOut:
     )
 
 
-async def _attachment_refs(ids: list[str]) -> list[AttachmentRef]:
-    atts = await db.get_attachments(ids)
-    return [
-        AttachmentRef(
-            id=a["id"],
-            filename=a["filename"],
-            mime_type=a["mime_type"],
-            size_bytes=a["size_bytes"],
-        )
-        for a in atts
-    ]
-
-
-async def _row_to_message_out(row: dict) -> MessageOut:
+def _row_to_message_out(row: dict, atts_by_id: dict[str, dict]) -> MessageOut:
+    # Reihenfolge aus der Nachricht, nicht aus der DB: `IN (...)` liefert die
+    # Anhaenge in beliebiger Folge, dann standen Bilder anders als hochgeladen.
     return MessageOut(
         id=row["id"],
         conversation_id=row["conversation_id"],
@@ -266,8 +255,24 @@ async def _row_to_message_out(row: dict) -> MessageOut:
         content=row["content"],
         created_at=datetime.fromisoformat(row["created_at"]),
         tokens=row["tokens"],
-        attachments=await _attachment_refs(row["attachment_ids"]),
+        attachments=[
+            AttachmentRef(id=a["id"], filename=a["filename"],
+                          mime_type=a["mime_type"], size_bytes=a["size_bytes"])
+            for a in (atts_by_id.get(aid) for aid in row["attachment_ids"] or [])
+            if a
+        ],
     )
+
+
+async def _attachments_by_id(ids: list[str]) -> dict[str, dict]:
+    """Alle Anhaenge eines Chats in wenigen Abfragen statt einer pro Nachricht.
+    In Bloecken, weil SQLite die Zahl der Platzhalter begrenzt."""
+    unique = list(dict.fromkeys(ids))
+    out: dict[str, dict] = {}
+    for i in range(0, len(unique), 500):
+        for a in await db.get_attachments(unique[i:i + 500]):
+            out[a["id"]] = a
+    return out
 
 
 # ---------- Health ----------
@@ -336,7 +341,9 @@ async def get_conversation(cid: str = PathParam(...), user=Depends(require_user)
     if not conv:
         raise HTTPException(404, "Konversation nicht gefunden.")
     msg_rows = await db.list_messages(cid)
-    messages = [await _row_to_message_out(m) for m in msg_rows]
+    atts_by_id = await _attachments_by_id(
+        [aid for m in msg_rows for aid in (m["attachment_ids"] or [])])
+    messages = [_row_to_message_out(m, atts_by_id) for m in msg_rows]
     return ConversationDetail(
         id=conv["id"],
         title=conv["title"],
@@ -446,6 +453,17 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
     conv = await db.get_conversation(cid, user_id=user["id"])
     if not conv:
         raise HTTPException(404, "Konversation nicht gefunden.")
+    # Erst alles pruefen, dann schreiben: sonst blieben Titel oder Pin
+    # gespeichert, obwohl der Aufruf mit 400 endet. Das Modell wird wie bei
+    # send_message und rewind gegen die Allowlist geprueft.
+    if body.chat_model is not None:
+        candidate = body.chat_model.strip()
+        if candidate and not await _model_key_is_known(candidate):
+            raise HTTPException(400, f"Unbekanntes Modell: {candidate!r}")
+    if body.chat_effort is not None:
+        effort_value = body.chat_effort.strip().lower()
+        if effort_value and effort_value not in _CHAT_EFFORTS:
+            raise HTTPException(400, f"Unbekannte Denktiefe: {effort_value!r}")
     if body.title is not None:
         await db.update_conversation_title(cid, body.title, user_id=user["id"])
     if body.pinned is not None:
@@ -461,10 +479,7 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
             log.info("PC_RESOLVE: cid=%s Modellwechsel per PATCH %r -> %r, "
                      "Claude-Session verworfen", cid, old_model, new_model)
     if body.chat_effort is not None:
-        effort_value = body.chat_effort.strip().lower()
-        if effort_value and effort_value not in _CHAT_EFFORTS:
-            raise HTTPException(400, f"Unbekannte Denktiefe: {effort_value!r}")
-        await db.set_chat_effort(cid, effort_value, user_id=user["id"])
+        await db.set_chat_effort(cid, body.chat_effort.strip().lower(), user_id=user["id"])
     if body.locked is not None:
         # Sperren nur erlauben, wenn ein globaler PIN gesetzt ist — sonst hätte
         # der User einen gesperrten Chat, den er nicht mehr aufbekommt.
@@ -937,7 +952,15 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
                 "PC_SSE: event_gen FOR-LOOP-EXIT cid=%s deltas=%d last=%s assistant_msg_id=%s",
                 cid, delta_count, last_event, assistant_msg_id,
             )
-        except BaseException as _sse_exc:  # noqa: BLE001 — catches GeneratorExit + cancels
+        except (asyncio.CancelledError, GeneratorExit):
+            # Client weg (sse-starlette bricht ab). Hier NICHT mehr yielden:
+            # der Generator bliebe sonst am yield haengen, und `finally` mit
+            # lock.release() liefe erst, wenn der Muell eingesammelt wird.
+            # Bis dahin waere der Chat fuer den naechsten Turn gesperrt.
+            log.info("PC_SSE: event_gen abgebrochen cid=%s deltas=%d last=%s",
+                     cid, delta_count, last_event)
+            raise
+        except Exception as _sse_exc:  # noqa: BLE001
             import traceback as _tb
             log.error(
                 "PC_SSE: event_gen EXCEPTION cid=%s deltas=%d last=%s exc=%s\n%s",
@@ -1052,7 +1075,10 @@ async def _store_upload(file: UploadFile, user_id: str) -> dict:
     # nicht den Event-Loop blockiert (sonst hängen parallele Requests).
     import secrets as _secrets
     import asyncio as _asyncio
-    suffix = (filename.rsplit(".", 1)[-1] if "." in filename else "bin")[:10]
+    # Nur Buchstaben und Ziffern: ein Dateiname wie "x.png/abc" ergaebe sonst
+    # einen Unterordner im Upload-Verzeichnis und einen 500er beim Schreiben.
+    suffix = "".join(c for c in (filename.rsplit(".", 1)[-1] if "." in filename else "")
+                     if c.isascii() and c.isalnum())[:10] or "bin"
     disk_name = f"{_secrets.token_urlsafe(12)}.{suffix}"
     target = settings.uploads_dir / disk_name
     await _asyncio.to_thread(target.write_bytes, contents)
@@ -1845,6 +1871,11 @@ async def images_generate(body: dict, user=Depends(require_user)):
         body.get("image_size") or body.get("size")
         or (kv_img.get(_KV_IMAGE_DEFAULT_SIZE) or "").strip() or None
     )
+    # Wie die Groesse: ohne Angabe gilt die gespeicherte Vorgabe, nicht 1:1.
+    aspect_ratio = (
+        body.get("aspect_ratio")
+        or (kv_img.get(_KV_IMAGE_DEFAULT_ASPECT) or "").strip() or None
+    )
     try:
         images = await image_engine.generate(
             prompt=prompt,
@@ -1853,7 +1884,7 @@ async def images_generate(body: dict, user=Depends(require_user)):
                 or (kv_img.get(_KV_IMAGE_PROVIDER) or "").strip()
             ),
             model=body.get("model"),
-            aspect_ratio=body.get("aspect_ratio"),
+            aspect_ratio=aspect_ratio,
             image_size=image_size,
             count=count_val,
             references=references or None,
@@ -1873,20 +1904,26 @@ async def images_generate(body: dict, user=Depends(require_user)):
         conv = await db.get_conversation(cid, user_id=user["id"])
         if not conv:
             raise HTTPException(404, "Konversation nicht gefunden.")
-        # User-Prompt als 'user'-Message, dann die Bilder als 'assistant'-Message
-        await db.add_message(
-            cid, role="user",
-            content=_format_image_user_prompt(prompt, body),
-            attachment_ids=ref_ids,
-            tokens=max(1, len(prompt) // 4),
-        )
-        assistant_text = _format_image_assistant_text(prompt, body, images)
-        msg_id = await db.add_message(
-            cid, role="assistant",
-            content=assistant_text,
-            attachment_ids=[a["id"] for a in out_atts],
-            tokens=0,
-        )
+        # User-Prompt als 'user'-Message, dann die Bilder als 'assistant'-Message.
+        # Unter dem Chat-Lock, damit kein laufender Turn dazwischenschreibt, und
+        # ohne Claude-Session: die kennt diese beiden Nachrichten nicht, der
+        # naechste Claude-Turn bekommt den Verlauf per replay_history.
+        async with _conv_lock(cid):
+            await db.add_message(
+                cid, role="user",
+                content=_format_image_user_prompt(prompt, body),
+                attachment_ids=ref_ids,
+                tokens=max(1, len(prompt) // 4),
+            )
+            assistant_text = _format_image_assistant_text(prompt, body, images)
+            msg_id = await db.add_message(
+                cid, role="assistant",
+                content=assistant_text,
+                attachment_ids=[a["id"] for a in out_atts],
+                tokens=0,
+            )
+            if conv.get("claude_session_id"):
+                await db.set_claude_session_id(cid, None)
         # Gleicher kurzer Auto-Titel wie im Chat-Flow (1-2 Woerter statt der
         # verbatim ersten Zeile). Non-streaming: Client zieht den Titel beim
         # naechsten Laden der Liste.
@@ -1896,7 +1933,7 @@ async def images_generate(body: dict, user=Depends(require_user)):
     return {
         "ok": True,
         "model": body.get("model") or image_engine.get_config()["default_model"],
-        "aspect_ratio": body.get("aspect_ratio") or "1:1",
+        "aspect_ratio": aspect_ratio or "1:1",
         "count": len(out_atts),
         "attachments": out_atts,
         "message": saved_message,
@@ -2091,6 +2128,15 @@ async def _resolve_effective_skills(
     return await _resolve_user_default_skills(user_id), False
 
 
+async def _gem_skills_of(conv: dict, user_id: str) -> str | None:
+    """Skills des Gems eines Chats. Ohne das zeigte der Skills-Dialog in einem
+    Gem-Chat die User-Vorgaben, waehrend der Turn die Gem-Skills benutzte."""
+    if not conv.get("gem_id"):
+        return None
+    gem = await db.get_gem(conv["gem_id"], user_id=user_id)
+    return gem.get("skills") if gem else None
+
+
 @app.get("/skills/defaults", response_model=SkillsDto)
 async def get_skills_defaults(user=Depends(require_user)) -> SkillsDto:
     """User-Default-Skills (gelten für alle neuen + nicht-überschriebenen Chats)."""
@@ -2117,6 +2163,7 @@ async def get_conversation_skills(
         raise HTTPException(404, "Konversation nicht gefunden.")
     skills, is_override = await _resolve_effective_skills(
         user["id"], conv.get("skills_override"),
+        gem_skills_override=await _gem_skills_of(conv, user["id"]),
     )
     return ConversationSkillsResponse(skills=skills, is_override=is_override)
 
@@ -2137,6 +2184,7 @@ async def set_conversation_skills(
         raise HTTPException(404, "Konversation nicht gefunden.")
     skills, is_override = await _resolve_effective_skills(
         user["id"], override_json,
+        gem_skills_override=await _gem_skills_of(conv, user["id"]),
     )
     return ConversationSkillsResponse(skills=skills, is_override=is_override)
 
@@ -2231,7 +2279,7 @@ async def get_avatar(
         raise HTTPException(403, "Kein Zugriff.")
     path = _avatar_path(user_id)
     try:
-        data = path.read_bytes()
+        data = await asyncio.to_thread(path.read_bytes)
     except OSError:
         raise HTTPException(404, "Kein Profilbild.")
     from fastapi.responses import Response
@@ -2446,14 +2494,13 @@ async def update_claude_auth(body: ClaudeAuthUpdateRequest, user=Depends(require
     # for opaque downstream errors. Reject it eagerly with a clear message.
     if body.mode == "bedrock":
         kv = await db.kv_get_all(scope=user["id"])
-        has_akid = bool(
-            (body.aws_access_key_id and body.aws_access_key_id.strip())
-            or kv.get(auth_modes.KV_AWS_ACCESS_KEY_ID)
-        )
-        has_secret = bool(
-            (body.aws_secret_access_key and body.aws_secret_access_key.strip())
-            or kv.get(auth_modes.KV_AWS_SECRET_ACCESS_KEY)
-        )
+        # Ein mitgeschickter Wert gilt, auch ein leerer (= loeschen). Nur wenn
+        # das Feld fehlt, zaehlt der gespeicherte Stand; sonst stuende der
+        # Modus danach auf Bedrock ohne Zugangsdaten.
+        def _will_have(sent: str | None, kv_key: str) -> bool:
+            return bool(sent.strip() if sent is not None else kv.get(kv_key))
+        has_akid = _will_have(body.aws_access_key_id, auth_modes.KV_AWS_ACCESS_KEY_ID)
+        has_secret = _will_have(body.aws_secret_access_key, auth_modes.KV_AWS_SECRET_ACCESS_KEY)
         if not (has_akid and has_secret):
             raise HTTPException(
                 400,

@@ -1342,9 +1342,13 @@ async function newChat(opts = {}) {
   if (window.PocketVoice) { try { window.PocketVoice.resetForChatSwitch(); } catch (_) {} }
   stopAudio();
   closeChatSearch();
+  // Eigene Generation: ein noch laufendes openChat darf diesen Chat nicht mehr
+  // ueberschreiben, und wer waehrend des Anlegens schon woanders hin geklickt
+  // hat, wird von der spaeten Antwort nicht zurueckgerissen.
+  const gen = ++_loadSeq;
   try {
     const c = await api('POST', '/conversations', opts.gemId ? { gem_id: opts.gemId } : {});
-    _loadSeq++;   // ein noch laufendes openChat darf diesen Chat nicht mehr ueberschreiben
+    if (gen !== _loadSeq) return;
     state.chatLoading = false;
     state.chatLoadFailed = false;
     state.cid = c.id;

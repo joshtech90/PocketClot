@@ -297,17 +297,22 @@ function gemWelcomeEl(gem) {
     };
     const saveBtn = $('gem-editor-save');
     saveBtn.disabled = true;
+    // Gem und Dateiliste jetzt festhalten: wird waehrend des Speicherns ein
+    // anderer Editor geoeffnet, landeten dessen Dateien sonst an diesem Gem.
+    const startId = editorGemId;
+    const files = queuedFiles;
     try {
-      const saved = editorGemId
-        ? await api('PUT', '/me/gems/' + editorGemId, payload)
+      const saved = startId
+        ? await api('PUT', '/me/gems/' + startId, payload)
         : await api('POST', '/me/gems', payload);
-      const gemId = editorGemId || saved.id;
+      const gemId = startId || saved.id;
       // Dateien, die vor dem ersten Speichern gewaehlt wurden, jetzt hochladen.
-      if (queuedFiles.length) {
+      if (files.length) {
         status.className = 'backup-status';
         status.textContent = t('gem_uploading');
-        for (const f of queuedFiles) await uploadGemFile(gemId, f);
-        queuedFiles = [];
+        for (const f of files) await uploadGemFile(gemId, f);
+        const done = [...files];
+        queuedFiles = queuedFiles.filter((f) => !done.includes(f));
       }
       $('gem-editor-modal').classList.add('hidden');
       await loadGems();

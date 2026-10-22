@@ -647,13 +647,15 @@
     api('POST', '/images/generate', payload)
       .then(function (res) {
         var attachments = (res && res.attachments) || [];
+        // Werte aus dem Auftrag, nicht die aktuelle Auswahl: die Knoepfe
+        // bleiben waehrend des Zeichnens bedienbar.
         var entry = {
           id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
           created: new Date().toISOString(),
           prompt: prompt,
-          provider: selectedProvider,
-          size: selectedSize,
-          aspect: selectedAspect,
+          provider: payload.provider,
+          size: payload.image_size,
+          aspect: payload.aspect_ratio,
           refs: refIds.length,
           images: attachments.map(function (a) {
             return {
