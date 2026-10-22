@@ -44,7 +44,8 @@ import de.smartzone.pocketclaude.ui.theme.PocketIcons
  * Layout (oben → unten):
  *   1) Status-Text (groß, fett, je nach Phase: Höre zu / Claude denkt / Liest vor / …)
  *   2) Hinweis-Text (klein, je nach Phase: Tippe zum Senden / Tippe zum Sprechen)
- *   3) Großer MicButton (140 dp Outer, leicht treffbar mit Daumen)
+ *   3) PocketVoiceOrb: Klumpen im Ring (140 dp, seit 22.10.2026 statt des
+ *      Mikrofon-Knopfs, gleiche Bedienung, Stille-Countdown als Bogen am Ring)
  *   4) Exit-Button "Auto-Modus beenden"
  *
  * Status-Inferenz:
@@ -94,8 +95,8 @@ fun AutoModeBar(
         AutoPhase.Speaking -> R.string.auto_mode_status_speaking
         AutoPhase.Idle -> R.string.auto_mode_status_idle
     }
-    // Countdown wird AUSSCHLIESSLICH visuell als Ring um den Mic gerendert
-    // (siehe MicButton.progressFraction). Der Status-Text bleibt konstant
+    // Countdown wird AUSSCHLIESSLICH visuell als Bogen auf dem Ring gerendert
+    // (siehe PocketVoiceOrb.progressFraction). Der Status-Text bleibt konstant
     // auf „Höre zu" — vermeidet das nervige Hin-Her-Springen zwischen
     // „Höre zu" und „Senden in Ns".
     val ringFraction = if (
@@ -112,10 +113,11 @@ fun AutoModeBar(
         else -> null
     }
 
-    val micState = when (voiceState) {
-        de.smartzone.pocketclaude.ui.chat.VoiceState.Idle -> MicState.Idle
-        de.smartzone.pocketclaude.ui.chat.VoiceState.Recording -> MicState.Recording
-        de.smartzone.pocketclaude.ui.chat.VoiceState.Transcribing -> MicState.Transcribing
+    val orbPhase = when (phase) {
+        AutoPhase.Listening -> VoiceOrbPhase.Listening
+        AutoPhase.Transcribing, AutoPhase.Thinking, AutoPhase.LoadingAudio -> VoiceOrbPhase.Working
+        AutoPhase.Speaking -> VoiceOrbPhase.Speaking
+        AutoPhase.Idle -> VoiceOrbPhase.Idle
     }
     val micEnabled = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording ||
         (voiceEnabled && voiceState != de.smartzone.pocketclaude.ui.chat.VoiceState.Transcribing)
@@ -156,12 +158,14 @@ fun AutoModeBar(
 
         Spacer(Modifier.size(4.dp))
 
-        MicButton(
-            state = micState,
+        PocketVoiceOrb(
+            phase = orbPhase,
+            recording = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording,
+            statusLabel = stringResource(statusRes),
             onTap = onMicTap,
             onCancel = onMicCancel,
             enabled = micEnabled,
-            outerSize = 140.dp,
+            size = 140.dp,
             progressFraction = ringFraction,
         )
 
