@@ -778,4 +778,41 @@
     <string name="settings_tts_provider_grok_body">La función de lectura en voz alta de Grok, proporcionada por un servicio en tu servidor con una sesión iniciada de Grok. Gratis, 28 voces, la velocidad está integrada directamente en el audio.</string>
     <string name="settings_tts_status_grok_active">Grok activo: gratis, 28 voces para elegir.</string>
     <string name="settings_tts_status_fallback">%1$s está seleccionado, pero no tiene la sesión iniciada. Mientras tanto, %2$s leerá en voz alta.</string>
+
+    <!-- Chat-Sperre und Markdown-Export (nachuebersetzt) -->
+    <string name="save_as_markdown">Guardar como Markdown</string>
+    <string name="chat_export_saved">Guardado.</string>
+    <string name="chat_export_save_failed">No se pudo guardar el archivo.</string>
+    <string name="conversation_lock">Bloquear</string>
+    <string name="conversation_unlock">Desbloquear</string>
+    <string name="convo_locked">Bloqueado</string>
+    <string name="chat_lock_locked_heading">Chat bloqueado</string>
+    <string name="chat_lock_enter_pin">Introduce tu PIN</string>
+    <string name="chat_lock_use_fingerprint">Usar huella dactilar</string>
+    <string name="chat_lock_unlock_chat">Desbloquear chat</string>
+    <string name="chat_lock_use_pin">Usar PIN</string>
+    <string name="chat_lock_wrong_pin">PIN incorrecto</string>
+    <string name="chat_lock_locked_out">Demasiados intentos. Inténtalo de nuevo en %1$d s</string>
+    <string name="chat_lock_need_pin_first">Configura primero un PIN de bloqueo de chats en Ajustes.</string>
+    <string name="chat_lock_remove_from_chat_title">¿Desbloquear este chat?</string>
+    <string name="chat_lock_remove_from_chat_msg">Introduce tu PIN para quitar el bloqueo de este chat.</string>
+    <string name="settings_section_chat_lock">Bloqueo de chats</string>
+    <string name="settings_subtitle_chat_lock">PIN + huella dactilar para chats individuales</string>
+    <string name="chat_lock_info_title">Bloqueo de chats</string>
+    <string name="chat_lock_info_body">Bloquea chats individuales con un PIN de 5 dígitos. En este teléfono también puedes desbloquear con tu huella dactilar. Los chats bloqueados se vuelven a bloquear cuando la aplicación pasa a segundo plano.\n\nEsto es un bloqueo de pantalla de privacidad, no un cifrado — los mensajes siguen existiendo en tu servidor.</string>
+    <string name="chat_lock_set_pin">Configurar PIN</string>
+    <string name="chat_lock_change_pin">Cambiar PIN</string>
+    <string name="chat_lock_remove_pin">Eliminar PIN</string>
+    <string name="chat_lock_new_pin">Nuevo PIN (5 dígitos)</string>
+    <string name="chat_lock_confirm_pin">Confirmar PIN</string>
+    <string name="chat_lock_current_pin">PIN actual</string>
+    <string name="chat_lock_pins_mismatch">Los PIN no coinciden.</string>
+    <string name="chat_lock_pin_must_be_5">El PIN debe tener exactamente 5 dígitos.</string>
+    <string name="chat_lock_wrong_current">El PIN actual es incorrecto.</string>
+    <string name="chat_lock_biometric_toggle">Desbloquear con huella dactilar</string>
+    <string name="chat_lock_biometric_toggle_sub">Usa huella dactilar/rostro en lugar del PIN en este dispositivo.</string>
+    <string name="chat_lock_pin_active">El PIN está configurado — puedes bloquear chats.</string>
+    <string name="chat_lock_no_pin">Aún no se ha configurado ningún PIN.</string>
+    <string name="chat_lock_pin_saved">PIN guardado.</string>
+    <string name="chat_lock_pin_removed">PIN eliminado.</string>
 </resources>

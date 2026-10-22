@@ -778,4 +778,41 @@
     <string name="settings_tts_provider_grok_body">La fonction de lecture à voix haute de Grok, fournie par un service sur ton serveur avec une session Grok connectée. Gratuit, 28 voix, la vitesse est directement intégrée dans l\'audio.</string>
     <string name="settings_tts_status_grok_active">Grok actif : gratuit, 28 voix au choix.</string>
     <string name="settings_tts_status_fallback">%1$s est sélectionné, mais n\'est pas connecté pour le moment. En attendant, %2$s lira à voix haute.</string>
+
+    <!-- Chat-Sperre und Markdown-Export (nachuebersetzt) -->
+    <string name="save_as_markdown">Enregistrer en Markdown</string>
+    <string name="chat_export_saved">Enregistré.</string>
+    <string name="chat_export_save_failed">Impossible d\'enregistrer le fichier.</string>
+    <string name="conversation_lock">Verrouiller</string>
+    <string name="conversation_unlock">Déverrouiller</string>
+    <string name="convo_locked">Verrouillé</string>
+    <string name="chat_lock_locked_heading">Discussion verrouillée</string>
+    <string name="chat_lock_enter_pin">Saisissez votre PIN</string>
+    <string name="chat_lock_use_fingerprint">Utiliser l\'empreinte digitale</string>
+    <string name="chat_lock_unlock_chat">Déverrouiller la discussion</string>
+    <string name="chat_lock_use_pin">Utiliser le PIN</string>
+    <string name="chat_lock_wrong_pin">PIN incorrect</string>
+    <string name="chat_lock_locked_out">Trop de tentatives. Réessayez dans %1$d s</string>
+    <string name="chat_lock_need_pin_first">Définissez d\'abord un PIN de verrouillage des discussions dans les paramètres.</string>
+    <string name="chat_lock_remove_from_chat_title">Déverrouiller cette discussion ?</string>
+    <string name="chat_lock_remove_from_chat_msg">Saisissez votre PIN pour supprimer le verrouillage de cette discussion.</string>
+    <string name="settings_section_chat_lock">Verrouillage des discussions</string>
+    <string name="settings_subtitle_chat_lock">PIN + empreinte digitale pour les discussions individuelles</string>
+    <string name="chat_lock_info_title">Verrouillage des discussions</string>
+    <string name="chat_lock_info_body">Verrouillez des discussions individuelles avec un PIN à 5 chiffres. Sur ce téléphone, vous pouvez également déverrouiller avec votre empreinte digitale. Les discussions verrouillées se reverrouillent lorsque l\'application passe en arrière-plan.\n\nIl s\'agit d\'un écran de confidentialité et non d\'un chiffrement — les messages restent sur votre serveur.</string>
+    <string name="chat_lock_set_pin">Définir un PIN</string>
+    <string name="chat_lock_change_pin">Modifier le PIN</string>
+    <string name="chat_lock_remove_pin">Supprimer le PIN</string>
+    <string name="chat_lock_new_pin">Nouveau PIN (5 chiffres)</string>
+    <string name="chat_lock_confirm_pin">Confirmer le PIN</string>
+    <string name="chat_lock_current_pin">PIN actuel</string>
+    <string name="chat_lock_pins_mismatch">Les PIN ne correspondent pas.</string>
+    <string name="chat_lock_pin_must_be_5">Le PIN doit comporter exactement 5 chiffres.</string>
+    <string name="chat_lock_wrong_current">Le PIN actuel est incorrect.</string>
+    <string name="chat_lock_biometric_toggle">Déverrouiller avec l\'empreinte digitale</string>
+    <string name="chat_lock_biometric_toggle_sub">Sur cet appareil, utilisez l\'empreinte digitale ou le visage plutôt que le PIN.</string>
+    <string name="chat_lock_pin_active">Le PIN est défini — vous pouvez verrouiller des discussions.</string>
+    <string name="chat_lock_no_pin">Aucun PIN n\'a encore été défini.</string>
+    <string name="chat_lock_pin_saved">PIN enregistré.</string>
+    <string name="chat_lock_pin_removed">PIN supprimé.</string>
 </resources>

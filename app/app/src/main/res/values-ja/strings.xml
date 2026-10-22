@@ -777,4 +777,41 @@
     <string name="settings_tts_provider_grok_body">Grok の読み上げ機能。サーバー上のログイン済み Grok セッションから提供されます。無料、28種類の音声、再生速度は音声に直接反映されます。</string>
     <string name="settings_tts_status_grok_active">Grok 有効：無料、28種類の音声から選択可能。</string>
     <string name="settings_tts_status_fallback">%1$s が選択されていますが、現在ログインしていません。それまでは %2$s が読み上げます。</string>
+
+    <!-- Chat-Sperre und Markdown-Export (nachuebersetzt) -->
+    <string name="save_as_markdown">Markdownとして保存</string>
+    <string name="chat_export_saved">保存しました。</string>
+    <string name="chat_export_save_failed">ファイルを保存できませんでした。</string>
+    <string name="conversation_lock">ロック</string>
+    <string name="conversation_unlock">ロック解除</string>
+    <string name="convo_locked">ロック中</string>
+    <string name="chat_lock_locked_heading">ロックされたチャット</string>
+    <string name="chat_lock_enter_pin">PINを入力</string>
+    <string name="chat_lock_use_fingerprint">指紋認証を使用</string>
+    <string name="chat_lock_unlock_chat">チャットのロックを解除</string>
+    <string name="chat_lock_use_pin">PINを使用</string>
+    <string name="chat_lock_wrong_pin">PINが正しくありません</string>
+    <string name="chat_lock_locked_out">試行回数が多すぎます。%1$d秒後にもう一度お試しください</string>
+    <string name="chat_lock_need_pin_first">最初に設定でチャットロック用PINを設定してください。</string>
+    <string name="chat_lock_remove_from_chat_title">このチャットのロックを解除しますか？</string>
+    <string name="chat_lock_remove_from_chat_msg">このチャットのロックを解除するにはPINを入力してください。</string>
+    <string name="settings_section_chat_lock">チャットロック</string>
+    <string name="settings_subtitle_chat_lock">個別チャットのPIN + 指紋認証</string>
+    <string name="chat_lock_info_title">チャットロック</string>
+    <string name="chat_lock_info_body">個別チャットを5桁のPINでロックします。このスマートフォンでは指紋認証でもロック解除できます。ロックされたチャットは、アプリがバックグラウンドに移行すると再びロックされます。\n\nこれはプライバシー保護の画面ロックであり、暗号化ではありません — メッセージはサーバー上に引き続き保持されます。</string>
+    <string name="chat_lock_set_pin">PINを設定</string>
+    <string name="chat_lock_change_pin">PINを変更</string>
+    <string name="chat_lock_remove_pin">PINを削除</string>
+    <string name="chat_lock_new_pin">新しいPIN（5桁）</string>
+    <string name="chat_lock_confirm_pin">PINの確認</string>
+    <string name="chat_lock_current_pin">現在のPIN</string>
+    <string name="chat_lock_pins_mismatch">PINが一致しません。</string>
+    <string name="chat_lock_pin_must_be_5">PINは5桁である必要があります。</string>
+    <string name="chat_lock_wrong_current">現在のPINが正しくありません。</string>
+    <string name="chat_lock_biometric_toggle">指紋認証でロック解除</string>
+    <string name="chat_lock_biometric_toggle_sub">この端末ではPINの代わりに指紋/顔認証を使用します。</string>
+    <string name="chat_lock_pin_active">PINが設定されています — チャットをロックできます。</string>
+    <string name="chat_lock_no_pin">PINはまだ設定されていません。</string>
+    <string name="chat_lock_pin_saved">PINを保存しました。</string>
+    <string name="chat_lock_pin_removed">PINを削除しました。</string>
 </resources>

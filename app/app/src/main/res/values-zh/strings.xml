@@ -777,4 +777,41 @@
     <string name="settings_tts_provider_grok_body">Grok 的朗读功能，由你服务器上已登录 Grok 会话的服务提供。免费，28 种声音，语速直接嵌入在音频中。</string>
     <string name="settings_tts_status_grok_active">Grok 已激活：免费，28 种声音可选。</string>
     <string name="settings_tts_status_fallback">已选择 %1$s，但当前未登录。在此之前将由 %2$s 朗读。</string>
+
+    <!-- Chat-Sperre und Markdown-Export (nachuebersetzt) -->
+    <string name="save_as_markdown">保存为 Markdown</string>
+    <string name="chat_export_saved">已保存。</string>
+    <string name="chat_export_save_failed">无法保存文件。</string>
+    <string name="conversation_lock">锁定</string>
+    <string name="conversation_unlock">解锁</string>
+    <string name="convo_locked">已锁定</string>
+    <string name="chat_lock_locked_heading">已锁定的聊天</string>
+    <string name="chat_lock_enter_pin">输入你的 PIN</string>
+    <string name="chat_lock_use_fingerprint">使用指纹</string>
+    <string name="chat_lock_unlock_chat">解锁聊天</string>
+    <string name="chat_lock_use_pin">使用 PIN</string>
+    <string name="chat_lock_wrong_pin">PIN 错误</string>
+    <string name="chat_lock_locked_out">尝试次数过多。请在 %1$d 秒后重试</string>
+    <string name="chat_lock_need_pin_first">请先在设置中设置聊天锁定 PIN。</string>
+    <string name="chat_lock_remove_from_chat_title">解锁此聊天？</string>
+    <string name="chat_lock_remove_from_chat_msg">输入你的 PIN 以解除此聊天的锁定。</string>
+    <string name="settings_section_chat_lock">聊天锁定</string>
+    <string name="settings_subtitle_chat_lock">单个聊天的 PIN + 指纹</string>
+    <string name="chat_lock_info_title">聊天锁定</string>
+    <string name="chat_lock_info_body">使用 5 位 PIN 锁定单个聊天。在此手机上，你还可以使用指纹解锁。当应用切换到后台时，已锁定的聊天将重新锁定。\n\n这是一种隐私屏幕锁，并非加密 — 消息仍然保存在你的服务器上。</string>
+    <string name="chat_lock_set_pin">设置 PIN</string>
+    <string name="chat_lock_change_pin">更改 PIN</string>
+    <string name="chat_lock_remove_pin">移除 PIN</string>
+    <string name="chat_lock_new_pin">新 PIN（5 位）</string>
+    <string name="chat_lock_confirm_pin">确认 PIN</string>
+    <string name="chat_lock_current_pin">当前 PIN</string>
+    <string name="chat_lock_pins_mismatch">PIN 不匹配。</string>
+    <string name="chat_lock_pin_must_be_5">PIN 必须为 5 位数字。</string>
+    <string name="chat_lock_wrong_current">当前 PIN 不正确。</string>
+    <string name="chat_lock_biometric_toggle">使用指纹解锁</string>
+    <string name="chat_lock_biometric_toggle_sub">在此设备上使用指纹/面部识别替代 PIN。</string>
+    <string name="chat_lock_pin_active">PIN 已设置 — 你可以锁定聊天。</string>
+    <string name="chat_lock_no_pin">尚未设置 PIN。</string>
+    <string name="chat_lock_pin_saved">PIN 已保存。</string>
+    <string name="chat_lock_pin_removed">PIN 已移除。</string>
 </resources>
