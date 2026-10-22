@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">PocketClot</string>
 
     <!-- ─── Generic actions / common ──────────────────────────────────── -->
@@ -761,7 +761,8 @@
     <string name="settings_provider_defaults">Modelo e profundidade de raciocínio por provedor</string>
     <string name="settings_provider_defaults_hint">São exibidos apenas os níveis de raciocínio que o modelo escolhido realmente suporta.</string>
     <string name="effort_not_supported">Este modelo não possui níveis de raciocínio.</string>
-  <plurals name="rewind_dialog_body">
+  <!-- 0 hat einen eigenen Text (rewind_dialog_body_none), "one" trifft nur noch 1 -->
+  <plurals name="rewind_dialog_body" tools:ignore="ImpliedQuantity">
     <item quantity="one">A mensagem após esta resposta será descartada. Depois você continuará a partir daqui.</item>
     <item quantity="other">As %1$d mensagens após esta resposta serão descartadas. Depois você continuará a partir daqui.</item>
   </plurals>

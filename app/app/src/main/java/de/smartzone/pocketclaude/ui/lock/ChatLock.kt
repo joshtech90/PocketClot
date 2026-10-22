@@ -327,6 +327,7 @@ fun PinVerifyDialog(
     var wrong by remember { mutableStateOf(false) }
     var cooldown by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(cooldown) {
         if (cooldown > 0) { delay(1000); cooldown -= 1 }
@@ -334,12 +335,18 @@ fun PinVerifyDialog(
 
     fun submit(candidate: String) {
         if (busy || cooldown > 0) return
-        busy = true; wrong = false
+        busy = true; wrong = false; error = null
         scope.launch {
-            val res = runCatching { verifyPin(candidate) }.getOrNull()
+            // Ein Netzfehler ist kein falscher PIN; wie im Sperrbildschirm
+            // die Meldung zeigen statt "falscher PIN".
+            val res = runCatching { verifyPin(candidate) }.getOrElse {
+                busy = false
+                error = it.message ?: it::class.java.simpleName
+                pin = ""
+                return@launch
+            }
             busy = false
             when {
-                res == null -> { wrong = true; pin = "" }
                 res.ok -> onVerified()
                 res.retryAfterSeconds > 0 -> { cooldown = res.retryAfterSeconds; pin = "" }
                 else -> { wrong = true; pin = "" }
@@ -360,7 +367,7 @@ fun PinVerifyDialog(
                     enabled = !busy && cooldown == 0,
                     onDigit = { d ->
                         if (pin.length < CHAT_LOCK_PIN_LENGTH) {
-                            wrong = false
+                            wrong = false; error = null
                             pin += d
                             if (pin.length == CHAT_LOCK_PIN_LENGTH) submit(pin)
                         }
@@ -374,10 +381,10 @@ fun PinVerifyDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
-                } else if (wrong) {
+                } else if (wrong || error != null) {
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        stringResource(R.string.chat_lock_wrong_pin),
+                        error ?: stringResource(R.string.chat_lock_wrong_pin),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )

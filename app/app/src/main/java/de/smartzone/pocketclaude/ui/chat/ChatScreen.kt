@@ -233,7 +233,8 @@ fun ChatScreen(
         pendingExportMd = null
         if (uri != null && md != null) {
             val ok = runCatching {
-                context.contentResolver.openOutputStream(uri)?.use {
+                // Ohne Stream ist nichts gespeichert; nicht "Gespeichert" melden.
+                (context.contentResolver.openOutputStream(uri) ?: error("kein Ausgabestrom")).use {
                     it.write(md.toByteArray(Charsets.UTF_8))
                 }
             }.isSuccess

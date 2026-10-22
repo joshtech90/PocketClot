@@ -581,8 +581,9 @@ class SettingsViewModel(
 
     fun deleteImageApiKey() = viewModelScope.launch {
         _imageKeyBusy.value = true
-        runCatching { chatRepo.deleteImageApiKey() }
-        _imageKeyMessage.value = "Key entfernt"
+        // Erfolg nur melden, wenn der Server wirklich geloescht hat.
+        _imageKeyMessage.value = runCatching { chatRepo.deleteImageApiKey() }
+            .fold({ "Key entfernt" }, { e -> "Fehler: ${e.message}" })
         refreshImageConfig().join()
         _imageKeyBusy.value = false
     }
@@ -627,8 +628,9 @@ class SettingsViewModel(
 
     fun deleteVoiceApiKey() = viewModelScope.launch {
         _voiceKeyBusy.value = true
-        runCatching { chatRepo.deleteVoiceApiKey() }
-        _voiceKeyMessage.value = "Key entfernt"
+        // Erfolg nur melden, wenn der Server wirklich geloescht hat.
+        _voiceKeyMessage.value = runCatching { chatRepo.deleteVoiceApiKey() }
+            .fold({ "Key entfernt" }, { e -> "Fehler: ${e.message}" })
         refreshVoiceConfig().join()
         _voiceKeyBusy.value = false
     }

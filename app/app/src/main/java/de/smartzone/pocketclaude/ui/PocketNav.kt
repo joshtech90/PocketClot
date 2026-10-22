@@ -84,13 +84,16 @@ fun PocketNav(container: AppContainer, initialChatCid: String? = null, shareNonc
     LaunchedEffect(initialChatCid) {
         val cid = initialChatCid ?: return@LaunchedEffect
         val current = nav.currentBackStackEntry?.destination?.route ?: return@LaunchedEffect
-        if (current.startsWith("chat/")) {
-            val currentCid = nav.currentBackStackEntry?.arguments?.getString("cid")
-            if (currentCid != cid) {
-                nav.navigate(Routes.chat(cid)) {
-                    popUpTo(Routes.CHAT) { inclusive = true }
-                    launchSingleTop = true
-                }
+        // Der Launch-Screen oeffnet den Chat selbst. Von ueberall sonst
+        // (auch Einstellungen, Chatliste, Gem-Editor) zum Ziel springen;
+        // vorher endete der Tipp auf die Benachrichtigung dort im Nichts.
+        if (current == Routes.LAUNCH) return@LaunchedEffect
+        val currentCid = if (current.startsWith("chat/"))
+            nav.currentBackStackEntry?.arguments?.getString("cid") else null
+        if (currentCid != cid) {
+            nav.navigate(Routes.chat(cid)) {
+                popUpTo(Routes.CHAT) { inclusive = true }
+                launchSingleTop = true
             }
         }
     }

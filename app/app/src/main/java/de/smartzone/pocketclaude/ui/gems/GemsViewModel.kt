@@ -229,8 +229,13 @@ class GemsViewModel(
         val files = if (st.pending.size != stillPending.size) {
             runCatching { chatRepo.getGem(saved.id).files }.getOrDefault(saved.files)
         } else saved.files
+        // Nur die hochgeladenen Dateien austragen, nicht die Liste vom Start
+        // zurueckschreiben: waehrend des Uploads hinzugefuegte oder entfernte
+        // Dateien gingen sonst verloren bzw. tauchten wieder auf.
+        val uploaded = st.pending.filterNot { it in stillPending }
         _editor.update {
-            it.copy(saving = false, pending = stillPending, files = files, error = uploadError)
+            it.copy(saving = false, pending = it.pending.filterNot { p -> p in uploaded },
+                    files = files, error = uploadError)
         }
         if (uploadError == null) onSaved()
     }

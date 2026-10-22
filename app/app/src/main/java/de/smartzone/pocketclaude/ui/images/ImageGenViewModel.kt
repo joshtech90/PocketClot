@@ -173,8 +173,10 @@ class ImageGenViewModel(
     /** Nimmt ein bereits erzeugtes Bild als Vorlage, ohne es neu hochzuladen. */
     fun addReferenceFromAttachment(att: ImageGenerateAttachment) = _state.update {
         if (!it.canEditReferences) it
+        // Laufende Uploads mitzaehlen, sonst nimmt eine Verlaufs-Vorlage
+        // deren Platz weg und der fertige Upload wird stillschweigend verworfen.
         else if (it.references.any { r -> r.id == att.id } ||
-                 it.references.size >= MAX_REFERENCES) it
+                 it.references.size + it.uploadsRunning >= MAX_REFERENCES) it
         else it.copy(references = it.references + ReferenceImageUi(att.id, att.filename))
     }
 

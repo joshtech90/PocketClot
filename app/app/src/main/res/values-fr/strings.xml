@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">PocketClot</string>
 
     <!-- ─── Generic actions / common ──────────────────────────────────── -->
@@ -761,7 +761,8 @@
     <string name="settings_provider_defaults">Modèle et profondeur de réflexion par fournisseur</string>
     <string name="settings_provider_defaults_hint">Seuls les niveaux de réflexion réellement pris en charge par le modèle choisi sont affichés.</string>
     <string name="effort_not_supported">Ce modèle n\'a pas de niveaux de réflexion.</string>
-  <plurals name="rewind_dialog_body">
+  <!-- 0 hat einen eigenen Text (rewind_dialog_body_none), "one" trifft nur noch 1 -->
+  <plurals name="rewind_dialog_body" tools:ignore="ImpliedQuantity">
     <item quantity="one">Le message après cette réponse sera supprimé. Vous continuerez ensuite à partir d\'ici.</item>
     <item quantity="other">Les %1$d messages après cette réponse seront supprimés. Vous continuerez ensuite à partir d\'ici.</item>
   </plurals>

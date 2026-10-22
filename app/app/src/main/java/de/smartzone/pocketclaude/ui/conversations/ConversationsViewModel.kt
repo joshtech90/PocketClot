@@ -66,14 +66,24 @@ class ConversationsViewModel(
         refresh()
     }
 
-    fun refresh() = viewModelScope.launch {
+    private var refreshJob: kotlinx.coroutines.Job? = null
+
+    /** Nur die juengste Abfrage zaehlt: nach einem Profilwechsel darf die noch
+     *  laufende Liste des alten Profils die neue nicht ueberschreiben. */
+    fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch { loadList() }
+    }
+
+    private suspend fun loadList() {
         val s = settingsRepo.current()
         if (!s.isConfigured) {
             _state.value = ConversationsState.NeedsSetup()
-            return@launch
+            return
         }
         _state.value = ConversationsState.Loading
         _state.value = runCatching { chatRepo.list() }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
             .map { ConversationsState.Loaded(it) as ConversationsState }
             .getOrElse { ConversationsState.Error(it.message ?: it::class.java.simpleName) }
     }
@@ -145,6 +155,9 @@ class ConversationsViewModel(
             kotlinx.coroutines.delay(250)  // Debounce
             _search.update { it.copy(isSearching = true) }
             runCatching { chatRepo.search(q) }
+                // Abgebrochen, weil schon weitergetippt wurde: kein Fehler fuer
+                // die neue Suche, einfach aufhoeren.
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                 .onSuccess { resp -> _search.update { it.copy(isSearching = false, hits = resp.hits) } }
                 .onFailure { e -> _search.update { it.copy(isSearching = false, error = e.message ?: "Suche fehlgeschlagen") } }
         }
