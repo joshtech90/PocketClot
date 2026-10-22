@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -116,7 +117,22 @@ fun PocketThinkingBlob(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
+        // Ueberblendung zum Ruhebild: Das PNG ist anders beleuchtet als der
+        // Canvas-Verlauf, ein hartes Umschalten bei progress 0 waere ein
+        // sichtbarer Farbsprung. Unten liegt das Markenzeichen, deckend bis zur
+        // Haelfte des Uebergangs; oben wird die Zeichnung erst ab dort ganz
+        // deckend. So bleibt die Flaeche nie halbdurchsichtig.
+        PocketBrandMark(
+            size = size,
+            modifier = Modifier.graphicsLayer {
+                alpha = (2f * (1f - transitionProgress)).coerceIn(0f, 1f)
+            },
+        )
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = (2f * transitionProgress).coerceIn(0f, 1f) },
+        ) {
             val baseRadius = minOf(this.size.width, this.size.height) * 0.36f
             // Schwerpunkt des Klumpens liegt nicht exakt in der Bildmitte des
             // Markenzeichens; so deckt sich die Kontur mit dem Ruhebild.
