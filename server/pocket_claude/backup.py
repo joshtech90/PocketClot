@@ -22,6 +22,7 @@ mehr direkt importierbar sind.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import json
 import logging
@@ -445,53 +446,21 @@ async def create_backup_zip(
         user_name=user_name,
     )
 
-    # DB sauber kopieren (kein Lock-Konflikt mit dem laufenden Server)
-    # Eindeutiger Name (zwei Exporte in derselben Sekunde) und Aufraeumen in
-    # jedem Fall: scheiterte der Export unterwegs, blieb sonst eine Kopie der
-    # Chat-Datenbank im Datenordner liegen.
-    tmp_db = settings.data_dir / f".backup-snapshot-{int(time.time())}-{uuid.uuid4().hex[:8]}.db"
-    try:
-        # Kopieren und Packen laufen im Thread: synchron im Event-Loop stand
-        # sonst der ganze Server, solange ein grosses Backup entsteht.
-        await asyncio.to_thread(_vacuum_to, tmp_db)
-        # Bei per-User-Export: die Kopie auf die User-Daten reduzieren (entfernt
-        # dabei auch die sessions-Tabelle). Beim globalen Admin-Export läuft der
-        # Filter nicht — sessions dort separat komplett entfernen, sonst würden ALLE
-        # aktiven Bearer-Tokens im Klartext im Backup landen.
-        if user_id is not None:
-            await asyncio.to_thread(_filter_db_to_user, tmp_db, user_id)
-        else:
-            await asyncio.to_thread(_strip_sessions, tmp_db)
+    # Welche Attachment-Pfade gehören mit ins ZIP?
+    allowed_paths: Optional[set[str]] = None
+    if user_id is not None:
+        async with aiosqlite.connect(settings.db_path) as conn:
+            cur = await conn.execute(
+                "SELECT path FROM attachments WHERE user_id = ?", (user_id,),
+            )
+            allowed_paths = {row[0] for row in await cur.fetchall()}
 
-        # Welche Attachment-Pfade gehören mit ins ZIP?
-        allowed_paths: Optional[set[str]] = None
-        if user_id is not None:
-            async with aiosqlite.connect(settings.db_path) as conn:
-                cur = await conn.execute(
-                    "SELECT path FROM attachments WHERE user_id = ?", (user_id,),
-                )
-                allowed_paths = {row[0] for row in await cur.fetchall()}
-
-        def _write_zip() -> io.BytesIO:
-            buf = io.BytesIO()
-            with _open_zip_for_write(buf, password) as zf:
-                zf.writestr(MANIFEST_FILENAME, json.dumps(manifest.to_dict(), indent=2))
-                zf.write(tmp_db, arcname=DB_FILENAME)
-                uploads_dir = settings.data_dir / "uploads"
-                if uploads_dir.exists():
-                    for f in uploads_dir.rglob("*"):
-                        if not f.is_file():
-                            continue
-                        # Bei per-User: nur die Files mit registriertem path
-                        if allowed_paths is not None and str(f) not in allowed_paths:
-                            continue
-                        arcname = f"{UPLOADS_DIR}/{f.relative_to(uploads_dir)}"
-                        zf.write(f, arcname=arcname)
-            return buf
-
-        buf = await asyncio.to_thread(_write_zip)
-    finally:
-        tmp_db.unlink(missing_ok=True)
+    # Kopieren, Filtern, Packen und Aufraeumen in EINEM Thread: synchron im
+    # Event-Loop stand sonst der ganze Server, solange ein grosses Backup
+    # entsteht. Und nur so raeumt der Thread seine Kopie selbst weg, auch wenn
+    # der Aufrufer unterdessen abbricht.
+    buf = await asyncio.to_thread(
+        _build_zip_sync, manifest, password, user_id, allowed_paths)
 
     scope = f"user={user_name or user_id}" if user_id else "global"
     encrypted_note = " [AES-256]" if password else ""
@@ -500,6 +469,47 @@ async def create_backup_zip(
         encrypted_note, scope, conv_count, msg_count, att_count, len(buf.getvalue()) // 1024,
     )
     return buf.getvalue()
+
+
+def _build_zip_sync(
+    manifest: "BackupManifest",
+    password: Optional[str],
+    user_id: Optional[str],
+    allowed_paths: Optional[set[str]],
+) -> io.BytesIO:
+    # DB sauber kopieren (kein Lock-Konflikt mit dem laufenden Server).
+    # Eindeutiger Name (zwei Exporte in derselben Sekunde) und Aufraeumen in
+    # jedem Fall: scheiterte der Export unterwegs, blieb sonst eine Kopie der
+    # Chat-Datenbank im Datenordner liegen.
+    tmp_db = settings.data_dir / f".backup-snapshot-{int(time.time())}-{uuid.uuid4().hex[:8]}.db"
+    try:
+        _vacuum_to(tmp_db)
+        # Bei per-User-Export: die Kopie auf die User-Daten reduzieren (entfernt
+        # dabei auch die sessions-Tabelle). Beim globalen Admin-Export läuft der
+        # Filter nicht — sessions dort separat komplett entfernen, sonst würden ALLE
+        # aktiven Bearer-Tokens im Klartext im Backup landen.
+        if user_id is not None:
+            _filter_db_to_user(tmp_db, user_id)
+        else:
+            _strip_sessions(tmp_db)
+
+        buf = io.BytesIO()
+        with _open_zip_for_write(buf, password) as zf:
+            zf.writestr(MANIFEST_FILENAME, json.dumps(manifest.to_dict(), indent=2))
+            zf.write(tmp_db, arcname=DB_FILENAME)
+            uploads_dir = settings.data_dir / "uploads"
+            if uploads_dir.exists():
+                for f in uploads_dir.rglob("*"):
+                    if not f.is_file():
+                        continue
+                    # Bei per-User: nur die Files mit registriertem path
+                    if allowed_paths is not None and str(f) not in allowed_paths:
+                        continue
+                    arcname = f"{UPLOADS_DIR}/{f.relative_to(uploads_dir)}"
+                    zf.write(f, arcname=arcname)
+        return buf
+    finally:
+        tmp_db.unlink(missing_ok=True)
 
 
 def suggested_filename() -> str:
@@ -616,6 +626,9 @@ def _replace_db_and_uploads(zf) -> tuple[int, int, int]:  # noqa: ANN001
     try:
         with zf.open(DB_FILENAME) as src, open(tmp_db, "wb") as dst:
             _copy_limited(src, dst, DB_FILENAME)
+        # Die neue DB muss lesbar sein und die Kerntabellen haben, BEVOR etwas
+        # getauscht wird; sonst ersetzte eine kaputte Datei die echte.
+        conv, msg = _check_import_db(tmp_db)
         # Uploads sicher extrahieren (Zip-Slip-/Zip-Bomb-Schutz, BR-008).
         att_count = _extract_uploads_safely(zf, new_uploads, skip_existing=False)
     except BaseException:
@@ -623,20 +636,45 @@ def _replace_db_and_uploads(zf) -> tuple[int, int, int]:  # noqa: ANN001
         shutil.rmtree(new_uploads, ignore_errors=True)
         raise
 
-    # DB atomar per os.replace tauschen. So bleiben evtl. noch offene
-    # aiosqlite-Handles auf dem alten Inode statt unter ihnen Bytes zu zerstören.
-    os.replace(tmp_db, target_db)
-    if uploads_dir.exists():
-        os.replace(uploads_dir, old_uploads)
-    os.replace(new_uploads, uploads_dir)
+    # Tauschen: erst die Uploads (zuruecknehmbar), zuletzt die DB. os.replace
+    # der DB ist atomar; offene aiosqlite-Handles bleiben auf dem alten Inode,
+    # statt dass unter ihnen Bytes zerstoert werden. Scheitert ein Schritt,
+    # kommt der alte Upload-Ordner zurueck und die DB bleibt unberuehrt.
+    had_uploads = uploads_dir.exists()
+    try:
+        if had_uploads:
+            os.replace(uploads_dir, old_uploads)
+        try:
+            os.replace(new_uploads, uploads_dir)
+            os.replace(tmp_db, target_db)
+        except BaseException:
+            if uploads_dir.exists() and not new_uploads.exists():
+                os.replace(uploads_dir, new_uploads)
+            if had_uploads:
+                os.replace(old_uploads, uploads_dir)
+            raise
+    except BaseException:
+        tmp_db.unlink(missing_ok=True)
+        shutil.rmtree(new_uploads, ignore_errors=True)
+        raise
     shutil.rmtree(old_uploads, ignore_errors=True)
 
-    # Counts aus neuer DB ziehen
-    with sqlite3.connect(str(target_db)) as conn:
-        conv = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
-        msg = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+    return conv, msg, att_count
 
-    return int(conv), int(msg), att_count
+
+def _check_import_db(path: Path) -> tuple[int, int]:
+    """Prueft eine Backup-DB vor dem Einspielen und liefert (Chats, Nachrichten)."""
+    try:
+        with contextlib.closing(sqlite3.connect(str(path))) as conn:
+            ok = conn.execute("PRAGMA quick_check").fetchone()
+            if not ok or ok[0] != "ok":
+                raise ValueError("Backup-Datenbank ist beschädigt.")
+            conv = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
+            msg = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+            conn.execute("SELECT COUNT(*) FROM attachments").fetchone()
+    except sqlite3.DatabaseError as exc:
+        raise ValueError(f"Backup-Datenbank ist nicht lesbar: {exc}") from exc
+    return int(conv), int(msg)
 
 
 def _merge_db_and_uploads(zf) -> tuple[int, int, int, int]:  # noqa: ANN001

@@ -19,7 +19,16 @@ from pocket_claude import backup, db  # noqa: E402
 from pocket_claude.config import settings  # noqa: E402
 
 
-def test_rejected_replace_keeps_live_data():
+def _corrupt_db(zf: zipfile.ZipFile) -> None:
+    zf.writestr(backup.DB_FILENAME, b"keine sqlite-datei" * 100)
+
+
+def _escaping_upload(zf: zipfile.ZipFile) -> None:
+    zf.writestr("uploads/../ausbruch.txt", b"boese")
+
+
+@pytest.mark.parametrize("verderben", [_escaping_upload, _corrupt_db])
+def test_rejected_replace_keeps_live_data(verderben):
     asyncio.run(db.init_db())
     cid = asyncio.run(db.create_conversation("Bleibt"))
     upload = settings.uploads_dir / "bleibt.txt"
@@ -27,11 +36,15 @@ def test_rejected_replace_keeps_live_data():
     db_before = settings.db_path.read_bytes()
 
     good = asyncio.run(backup.create_backup_zip())
-    buf = io.BytesIO(good)
-    with zipfile.ZipFile(buf, "a") as zf:
-        zf.writestr("uploads/../ausbruch.txt", b"boese")
+    src = zipfile.ZipFile(io.BytesIO(good))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for info in src.infolist():
+            if not (verderben is _corrupt_db and info.filename == backup.DB_FILENAME):
+                zf.writestr(info, src.read(info))
+        verderben(zf)
 
-    with pytest.raises(backup.BackupUnsafeEntryError):
+    with pytest.raises(ValueError):
         backup.import_backup(buf.getvalue(), "replace")
 
     assert upload.read_bytes() == b"vorher"

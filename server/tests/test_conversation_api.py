@@ -62,6 +62,10 @@ def test_patch_rejects_unknown_model_without_writing(ctx):
     assert r.status_code == 400
     conv = asyncio.run(db.get_conversation(cid))
     assert conv["title"] != "Neu" and not conv.get("chat_model")
+    # Sperren ohne PIN wird abgelehnt, ebenfalls ohne den Titel zu schreiben
+    r = c.patch(f"/conversations/{cid}", headers=h, json={"title": "Neu", "locked": True})
+    assert r.status_code == 400
+    assert asyncio.run(db.get_conversation(cid))["title"] != "Neu"
 
 
 def test_skills_dialog_shows_gem_skills(ctx):

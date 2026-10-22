@@ -464,6 +464,16 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
         effort_value = body.chat_effort.strip().lower()
         if effort_value and effort_value not in _CHAT_EFFORTS:
             raise HTTPException(400, f"Unbekannte Denktiefe: {effort_value!r}")
+    # Sperren nur erlauben, wenn ein globaler PIN gesetzt ist — sonst hätte
+    # der User einen gesperrten Chat, den er nicht mehr aufbekommt.
+    if body.locked:
+        kv = await db.kv_get_all(scope=user["id"])
+        if not kv.get(KV_CHAT_LOCK_PIN_HASH):
+            raise HTTPException(
+                400,
+                "Kein Chat-Sperr-PIN gesetzt. Lege zuerst in den Einstellungen "
+                "einen PIN fest.",
+            )
     if body.title is not None:
         await db.update_conversation_title(cid, body.title, user_id=user["id"])
     if body.pinned is not None:
@@ -481,16 +491,6 @@ async def patch_conversation(cid: str, body: ConversationPatch, user=Depends(req
     if body.chat_effort is not None:
         await db.set_chat_effort(cid, body.chat_effort.strip().lower(), user_id=user["id"])
     if body.locked is not None:
-        # Sperren nur erlauben, wenn ein globaler PIN gesetzt ist — sonst hätte
-        # der User einen gesperrten Chat, den er nicht mehr aufbekommt.
-        if body.locked:
-            kv = await db.kv_get_all(scope=user["id"])
-            if not kv.get(KV_CHAT_LOCK_PIN_HASH):
-                raise HTTPException(
-                    400,
-                    "Kein Chat-Sperr-PIN gesetzt. Lege zuerst in den Einstellungen "
-                    "einen PIN fest.",
-                )
         await db.set_locked(cid, body.locked, user_id=user["id"])
         if body.locked:
             from pocket_claude import wissen_export
@@ -1922,8 +1922,9 @@ async def images_generate(body: dict, user=Depends(require_user)):
                 attachment_ids=[a["id"] for a in out_atts],
                 tokens=0,
             )
-            if conv.get("claude_session_id"):
-                await db.set_claude_session_id(cid, None)
+            # Immer, nicht nach dem vor dem Lock gelesenen Stand: ein Turn
+            # kann seine Session erst waehrenddessen angelegt haben.
+            await db.set_claude_session_id(cid, None)
         # Gleicher kurzer Auto-Titel wie im Chat-Flow (1-2 Woerter statt der
         # verbatim ersten Zeile). Non-streaming: Client zieht den Titel beim
         # naechsten Laden der Liste.
