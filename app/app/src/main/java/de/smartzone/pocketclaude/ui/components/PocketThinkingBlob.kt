@@ -44,7 +44,7 @@ fun PocketThinkingBlob(
     isThinking: Boolean = true,
     speedMultiplier: Float = 1f,
     morphIntensity: Float = 0.12f,
-    specularShine: Float = 0.45f,
+    specularShine: Float = 0.3f,
     glowEnabled: Boolean = false,
 ) {
     val transitionProgress by animateFloatAsState(
@@ -155,17 +155,15 @@ fun PocketThinkingBlob(
                     )
 
                     // 3. Satin-Verlauf, Farben am Icon abgenommen
-                    val lightSource = Offset(center.x - baseRadius * 0.35f, center.y - baseRadius * 0.45f)
+                    val lightSource = Offset(center.x - baseRadius * 0.30f, center.y - baseRadius * 0.45f)
                     val blobBrush = Brush.radialGradient(
-                        colors = listOf(
-                            Color(0xFFA6DAFF),
-                            Color(0xFF80C8FB),
-                            Color(0xFF3190E8),
-                            Color(0xFF1B5DC0),
-                            Color(0xFF263D87),
-                        ),
+                        0.00f to Color(0xFF9AD3FF),
+                        0.18f to Color(0xFF5EAEF4),
+                        0.45f to Color(0xFF2F86E3),
+                        0.78f to Color(0xFF1F66C9),
+                        1.00f to Color(0xFF1A3F93),
                         center = lightSource,
-                        radius = baseRadius * 1.55f,
+                        radius = baseRadius * 1.8f,
                     )
                     drawPath(path = blobPath, brush = blobBrush)
 
@@ -195,20 +193,22 @@ fun PocketThinkingBlob(
     }
 }
 
-// 12 Kontrollpunkte: 6 Lappen + 6 Taeler, vermessen am Masterbild
+// 36 Kontrollpunkte im 10-Grad-Raster, vermessen am Masterbild
 // `Animation/nordic_soft_master.png` (Winkel im Uhrzeigersinn ab 3 Uhr,
 // Radien relativ zu baseRadius, skaliert wie ic_brand_mark mit 92 %).
-private val CONTROL_ANGLES = floatArrayOf(
-    23f, 56f, 89f, 115f, 147f, 176f, 204f, 237f, 274f, 303f, 333f, 357f,
-).map { (it * PI / 180.0).toFloat() }.toFloatArray()
+// Weniger Punkte machen die Lappen spitz und die Taeler flach.
+private val CONTROL_ANGLES = FloatArray(36) { (it * 10.0 * PI / 180.0).toFloat() }
 
 private val CONTROL_RADII = floatArrayOf(
-    1.347f, 1.047f, 1.245f, 1.139f, 1.351f, 1.098f, 1.339f, 1.067f, 1.294f, 1.065f, 1.340f, 1.163f,
+    1.166f, 1.293f, 1.345f, 1.329f, 1.253f, 1.084f, 1.051f, 1.155f, 1.224f,
+    1.243f, 1.214f, 1.148f, 1.152f, 1.267f, 1.334f, 1.347f, 1.302f, 1.156f,
+    1.113f, 1.265f, 1.333f, 1.326f, 1.251f, 1.105f, 1.067f, 1.159f, 1.243f,
+    1.287f, 1.284f, 1.208f, 1.067f, 1.118f, 1.277f, 1.335f, 1.321f, 1.222f,
 )
 
 // Abstand Schwerpunkt zu Bildmitte des Markenzeichens, in baseRadius.
-private const val CENTER_OFFSET_X = -0.009f
-private const val CENTER_OFFSET_Y = 0.023f
+private const val CENTER_OFFSET_X = -0.010f
+private const val CENTER_OFFSET_Y = 0.022f
 
 private fun create3DClayBlobPath(
     center: Offset,

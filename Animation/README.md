@@ -1,5 +1,13 @@
 # PocketClot Thinking Blob Animation (Entwurf & Asset-Paket)
 
+> **Stand 22.10.2026: Orange ist abgeloest.** Neues Icon "Nordic Soft"
+> (blauer Satin-Klumpen mit 6 Lappen) aus Astras Entwurfsrunde, Denk-Stil
+> "Sanftes Atmen" (3,6 s je Zyklus, 97 bis 103 %, +-2 Grad, Morph 12 %).
+> Quelle `nordic_soft_master.png`, Export aller App- und Web-Ressourcen mit
+> `export_nordic_icons.py`. Kontur und Farben der Denk-Animation in
+> `app/.../ui/components/PocketThinkingBlob.kt` sind am Master vermessen.
+> Alles unten (Orange, 5 Lappen, 0.8x/20 %) ist History.
+
 Dieses Verzeichnis enthaelt das vollstaendige Design- und Implementierungspaket fuer die animierte, morphende **PocketClot-Masse** waehrend des Denkvorgangs ("Thinking / Streaming").
 
 ---
