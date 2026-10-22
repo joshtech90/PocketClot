@@ -2,9 +2,10 @@ package de.smartzone.pocketclaude.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Midnight Atelier. Warm intelligence instead of generic software blue.
-val AtelierCoral = Color(0xFFF08361)
-val AtelierCoralDeep = Color(0xFFB64B32)
+// Midnight Atelier. Seit 22.10.2026 mit dem Blau des App-Icons "Nordic Soft"
+// statt Koralle (Joscha: Orange passt nicht mehr zur App).
+val AtelierBlue = Color(0xFF7CB8EB)
+val AtelierBlueDeep = Color(0xFF1B649E)
 val AtelierIce = Color(0xFF8BC9D6)
 val AtelierIceDeep = Color(0xFF3E6B75)
 val AtelierGold = Color(0xFFF1BE72)
@@ -20,7 +21,7 @@ val DarkOnSurfaceVariant = Color(0xFFBEB3AE)
 val DarkOutline = Color(0xFF463E49)
 val DarkOutlineSoft = Color(0xFF302B35)
 val DarkBubbleAssistant = Color(0xFF1C1821)
-val DarkBubbleUser = Color(0xFFE77755)
+val DarkBubbleUser = Color(0xFF2F6DB5)
 
 val LightBackground = Color(0xFFF7F2EB)
 val LightSurface = Color(0xFFFFFBF6)
@@ -33,7 +34,7 @@ val LightOnSurfaceVariant = Color(0xFF6F6361)
 val LightOutline = Color(0xFFD8CCC5)
 val LightOutlineSoft = Color(0xFFE8DED7)
 val LightBubbleAssistant = Color(0xFFFFFBF6)
-val LightBubbleUser = Color(0xFFB94F35)
+val LightBubbleUser = Color(0xFF1B649E)
 
 val ErrorRed = Color(0xFFB83C32)
 val DarkError = Color(0xFFFFB4AB)

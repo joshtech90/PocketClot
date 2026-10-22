@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.smartzone.pocketclaude.R
-import de.smartzone.pocketclaude.ui.theme.AtelierCoral
 import de.smartzone.pocketclaude.ui.theme.AtelierGold
 import de.smartzone.pocketclaude.ui.theme.PocketTheme
 import java.util.Locale

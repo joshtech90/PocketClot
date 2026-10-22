@@ -48,14 +48,14 @@ fun specFor(palette: PocketPalette): PaletteSpec = when (palette) {
 }
 
 // ---------------------------------------------------------------------------
-// 1) Midnight Atelier (Standard-Schema, 1:1 aus Color.kt und Theme.kt)
+// 1) Midnight Atelier (Standard dunkel; Akzent seit 22.10.2026 Icon-Blau statt Koralle)
 // ---------------------------------------------------------------------------
 
 private val MidnightAtelierDarkColors = darkColorScheme(
-    primary = AtelierCoral,
-    onPrimary = Color(0xFF29130D),
-    primaryContainer = Color(0xFF633020),
-    onPrimaryContainer = Color(0xFFFFDBCF),
+    primary = AtelierBlue,
+    onPrimary = Color(0xFF062B4A),
+    primaryContainer = Color(0xFF1E486D),
+    onPrimaryContainer = Color(0xFFD2E6FA),
     secondary = AtelierIce,
     onSecondary = Color(0xFF092A31),
     secondaryContainer = Color(0xFF214A54),
@@ -82,10 +82,10 @@ private val MidnightAtelierDarkColors = darkColorScheme(
 )
 
 private val MidnightAtelierLightColors = lightColorScheme(
-    primary = AtelierCoralDeep,
+    primary = AtelierBlueDeep,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFDBCF),
-    onPrimaryContainer = Color(0xFF3B0B00),
+    primaryContainer = Color(0xFFD3E5F7),
+    onPrimaryContainer = Color(0xFF001D36),
     secondary = AtelierIceDeep,
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFCFE7EC),
@@ -114,11 +114,11 @@ private val MidnightAtelierLightColors = lightColorScheme(
 private val MidnightAtelierDarkPocket = PocketColors(
     bubbleUser = DarkBubbleUser,
     bubbleAssistant = DarkBubbleAssistant,
-    onBubbleUser = Color(0xFF26130D),
+    onBubbleUser = Color.White,
     onBubbleAssistant = DarkOnSurface,
     accent = AtelierIce,
     success = SuccessGreen,
-    ambientPrimary = AtelierCoral,
+    ambientPrimary = AtelierBlue,
     ambientSecondary = AtelierIce,
     surfaceLow = DarkSurfaceLow,
     outlineSoft = DarkOutlineSoft,
@@ -131,7 +131,7 @@ private val MidnightAtelierLightPocket = PocketColors(
     onBubbleAssistant = LightOnSurface,
     accent = AtelierIceDeep,
     success = LightSuccessGreen,
-    ambientPrimary = AtelierCoral,
+    ambientPrimary = AtelierBlue,
     ambientSecondary = AtelierIce,
     surfaceLow = LightSurfaceLow,
     outlineSoft = LightOutlineSoft,
