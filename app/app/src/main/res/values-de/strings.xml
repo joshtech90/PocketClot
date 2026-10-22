@@ -803,6 +803,7 @@
     <item quantity="one">Die Nachricht nach dieser Antwort wird verworfen. Danach geht es hier weiter.</item>
     <item quantity="other">Die %1$d Nachrichten nach dieser Antwort werden verworfen. Danach geht es hier weiter.</item>
   </plurals>
+    <string name="rewind_dialog_body_none">Es wird nichts verworfen. Es geht einfach hier weiter.</string>
     <string name="section_memory">Gedächtnis</string>
     <string name="memory_key_set">Schlüssel auf diesem Gerät gespeichert</string>
     <string name="memory_key_unset">Kein Schlüssel eingetragen</string>

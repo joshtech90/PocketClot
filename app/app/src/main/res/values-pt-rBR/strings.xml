@@ -765,6 +765,7 @@
     <item quantity="one">A mensagem após esta resposta será descartada. Depois você continuará a partir daqui.</item>
     <item quantity="other">As %1$d mensagens após esta resposta serão descartadas. Depois você continuará a partir daqui.</item>
   </plurals>
+    <string name="rewind_dialog_body_none">Nada é descartado. Você simplesmente continua a partir daqui.</string>
     <string name="section_memory">Memória</string>
     <string name="memory_key_set">Chave salva neste dispositivo</string>
     <string name="memory_key_unset">Nenhuma chave</string>

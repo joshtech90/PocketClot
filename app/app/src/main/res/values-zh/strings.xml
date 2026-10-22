@@ -764,6 +764,7 @@
   <plurals name="rewind_dialog_body">
     <item quantity="other">此回复之后的 %1$d 条消息将被舍弃。然后从这里继续。</item>
   </plurals>
+    <string name="rewind_dialog_body_none">不会丢弃任何内容。你只需从这里继续。</string>
     <string name="section_memory">记忆</string>
     <string name="memory_key_set">密钥已保存在此设备</string>
     <string name="memory_key_unset">未设置密钥</string>

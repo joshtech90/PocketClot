@@ -803,6 +803,7 @@
     <item quantity="one">The message after this answer gets discarded. Then you carry on from here.</item>
     <item quantity="other">The %1$d messages after this answer get discarded. Then you carry on from here.</item>
   </plurals>
+    <string name="rewind_dialog_body_none">Nothing gets discarded. You simply continue from here.</string>
     <string name="section_memory">Memory</string>
     <string name="memory_key_set">Key saved on this device</string>
     <string name="memory_key_unset">No key set</string>

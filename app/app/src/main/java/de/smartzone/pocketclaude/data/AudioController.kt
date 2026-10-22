@@ -6,6 +6,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -170,6 +171,7 @@ class AudioController(
      * in der gewuenschten Geschwindigkeit, dort bleibt der Wert auf 1.0 —
      * sonst wuerde das Tempo zweimal angewandt.
      */
+    @androidx.annotation.OptIn(UnstableApi::class)  // setCustomCacheKey
     private fun startPlayback(messageId: Long, url: String, cacheKey: String?, speed: Float = 1.0f) {
         if (_state.value.loadingMessageId != messageId) {
             return

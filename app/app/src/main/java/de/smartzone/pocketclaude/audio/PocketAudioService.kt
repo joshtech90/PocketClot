@@ -27,6 +27,7 @@ import java.io.File
  * Voice+Rate-Kombination wird direkt aus dem Cache gespielt — kein Server-
  * Roundtrip, kein erneutes Synthetisieren.
  */
+@OptIn(UnstableApi::class)  // SimpleCache als Feld
 class PocketAudioService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var cache: SimpleCache? = null

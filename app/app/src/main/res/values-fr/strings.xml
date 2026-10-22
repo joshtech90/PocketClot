@@ -765,6 +765,7 @@
     <item quantity="one">Le message après cette réponse sera supprimé. Vous continuerez ensuite à partir d\'ici.</item>
     <item quantity="other">Les %1$d messages après cette réponse seront supprimés. Vous continuerez ensuite à partir d\'ici.</item>
   </plurals>
+    <string name="rewind_dialog_body_none">Rien n\'est supprimé. Vous reprenez simplement à partir d\'ici.</string>
     <string name="section_memory">Mémoire</string>
     <string name="memory_key_set">Clé enregistrée sur cet appareil</string>
     <string name="memory_key_unset">Aucune clé</string>

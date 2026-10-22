@@ -1409,11 +1409,19 @@ private fun RewindDialog(
         title = { Text(stringResource(de.smartzone.pocketclaude.R.string.rewind_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // An der letzten Antwort faellt nichts weg. Ohne eigenen Text
+                // hiess es dort "Die 0 Nachrichten ...", auf Franzoesisch und
+                // Portugiesisch sogar "Die Nachricht ... wird verworfen", weil
+                // dort 0 in die Einzahl faellt.
                 Text(
-                    pluralStringResource(
-                        de.smartzone.pocketclaude.R.plurals.rewind_dialog_body,
-                        droppedCount, droppedCount,
-                    ),
+                    if (droppedCount == 0) {
+                        stringResource(de.smartzone.pocketclaude.R.string.rewind_dialog_body_none)
+                    } else {
+                        pluralStringResource(
+                            de.smartzone.pocketclaude.R.plurals.rewind_dialog_body,
+                            droppedCount, droppedCount,
+                        )
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (models.isNotEmpty()) {
