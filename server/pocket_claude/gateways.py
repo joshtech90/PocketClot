@@ -304,8 +304,9 @@ def _detect_context_length(item: dict) -> int | None:
 
 
 def _is_text_output(item: dict) -> bool:
-    caps = _caps(item)
-    mods = caps.get("output_modalities")
+    # Gleiche Quellen wie extract_image_models(), sonst landet ein reines
+    # Bildmodell, das seine Modalitaeten unter metadata meldet, im Chat-Picker.
+    mods = _caps(item).get("output_modalities") or _meta(item).get("output_modalities")
     if isinstance(mods, list) and mods:
         return "text" in mods
     return True
@@ -755,8 +756,8 @@ async def gpt_image_gateway() -> GatewayConfig | None:
 async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
     """Das Gateway und das Gemini-Bildmodell fuer den nativen Gemini-Pfad.
 
-    Es gewinnt das erste Gateway, das ein Gemini-Bildmodell anbietet. Ist
-    `preferred` gesetzt und dort vorhanden, wird das genommen. Gibt None
+    Ist `preferred` gesetzt und auf irgendeinem Gateway vorhanden, gewinnt
+    dieses. Sonst das erste Gateway, das ein Gemini-Bildmodell anbietet. Gibt None
     zurueck, wenn kein Gateway eines hat: dann ist der Gemini-Weg fuer Bilder
     schlicht nicht eingerichtet.
 
@@ -768,6 +769,9 @@ async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
     if not gws:
         return None
     await list_models(force=False)
+    # Erst ueber ALLE Gateways nach dem Wunschmodell suchen: liegt es auf dem
+    # zweiten, haette sonst das erste mit irgendeinem Bildmodell gewonnen.
+    first: tuple[GatewayConfig, str] | None = None
     for gw in gws:
         entry = _cache.get(gw.id)
         if not entry:
@@ -777,8 +781,9 @@ async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
             continue
         if preferred and preferred in gemini_models:
             return gw, preferred
-        return gw, gemini_models[0]
-    return None
+        if first is None:
+            first = (gw, gemini_models[0])
+    return first
 
 
 def native_base_url(gw: GatewayConfig) -> str:

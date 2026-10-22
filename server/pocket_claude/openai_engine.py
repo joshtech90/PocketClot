@@ -371,7 +371,11 @@ def _merge_tool_call_delta(acc: dict[int, dict], deltas: list) -> None:
     for tc in deltas:
         if not isinstance(tc, dict):
             continue
-        idx = tc.get("index", 0)
+        # Manche Gateways schicken "index": null; als Schluessel neben Zahlen
+        # liesse sich das spaeter nicht sortieren.
+        idx = tc.get("index")
+        if not isinstance(idx, int):
+            idx = 0
         slot = acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
         if tc.get("id"):
             slot["id"] = tc["id"]
@@ -586,6 +590,11 @@ async def stream_reply(
                                      "versuche %r", model.key,
                                      reasoning_effort, higher)
                             reasoning_effort = higher
+                            # Bei Namensvarianten steckt die Stufe auch in der
+                            # Modell-ID; die muss mitwandern, sonst geht die
+                            # abgelehnte Variante einfach nochmal raus.
+                            if model.effort_mode == "model_variant" and higher:
+                                model_id = model.variant_ids.get(higher, model.fallback_id)
                             effort_retries += 1
                             continue
                         msg = _http_error_message(resp.status_code, body, gw, model_id)
