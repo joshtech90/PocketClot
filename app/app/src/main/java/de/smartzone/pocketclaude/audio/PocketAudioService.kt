@@ -12,6 +12,7 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import java.io.File
@@ -75,6 +76,14 @@ class PocketAudioService : MediaSessionService() {
             .build()
 
         mediaSession = MediaSession.Builder(this, player).build()
+
+        // Vorlese-Benachrichtigung mit dem App-Symbol statt dem Notensymbol
+        // von Media3, wie die uebrigen Benachrichtigungen.
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this).build().apply {
+                setSmallIcon(de.smartzone.pocketclaude.R.drawable.ic_notification)
+            }
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
