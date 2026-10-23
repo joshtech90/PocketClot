@@ -2,9 +2,16 @@ from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase, TestCase
 from unittest.mock import patch
 
-from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
+from claude_agent_sdk import (
+    AssistantMessage,
+    RateLimitEvent,
+    RateLimitInfo,
+    ResultMessage,
+    TextBlock,
+)
 
 from pocket_claude.claude_engine import (
+    _FailureHints,
     _process_error_client_message,
     _result_error_message,
     oneshot_text,
@@ -61,7 +68,51 @@ class ResultErrorMessageTests(TestCase):
         self.assertIn("ohne weitere Fehlermeldung", text)
 
 
+class FailureHintTests(TestCase):
+    def _hints(self, *, error=None, status=None, kind=None, resets_at=None):
+        hints = _FailureHints()
+        hints.observe(AssistantMessage(content=[TextBlock("You've hit your limit")],
+                                       model="m", error=error))
+        if status:
+            hints.observe(RateLimitEvent(
+                rate_limit_info=RateLimitInfo(status=status, rate_limit_type=kind,
+                                              resets_at=resets_at),
+                uuid="u", session_id="s"))
+        return hints
+
+    def test_rate_limit_names_window_and_reset_time(self):
+        hints = self._hints(error="rate_limit", status="rejected", kind="seven_day",
+                            resets_at=1_793_000_000)
+        text = _result_error_message(_message(), hints)
+        self.assertIn("Wochenlimit", text)
+        self.assertIn("Wieder frei ab", text)
+        self.assertNotIn("ohne weitere Fehlermeldung", text)
+
+    def test_rejected_event_alone_counts_as_limit(self):
+        text = _result_error_message(_message(), self._hints(status="rejected", kind="five_hour"))
+        self.assertIn("5-Stunden-Limit", text)
+
+    def test_warning_is_not_a_limit(self):
+        text = _result_error_message(_message(), self._hints(status="allowed_warning"))
+        self.assertIn("ohne weitere Fehlermeldung", text)
+
+    def test_authentication_error_asks_for_relogin(self):
+        text = _result_error_message(_message(), self._hints(error="authentication_failed"))
+        self.assertIn("neu anmelden", text)
+
+
 class ResultCompletionTests(IsolatedAsyncioTestCase):
+    async def test_oneshot_limit_error_is_explained(self):
+        async def limited_query(**_kwargs):
+            yield AssistantMessage(content=[TextBlock("You've hit your limit")],
+                                   model="m", error="rate_limit")
+            yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
+                                is_error=True, num_turns=1, session_id="s")
+
+        with patch("pocket_claude.claude_engine.query", limited_query):
+            with self.assertRaisesRegex(RuntimeError, "Nutzungslimit"):
+                await oneshot_text(system_prompt="t", user_message="t", timeout_sec=1)
+
     async def test_oneshot_rejects_text_without_result_message(self):
         async def incomplete_query(**_kwargs):
             yield AssistantMessage(

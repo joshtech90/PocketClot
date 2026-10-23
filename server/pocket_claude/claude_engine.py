@@ -54,8 +54,88 @@ class _PublicClaudeError(RuntimeError):
     """Fehler, dessen Text absichtlich fuer Client und aufrufenden Code sicher ist."""
 
 
-def _result_error_message(message: ResultMessage) -> str:
+try:  # erst ab SDK 0.2.1xx; aeltere Versionen liefern das Event nicht
+    from claude_agent_sdk import RateLimitEvent
+except ImportError:  # pragma: no cover
+    RateLimitEvent = None  # type: ignore[assignment,misc]
+
+
+def _reset_hint(resets_at: int | None) -> str:
+    """'wieder frei ab 21:00 Uhr' in deutscher Zeit, oder leer."""
+    if not resets_at:
+        return ""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        when = datetime.fromtimestamp(int(resets_at), ZoneInfo("Europe/Berlin"))
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+    today = datetime.now(ZoneInfo("Europe/Berlin")).date()
+    if when.date() == today:
+        return f" Wieder frei ab {when:%H:%M} Uhr."
+    return f" Wieder frei ab {when:%d.%m.} um {when:%H:%M} Uhr."
+
+
+class _FailureHints:
+    """Was die CLI vor dem Abschluss ueber einen Fehler verraten hat.
+
+    Bei Abo-Limit oder abgelaufener Anmeldung meldet die CLI das NICHT ueber
+    `api_error_status`, sondern als AssistantMessage mit `error` (und vorher
+    ein RateLimitEvent mit `rejected`). Die ResultMessage hat dann
+    `subtype=success` und sonst nichts; ohne diese Hinweise kam bei Joscha und
+    Kati nur "ohne weitere Fehlermeldung" an (23.10.2026).
+    """
+
+    def __init__(self) -> None:
+        self.assistant_error: str | None = None
+        self.rate_limit_status: str | None = None
+        self.rate_limit_type: str | None = None
+        self.resets_at: int | None = None
+
+    def observe(self, message) -> None:
+        if isinstance(message, AssistantMessage):
+            err = getattr(message, "error", None)
+            if err:
+                self.assistant_error = str(err)
+        elif RateLimitEvent is not None and isinstance(message, RateLimitEvent):
+            info = message.rate_limit_info
+            self.rate_limit_status = info.status
+            self.rate_limit_type = info.rate_limit_type
+            self.resets_at = info.resets_at
+            if info.status != "allowed":
+                log.info(
+                    "PC_LIMIT: status=%s type=%s utilization=%s resets_at=%s",
+                    info.status, info.rate_limit_type, info.utilization, info.resets_at,
+                )
+
+
+def _result_error_message(message: ResultMessage, hints: _FailureHints | None = None) -> str:
     """Mappt SDK-Abschlussfehler auf eine klare, sichere Nutzermeldung."""
+    hints = hints or _FailureHints()
+    if hints.assistant_error == "rate_limit" or hints.rate_limit_status == "rejected":
+        window = {
+            "five_hour": "Das 5-Stunden-Limit des Claude-Abos ist erreicht.",
+            "seven_day": "Das Wochenlimit des Claude-Abos ist erreicht.",
+            "seven_day_opus": "Das Wochenlimit fuer Opus ist erreicht.",
+            "seven_day_sonnet": "Das Wochenlimit fuer Sonnet ist erreicht.",
+        }.get(hints.rate_limit_type or "", "Das Nutzungslimit des Claude-Abos ist erreicht.")
+        return (
+            f"Claude: {window}{_reset_hint(hints.resets_at)} "
+            "Bis dahin geht ein Gemini- oder GPT-Modell."
+        )
+    if hints.assistant_error == "authentication_failed":
+        return (
+            "Claude: Die Anmeldung auf dem Server ist abgelaufen. "
+            "Der Administrator muss Claude neu anmelden."
+        )
+    if hints.assistant_error == "billing_error":
+        return "Claude: Mit dem Claude-Abo des Servers stimmt etwas nicht (Abrechnung)."
+    if hints.assistant_error == "server_error":
+        return "Claude: Der Dienst ist voruebergehend gestoert. Bitte gleich noch einmal versuchen."
+    if hints.assistant_error == "invalid_request":
+        return "Claude: Die Anfrage wurde von Claude abgelehnt (ungueltige Anfrage)."
+
     status = getattr(message, "api_error_status", None)
     if status == 401:
         return (
@@ -213,17 +293,21 @@ async def oneshot_text(
 
     text_parts: list[str] = []
     received_success_result = False
+    hints = _FailureHints()
 
     async def _run() -> None:
         nonlocal received_success_result
         async for message in query(prompt=user_message, options=options):
+            hints.observe(message)
             if isinstance(message, AssistantMessage):
+                if getattr(message, "error", None):
+                    continue  # Fehlertext der CLI ist keine Antwort
                 for block in message.content:
                     if isinstance(block, TextBlock) and block.text:
                         text_parts.append(block.text)
             elif isinstance(message, ResultMessage):
                 if message.is_error:
-                    raise _PublicClaudeError(_result_error_message(message))
+                    raise _PublicClaudeError(_result_error_message(message, hints))
                 received_success_result = True
             # SystemMessage / erfolgreiche ResultMessage / StreamEvent bleiben ungenutzt.
 
@@ -795,6 +879,7 @@ async def stream_reply(
         usage_acc: dict = {}
         emitted_via_stream = False
         received_success_result = False
+        hints = _FailureHints()
 
         # Mit Bildern geht die Nachricht als Inhaltsliste raus, Text vorne.
         # Ein reiner String bleibt der Normalfall.
@@ -822,6 +907,13 @@ async def stream_reply(
             sid = getattr(message, "session_id", None)
             if sid:
                 new_session_id = sid
+
+            hints.observe(message)
+            if isinstance(message, AssistantMessage) and getattr(message, "error", None):
+                # Limit-/Anmeldefehler der CLI: Text ist keine Antwort, die
+                # Meldung kommt gleich mit der ResultMessage.
+                log.error("PC_LIMIT: AssistantMessage error=%s", message.error)
+                continue
 
             if isinstance(message, SystemMessage):
                 # Init: enthält Modell, Tools, Cwd etc. — wir loggen nur das Modell
@@ -899,7 +991,8 @@ async def stream_reply(
                     log.error(
                         "Claude ResultMessage error: subtype=%s api_status=%s "
                         "stop_reason=%s errors_count=%d result_len=%d "
-                        "assistant_text_len=%d stderr_len=%d",
+                        "assistant_text_len=%d stderr_len=%d assistant_error=%s "
+                        "rate_limit=%s/%s resets_at=%s",
                         message.subtype,
                         getattr(message, "api_error_status", None),
                         message.stop_reason,
@@ -907,8 +1000,12 @@ async def stream_reply(
                         len(message.result or ""),
                         sum(len(part) for part in full_text_parts),
                         sum(len(line) for line in cli_stderr_lines),
+                        hints.assistant_error,
+                        hints.rate_limit_status,
+                        hints.rate_limit_type,
+                        hints.resets_at,
                     )
-                    yield {"type": "error", "message": _result_error_message(message)}
+                    yield {"type": "error", "message": _result_error_message(message, hints)}
                     return
                 received_success_result = True
 
