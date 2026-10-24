@@ -35,8 +35,14 @@ class VoiceChatTileService : TileService() {
                 )
             )
         } else {
-            @Suppress("DEPRECATION")
-            startActivityAndCollapse(intent)
+            // Android 12/13 kennen nur diese Form; die neue ab 14 steht oben.
+            startActivityAndCollapseLegacy(intent)
         }
+    }
+
+    @Suppress("DEPRECATION")
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
+    private fun startActivityAndCollapseLegacy(intent: android.content.Intent) {
+        startActivityAndCollapse(intent)
     }
 }
