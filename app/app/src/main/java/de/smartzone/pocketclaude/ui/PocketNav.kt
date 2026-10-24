@@ -68,6 +68,7 @@ fun PocketNav(
 ) {
     val nav = rememberNavController()
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // Share-to-PocketClaude bei BEREITS offener App: frischen Chat anlegen und
     // dorthin navigieren. ChatScreen holt den geteilten Inhalt aus
@@ -86,18 +87,33 @@ fun PocketNav(
 
     // Neuer Sprach-Chat bei BEREITS offener App (Assistenten-Taste, Kachel,
     // Verknuepfung): frischen Chat anlegen, ChatScreen startet dort das
-    // Diktat. Den Kaltstart erledigt der Launch-Screen; wer den Wunsch
-    // zuerst abholt, legt den Chat an.
+    // Diktat. Den Kaltstart erledigt der Launch-Screen. Eigener Scope statt
+    // des Effekts: ein weiterer Druck darf ein laufendes Anlegen nicht
+    // abbrechen, sonst laege der Chat auf dem Server und die App bliebe stehen.
     LaunchedEffect(voiceNonce) {
-        if (voiceNonce <= 0 || !container.voiceChatRequested.getAndSet(false)) return@LaunchedEffect
-        runCatching { container.chatRepository.create() }
-            .onSuccess { fresh ->
-                container.pendingVoiceCid = fresh.id
-                nav.navigate(Routes.chat(fresh.id)) {
+        if (voiceNonce <= 0) return@LaunchedEffect
+        coroutineScope.launch {
+            try {
+                val cid = container.voiceChat.createIfRequested {
+                    container.chatRepository.create().id
+                } ?: return@launch
+                nav.navigate(Routes.chat(cid)) {
                     popUpTo(Routes.CHAT) { inclusive = true }
                     launchSingleTop = true
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    context,
+                    context.getString(
+                        de.smartzone.pocketclaude.R.string.connection_failed_prefix,
+                        e.message ?: e::class.java.simpleName,
+                    ),
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
             }
+        }
     }
 
     // Re-Open mit cid aus Notification, App war bereits geladen: zum Ziel-Chat
@@ -289,7 +305,7 @@ private fun LaunchScreen(
         if (!s.isConfigured) {
             // Ohne Server kein Chat: den Sprach-Wunsch verwerfen, sonst
             // oeffnete ihn erst ein spaeterer, normaler Start.
-            container.voiceChatRequested.set(false)
+            container.voiceChat.discard()
             onNeedsSettings()
             return@LaunchedEffect
         }
@@ -300,13 +316,16 @@ private fun LaunchScreen(
         // besser als überrascht in einem neuen Chat zu stehen.
         // Neuer Sprach-Chat beim KALTSTART: frischer Chat, dort startet
         // ChatScreen das Diktat.
-        if (container.voiceChatRequested.getAndSet(false)) {
-            runCatching { container.chatRepository.create() }
-                .onSuccess {
-                    container.pendingVoiceCid = it.id
-                    onChatReady(it.id)
-                }
-                .onFailure { errorMessage = it.message ?: it::class.java.simpleName }
+        val voiceCid = try {
+            container.voiceChat.createIfRequested { container.chatRepository.create().id }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            errorMessage = e.message ?: e::class.java.simpleName
+            return@LaunchedEffect
+        }
+        if (voiceCid != null) {
+            onChatReady(voiceCid)
             return@LaunchedEffect
         }
         // Share-Intent beim KALTSTART: frischen Chat für den geteilten Inhalt

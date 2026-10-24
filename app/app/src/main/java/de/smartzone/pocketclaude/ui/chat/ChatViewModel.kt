@@ -35,6 +35,7 @@ import de.smartzone.pocketclaude.service.StreamingService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -1004,7 +1005,16 @@ class ChatViewModel(
     fun startVoiceInputNow() {
         if (_state.value.voiceState != VoiceState.Idle) return
         audio.stop()
-        startRecordingInternal()
+        viewModelScope.launch {
+            // Der vorige Chat kann seine Aufnahme gerade noch abschliessen
+            // (Encoder ausdrainieren, bis gut 2 s). Der Recorder ist fuer alle
+            // Chats derselbe; vorher zu starten wuerde die neue Aufnahme
+            // mitten in dessen Aufraeumen werfen.
+            withTimeoutOrNull(3_000L) {
+                while (voiceRecorder.isStopping) delay(50)
+            }
+            if (_state.value.voiceState == VoiceState.Idle) startRecordingInternal()
+        }
     }
 
     /** Long-Press auf Mic während Recording: Abbrechen ohne zu transkribieren. */

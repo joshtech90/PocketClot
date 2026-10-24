@@ -62,10 +62,14 @@ class VoiceRecorder(private val appContext: Context) {
     @Volatile private var readerThread: Thread? = null
 
     private val active = AtomicBoolean(false)
+    private val stopping = AtomicBoolean(false)
     private val lastPeak = AtomicInteger(0)
     private var startedAtMs: Long = 0L
 
     val isRecording: Boolean get() = active.get()
+
+    /** True, solange stop() noch Encoder und Muxer abschliesst. */
+    val isStopping: Boolean get() = stopping.get()
 
     /** Zaehlt jede Aufnahme hoch. Der Recorder ist ein Singleton fuer alle
      *  Chats; mit der Nummer bricht ein Chat beim Aufraeumen nur seine eigene
@@ -303,6 +307,15 @@ class VoiceRecorder(private val appContext: Context) {
 
     fun stop(): File? {
         if (!active.compareAndSet(true, false)) return null
+        stopping.set(true)
+        try {
+            return finishStop()
+        } finally {
+            stopping.set(false)
+        }
+    }
+
+    private fun finishStop(): File? {
         val rec = this.recorder
         val file = this.outputFile
         val codec = this.codec

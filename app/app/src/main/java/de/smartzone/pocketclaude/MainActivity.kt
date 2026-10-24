@@ -101,11 +101,11 @@ class MainActivity : FragmentActivity() {
      *  die Navigation legt den Chat an und startet dort das Diktat. */
     private fun handleVoiceIntent(intent: Intent?, bumpNonce: Boolean) {
         if (!VoiceLaunch.isRequest(intent)) return
-        (application as PocketClaudeApp).container.voiceChatRequested.set(true)
+        val fresh = (application as PocketClaudeApp).container.voiceChat.request()
         // Erledigt: wird die Activity später neu aufgebaut, soll dasselbe
         // Intent keinen weiteren Chat öffnen.
         setIntent(Intent(intent).setAction(Intent.ACTION_MAIN))
-        if (bumpNonce) voiceNonce.value += 1
+        if (fresh && bumpNonce) voiceNonce.value += 1
     }
 
     private fun extractCid(intent: Intent?): String? {

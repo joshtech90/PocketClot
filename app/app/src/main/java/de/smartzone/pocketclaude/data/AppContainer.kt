@@ -39,14 +39,8 @@ class AppContainer(context: Context) {
     var pendingShare: PendingShare? = null
 
     /** Wunsch nach einem neuen Sprach-Chat (Assistenten-Taste, Kachel,
-     *  Verknuepfung). Wer ihn per getAndSet(false) abholt, legt den Chat an;
-     *  so entsteht auch bei Kaltstart und onNewIntent gleichzeitig nur einer. */
-    val voiceChatRequested = java.util.concurrent.atomic.AtomicBoolean(false)
-
-    /** Chat, in dem das Diktat beim ersten Anzeigen sofort starten soll.
-     *  An die cid gebunden, damit kein anderer Chat den Start abgreift. */
-    @Volatile
-    var pendingVoiceCid: String? = null
+     *  Verknuepfung), siehe VoiceLaunch.kt. */
+    val voiceChat = de.smartzone.pocketclaude.VoiceChatRequests()
 
     val settingsRepository: SettingsRepository = SettingsRepository(
         context.dataStore,

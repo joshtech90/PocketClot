@@ -4,9 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * "Neuer Sprach-Chat": ein frischer Chat, in dem das Diktat sofort laeuft.
@@ -58,6 +60,52 @@ object VoiceLaunch {
             )
             .build()
         runCatching { ShortcutManagerCompat.setDynamicShortcuts(context, listOf(shortcut)) }
+    }
+}
+
+/**
+ * Stimmt Kaltstart (Launch-Screen) und offene App (PocketNav) ab, damit ein
+ * Druck genau einen Sprach-Chat anlegt. Lebt im AppContainer, also nur im
+ * Prozess: nach einem Neustart aus den letzten Apps gibt es keinen Wunsch.
+ */
+class VoiceChatRequests {
+    private val requested = AtomicBoolean(false)
+    private val creating = AtomicBoolean(false)
+    @Volatile private var lastCreatedAt = Long.MIN_VALUE / 2
+
+    /** Chat, in dem das Diktat beim ersten Anzeigen starten soll. Bleibt
+     *  gesetzt, bis die Aufnahme wirklich beginnt oder die Berechtigung
+     *  abgelehnt ist, damit ein Neuaufbau der Activity ihn nicht verliert. */
+    @Volatile var pendingCid: String? = null
+
+    /** Merkt einen Wunsch vor. False heisst Echo: waehrend ein Sprach-Chat
+     *  noch angelegt wird oder kurz danach (SystemUI schickt ASSIST beim
+     *  langen Druecken teils doppelt). */
+    fun request(now: Long = SystemClock.elapsedRealtime()): Boolean {
+        if (creating.get() || now - lastCreatedAt < ECHO_MS) return false
+        requested.set(true)
+        return true
+    }
+
+    fun discard() = requested.set(false)
+
+    /** Legt den Chat an, wenn ein Wunsch vorliegt und nicht schon einer
+     *  entsteht. Null heisst: nichts zu tun. Fehler gehen an den Aufrufer. */
+    suspend fun createIfRequested(create: suspend () -> String): String? {
+        if (!creating.compareAndSet(false, true)) return null
+        try {
+            if (!requested.getAndSet(false)) return null
+            val cid = create()
+            pendingCid = cid
+            lastCreatedAt = SystemClock.elapsedRealtime()
+            return cid
+        } finally {
+            creating.set(false)
+        }
+    }
+
+    private companion object {
+        const val ECHO_MS = 1_500L
     }
 }
 

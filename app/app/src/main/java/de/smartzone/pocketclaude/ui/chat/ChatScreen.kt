@@ -351,10 +351,16 @@ fun ChatScreen(
     }
 
     // ───── Voice-Input: Mic-Permission, Transkript-Empfang, Fehler ─────
-    var pendingMicAction by remember { mutableStateOf(false) }
+    // rememberSaveable: baut Android die Activity waehrend des
+    // Berechtigungsdialogs neu auf, soll die Aufnahme danach trotzdem starten.
+    var pendingMicAction by rememberSaveable { mutableStateOf(false) }
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
+        // Ein Sprach-Chat wartet nur bis zu dieser Antwort aufs Mikrofon.
+        if (container.voiceChat.pendingCid == state.conversationId) {
+            container.voiceChat.pendingCid = null
+        }
         if (granted && pendingMicAction) {
             vm.toggleRecording()
         } else if (!granted) {
@@ -372,12 +378,16 @@ fun ChatScreen(
     // Mikrofon nur Stille.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
-        if (container.pendingVoiceCid != state.conversationId) return@LaunchedEffect
-        container.pendingVoiceCid = null
+        val voice = container.voiceChat
+        if (voice.pendingCid != state.conversationId) return@LaunchedEffect
         lifecycleOwner.lifecycle.withResumed { }
+        // Waehrend des Wartens kann die Antwort auf den Berechtigungsdialog
+        // einer frueheren Instanz dieses Bildschirms den Wunsch erledigt haben.
+        if (voice.pendingCid != state.conversationId) return@LaunchedEffect
         if (container.voiceRecorder.hasPermission()) {
+            voice.pendingCid = null
             vm.startVoiceInputNow()
-        } else {
+        } else if (!pendingMicAction) {
             pendingMicAction = true
             micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
         }
