@@ -57,6 +57,35 @@
             </intent-filter>
         </activity>
 
+        <!-- Neuer Sprach-Chat ueber die Assistenten-Taste/-Geste (Standard-
+             Assistent) und die App-Verknuepfung; siehe VoiceLaunch.kt. Eigene
+             Task-Affinitaet, damit das Sprungbrett nie in einer fremden Task
+             haengen bleibt. -->
+        <activity
+            android:name=".VoiceChatActivity"
+            android:exported="true"
+            android:label="@string/voice_chat_long"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".service.VoiceChatTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_voice_chat"
+            android:label="@string/voice_chat_short"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

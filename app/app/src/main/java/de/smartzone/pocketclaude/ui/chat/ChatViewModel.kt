@@ -963,7 +963,12 @@ class ChatViewModel(
         // "Recording already in progress".
         autoModeJob?.cancel()
         autoModeJob = null
-        runCatching { voiceRecorder.cancel() }
+        // Nur die eigene Aufnahme abbrechen: der Recorder ist ein Singleton,
+        // und beim Sprung in einen neuen Sprach-Chat laeuft dort womoeglich
+        // schon das Diktat, bevor dieses ViewModel abgeraeumt wird.
+        if (_state.value.voiceState == VoiceState.Recording) {
+            runCatching { voiceRecorder.cancel() }
+        }
 
         streamJob?.cancel()
         audio.stop()
@@ -990,6 +995,15 @@ class ChatViewModel(
             VoiceState.Recording -> stopRecordingAndTranscribe()
             VoiceState.Transcribing -> Unit
         }
+    }
+
+    /** Neuer Sprach-Chat: Diktat sofort starten. Wer die Assistenten-Taste
+     *  drueckt, will reden, deshalb endet ein noch laufendes Vorlesen aus dem
+     *  vorigen Chat hier (sonst bricht der Voice-Guard die Aufnahme sofort ab). */
+    fun startVoiceInputNow() {
+        if (_state.value.voiceState != VoiceState.Idle) return
+        audio.stop()
+        startRecordingInternal()
     }
 
     /** Long-Press auf Mic während Recording: Abbrechen ohne zu transkribieren. */

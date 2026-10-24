@@ -1,5 +1,6 @@
 package de.smartzone.pocketclaude.ui.chat
 
+import androidx.lifecycle.withResumed
 import androidx.compose.ui.res.pluralStringResource
 import de.smartzone.pocketclaude.data.MessageDto
 import android.net.Uri
@@ -364,6 +365,22 @@ fun ChatScreen(
             }
         }
         pendingMicAction = false
+    }
+    // Neuer Sprach-Chat (Assistenten-Taste, Kachel, Verknuepfung): Diktat
+    // sofort starten, aber erst, wenn der Chat wirklich vorn ist. Vom
+    // Sperrbildschirm aus wartet das bis zum Entsperren; vorher bekaeme das
+    // Mikrofon nur Stille.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(Unit) {
+        if (container.pendingVoiceCid != state.conversationId) return@LaunchedEffect
+        container.pendingVoiceCid = null
+        lifecycleOwner.lifecycle.withResumed { }
+        if (container.voiceRecorder.hasPermission()) {
+            vm.startVoiceInputNow()
+        } else {
+            pendingMicAction = true
+            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
     }
     // Zurueck beendet im Auto-Modus nur den Modus, nicht die ganze App
     // (Joscha 19.10.2026). Ein offener Drawer faengt Zurueck vorher ab.

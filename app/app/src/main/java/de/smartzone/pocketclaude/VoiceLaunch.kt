@@ -15,8 +15,9 @@ import androidx.core.graphics.drawable.IconCompat
  * Dritt-Apps weitergibt:
  * - Assistenten-Taste/-Geste (ACTION_ASSIST an [VoiceChatActivity]), sobald
  *   PocketClot als Standard-Assistent gewaehlt ist. Auf Pixel und Samsung
- *   haengt das lange Druecken der Power-Taste daran; vivo mit OriginOS 6
- *   leitet sie fest an den eigenen Assistenten.
+ *   haengt das lange Druecken der Power-Taste daran; manche Hersteller
+ *   (berichtet fuer vivo mit OriginOS 6) leiten sie fest an den eigenen
+ *   Assistenten.
  * - Schnellkachel ([de.smartzone.pocketclaude.service.VoiceChatTileService]).
  * - App-Verknuepfung beim langen Druecken des App-Symbols.
  */

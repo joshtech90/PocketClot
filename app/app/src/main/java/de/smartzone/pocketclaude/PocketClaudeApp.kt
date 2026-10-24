@@ -24,6 +24,7 @@ class PocketClaudeApp : Application() {
         container = AppContainer(applicationContext)
         NotificationHelper.ensureChannels(this)
         registerActivityLifecycleCallbacks(ForegroundTracker())
+        VoiceLaunch.publishShortcut(this)
 
         // Gesperrte Chats werden erst wieder verriegelt, wenn der Bildschirm
         // ausgeht — NICHT schon beim Wechsel in den Hintergrund (App-Switch,

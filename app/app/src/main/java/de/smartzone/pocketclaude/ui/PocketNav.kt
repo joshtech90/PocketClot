@@ -60,7 +60,12 @@ object Routes {
 }
 
 @Composable
-fun PocketNav(container: AppContainer, initialChatCid: String? = null, shareNonce: Int = 0) {
+fun PocketNav(
+    container: AppContainer,
+    initialChatCid: String? = null,
+    shareNonce: Int = 0,
+    voiceNonce: Int = 0,
+) {
     val nav = rememberNavController()
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -72,6 +77,22 @@ fun PocketNav(container: AppContainer, initialChatCid: String? = null, shareNonc
         if (shareNonce <= 0 || container.pendingShare == null) return@LaunchedEffect
         runCatching { container.chatRepository.create() }
             .onSuccess { fresh ->
+                nav.navigate(Routes.chat(fresh.id)) {
+                    popUpTo(Routes.CHAT) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+    }
+
+    // Neuer Sprach-Chat bei BEREITS offener App (Assistenten-Taste, Kachel,
+    // Verknuepfung): frischen Chat anlegen, ChatScreen startet dort das
+    // Diktat. Den Kaltstart erledigt der Launch-Screen; wer den Wunsch
+    // zuerst abholt, legt den Chat an.
+    LaunchedEffect(voiceNonce) {
+        if (voiceNonce <= 0 || !container.voiceChatRequested.getAndSet(false)) return@LaunchedEffect
+        runCatching { container.chatRepository.create() }
+            .onSuccess { fresh ->
+                container.pendingVoiceCid = fresh.id
                 nav.navigate(Routes.chat(fresh.id)) {
                     popUpTo(Routes.CHAT) { inclusive = true }
                     launchSingleTop = true
@@ -266,6 +287,9 @@ private fun LaunchScreen(
         // zu Settings springen, obwohl der User längst alles eingetragen hat.
         val s = container.settingsRepository.current()
         if (!s.isConfigured) {
+            // Ohne Server kein Chat: den Sprach-Wunsch verwerfen, sonst
+            // oeffnete ihn erst ein spaeterer, normaler Start.
+            container.voiceChatRequested.set(false)
             onNeedsSettings()
             return@LaunchedEffect
         }
@@ -274,6 +298,17 @@ private fun LaunchScreen(
         // anzulegen. Falls der Chat zwischenzeitlich gelöscht wurde, fängt
         // ChatScreen das ab und der User landet einfach auf Error/leer —
         // besser als überrascht in einem neuen Chat zu stehen.
+        // Neuer Sprach-Chat beim KALTSTART: frischer Chat, dort startet
+        // ChatScreen das Diktat.
+        if (container.voiceChatRequested.getAndSet(false)) {
+            runCatching { container.chatRepository.create() }
+                .onSuccess {
+                    container.pendingVoiceCid = it.id
+                    onChatReady(it.id)
+                }
+                .onFailure { errorMessage = it.message ?: it::class.java.simpleName }
+            return@LaunchedEffect
+        }
         // Share-Intent beim KALTSTART: frischen Chat für den geteilten Inhalt
         // (nicht den letzten Chat wiederöffnen).
         if (container.pendingShare != null) {

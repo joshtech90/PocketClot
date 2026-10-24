@@ -44,6 +44,10 @@ class MainActivity : FragmentActivity() {
      *  bei bereits offener App auf einen frischen Chat mit dem geteilten Inhalt. */
     private val shareNonce = mutableStateOf(0)
 
+    /** Erhöht sich bei jedem Wunsch nach einem neuen Sprach-Chat bei bereits
+     *  offener App (Kaltstart läuft über den Launch-Screen). */
+    private val voiceNonce = mutableStateOf(0)
+
     private val requestNotifPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* Wir machen weiter, egal ob granted oder nicht. */ }
@@ -53,13 +57,22 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         initialChatCid.value = extractCid(intent)
         handleShareIntent(intent, bumpNonce = false)
+        // Nur beim echten Start: nach Rotation o. ä. steckt dasselbe Intent
+        // noch in der Activity und würde sonst einen zweiten Chat anlegen.
+        if (savedInstanceState == null) handleVoiceIntent(intent, bumpNonce = false)
         // Permission-Prompt nur beim ECHTEN ersten Start, nicht bei jedem
         // Configuration-Change (Rotation, Dark-Mode-Switch, …). Sonst poppt
         // der Dialog jedes Mal neu auf, auch wenn der User schon entschieden hat.
         if (savedInstanceState == null) {
             maybeAskNotificationPermission()
         }
-        setContent { PocketApp(initialChatCid = initialChatCid.value, shareNonce = shareNonce.value) }
+        setContent {
+            PocketApp(
+                initialChatCid = initialChatCid.value,
+                shareNonce = shareNonce.value,
+                voiceNonce = voiceNonce.value,
+            )
+        }
     }
 
     private fun maybeAskNotificationPermission() {
@@ -81,6 +94,18 @@ class MainActivity : FragmentActivity() {
         val cid = extractCid(intent)
         if (cid != null) initialChatCid.value = cid
         handleShareIntent(intent, bumpNonce = true)
+        handleVoiceIntent(intent, bumpNonce = true)
+    }
+
+    /** Neuer Sprach-Chat (siehe [VoiceLaunch]): Wunsch im Container vormerken,
+     *  die Navigation legt den Chat an und startet dort das Diktat. */
+    private fun handleVoiceIntent(intent: Intent?, bumpNonce: Boolean) {
+        if (!VoiceLaunch.isRequest(intent)) return
+        (application as PocketClaudeApp).container.voiceChatRequested.set(true)
+        // Erledigt: wird die Activity später neu aufgebaut, soll dasselbe
+        // Intent keinen weiteren Chat öffnen.
+        setIntent(Intent(intent).setAction(Intent.ACTION_MAIN))
+        if (bumpNonce) voiceNonce.value += 1
     }
 
     private fun extractCid(intent: Intent?): String? {
@@ -125,7 +150,7 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-private fun PocketApp(initialChatCid: String?, shareNonce: Int) {
+private fun PocketApp(initialChatCid: String?, shareNonce: Int, voiceNonce: Int) {
     val context = LocalContext.current
     val container = remember {
         (context.applicationContext as PocketClaudeApp).container
@@ -146,7 +171,12 @@ private fun PocketApp(initialChatCid: String?, shareNonce: Int) {
                 .background(MaterialTheme.colorScheme.background),
             color = MaterialTheme.colorScheme.background,
         ) {
-            PocketNav(container = container, initialChatCid = initialChatCid, shareNonce = shareNonce)
+            PocketNav(
+                container = container,
+                initialChatCid = initialChatCid,
+                shareNonce = shareNonce,
+                voiceNonce = voiceNonce,
+            )
         }
     }
 }
