@@ -66,6 +66,12 @@ class VoiceRecorder(private val appContext: Context) {
     private var startedAtMs: Long = 0L
 
     val isRecording: Boolean get() = active.get()
+
+    /** Zaehlt jede Aufnahme hoch. Der Recorder ist ein Singleton fuer alle
+     *  Chats; mit der Nummer bricht ein Chat beim Aufraeumen nur seine eigene
+     *  Aufnahme ab und nicht die, die ein neuer Chat gerade begonnen hat. */
+    @Volatile var session: Long = 0L
+        private set
     val elapsedMs: Long get() = if (active.get() && startedAtMs > 0) {
         System.currentTimeMillis() - startedAtMs
     } else 0L
@@ -89,6 +95,7 @@ class VoiceRecorder(private val appContext: Context) {
         if (!hasPermission()) {
             throw SecurityException("RECORD_AUDIO permission missing.")
         }
+        session++
 
         val cacheDir = File(appContext.cacheDir, "voice").apply { mkdirs() }
         val file = File(cacheDir, "voice-${System.currentTimeMillis()}.m4a")
@@ -390,6 +397,11 @@ class VoiceRecorder(private val appContext: Context) {
         audioTrackIdx = -1
         file?.delete()
         Log.d(TAG, "Recording cancelled.")
+    }
+
+    /** Bricht nur ab, wenn noch die Aufnahme [session] laeuft. */
+    fun cancelSession(session: Long) {
+        if (session == this.session) cancel()
     }
 
     fun release() {

@@ -171,6 +171,9 @@ class ChatViewModel(
     private val _transcriptToInsert = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val transcriptToInsert: SharedFlow<String> = _transcriptToInsert.asSharedFlow()
 
+    /** Nummer der zuletzt hier gestarteten Aufnahme, siehe VoiceRecorder.session. */
+    private var recordingSession = -1L
+
     /** Laufender Auto-Mode-Loop, oder null wenn aus. */
     private var autoModeJob: Job? = null
 
@@ -199,7 +202,7 @@ class ChatViewModel(
                 if (needsAbort) {
                     android.util.Log.w("ChatVM", "Voice guard: LLM busy " +
                         "while recording — auto-cancel.")
-                    runCatching { voiceRecorder.cancel() }
+                    runCatching { voiceRecorder.cancelSession(recordingSession) }
                     _state.update { it.copy(voiceState = VoiceState.Idle) }
                 }
             }
@@ -966,9 +969,7 @@ class ChatViewModel(
         // Nur die eigene Aufnahme abbrechen: der Recorder ist ein Singleton,
         // und beim Sprung in einen neuen Sprach-Chat laeuft dort womoeglich
         // schon das Diktat, bevor dieses ViewModel abgeraeumt wird.
-        if (_state.value.voiceState == VoiceState.Recording) {
-            runCatching { voiceRecorder.cancel() }
-        }
+        runCatching { voiceRecorder.cancelSession(recordingSession) }
 
         streamJob?.cancel()
         audio.stop()
@@ -1037,6 +1038,7 @@ class ChatViewModel(
         }
         try {
             voiceRecorder.start()
+            recordingSession = voiceRecorder.session
             _state.update { it.copy(voiceState = VoiceState.Recording, voiceError = null) }
         } catch (t: Throwable) {
             _state.update {
