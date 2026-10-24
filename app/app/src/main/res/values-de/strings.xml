@@ -816,4 +816,6 @@
     <string name="settings_tts_provider_grok_body">Die Vorlesefunktion von Grok, geliefert von einem Dienst auf deinem Server mit angemeldeter Grok-Sitzung. Kostenlos, 28 Stimmen, das Tempo steckt direkt im Audio.</string>
     <string name="settings_tts_status_grok_active">Grok aktiv: kostenlos, 28 Stimmen zur Auswahl.</string>
     <string name="settings_tts_status_fallback">%1$s ist gewählt, aber gerade nicht angemeldet. Bis dahin liest %2$s vor.</string>
+    <string name="voice_chat_short">Sprach-Chat</string>
+    <string name="voice_chat_long">Neuer Sprach-Chat</string>
 </resources>

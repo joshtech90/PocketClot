@@ -814,4 +814,6 @@
     <string name="chat_lock_no_pin">尚未设置 PIN。</string>
     <string name="chat_lock_pin_saved">PIN 已保存。</string>
     <string name="chat_lock_pin_removed">PIN 已移除。</string>
+    <string name="voice_chat_short">语音聊天</string>
+    <string name="voice_chat_long">新建语音聊天</string>
 </resources>

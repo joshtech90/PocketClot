@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App-Verknuepfung "Neuer Sprach-Chat": weisses Mikrofon (PocketIcons.Mic) auf
+  einem Kreis in der Markenfarbe Nordic Blue.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <path
+        android:fillColor="#FF1B649E"
+        android:pathData="M480,0 A480,480 0 1,1 480,960 A480,480 0 1,1 480,0Z" />
+    <group
+        android:pivotX="480"
+        android:pivotY="480"
+        android:scaleX="0.6"
+        android:scaleY="0.6">
+        <group android:translateY="960">
+            <path
+                android:fillColor="#FFFFFFFF"
+                android:pathData="M395-435q-35-35-35-85v-240q0-50 35-85t85-35q50 0 85 35t35 85v240q0 50-35 85t-85 35q-50 0-85-35Zm85-205Zm-40 480v-83q-92-13-157.5-78T203-479q-2-17 9-29t28-12q17 0 28.5 11.5T284-480q14 70 69.5 115T480-320q72 0 127-45.5T676-480q4-17 15.5-28.5T720-520q17 0 28 12t9 29q-14 91-79 157t-158 79v83q0 17-11.5 28.5T480-120q-17 0-28.5-11.5T440-160Zm68.5-331.5Q520-503 520-520v-240q0-17-11.5-28.5T480-800q-17 0-28.5 11.5T440-760v240q0 17 11.5 28.5T480-480q17 0 28.5-11.5Z" />
+        </group>
+    </group>
+</vector>

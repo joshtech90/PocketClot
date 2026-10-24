@@ -814,4 +814,6 @@
     <string name="chat_lock_no_pin">PINはまだ設定されていません。</string>
     <string name="chat_lock_pin_saved">PINを保存しました。</string>
     <string name="chat_lock_pin_removed">PINを削除しました。</string>
+    <string name="voice_chat_short">音声チャット</string>
+    <string name="voice_chat_long">新しい音声チャット</string>
 </resources>

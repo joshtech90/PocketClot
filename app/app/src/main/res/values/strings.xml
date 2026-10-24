@@ -816,4 +816,6 @@
     <string name="settings_tts_provider_grok_body">Grok read-aloud feature, provided by a service on your server with an active Grok session. Free, 28 voices, speed is embedded directly in the audio.</string>
     <string name="settings_tts_status_grok_active">Grok active: free, 28 voices to choose from.</string>
     <string name="settings_tts_status_fallback">%1$s is selected, but not currently signed in. In the meantime, %2$s will read aloud.</string>
+    <string name="voice_chat_short">Voice chat</string>
+    <string name="voice_chat_long">New voice chat</string>
 </resources>

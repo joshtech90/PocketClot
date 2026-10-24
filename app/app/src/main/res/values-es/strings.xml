@@ -815,4 +815,6 @@
     <string name="chat_lock_no_pin">Aún no se ha configurado ningún PIN.</string>
     <string name="chat_lock_pin_saved">PIN guardado.</string>
     <string name="chat_lock_pin_removed">PIN eliminado.</string>
+    <string name="voice_chat_short">Chat de voz</string>
+    <string name="voice_chat_long">Nuevo chat de voz</string>
 </resources>
