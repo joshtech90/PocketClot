@@ -147,7 +147,7 @@ class ApiClient(
      * explizite Parameter und geht NICHT über `authHeader()`/`baseUrl()`.
      */
     suspend fun login(serverUrl: String, username: String, password: String): LoginResponse {
-        val cleanBase = serverUrl.trim().trimEnd('/')
+        val cleanBase = cleanServerUrl(serverUrl)
         val payload = json.encodeToString(
             LoginRequest(username = username, password = password)
         ).toRequestBody("application/json".toMediaType())

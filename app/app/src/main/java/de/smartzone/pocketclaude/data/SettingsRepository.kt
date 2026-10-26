@@ -21,6 +21,14 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
+/** Bereinigt eine eingegebene Server-URL. Aus Messengern kopiert kommt die
+ *  Adresse oft doppelt mit Zeilenumbruch an (Link plus Vorschau); ein
+ *  einzeiliges Feld zeigt nur die erste Zeile, OkHttp meldet dann
+ *  "Invalid URL host". Deshalb zaehlt nur die erste nicht leere Zeile. */
+fun cleanServerUrl(raw: String): String =
+    raw.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+        .orEmpty().trimEnd('/')
+
 /** Vorgabe-Farbschema fuer den hellen Modus. Muss zur ID von
  *  `PocketPalette.NORDIC_BLUE` passen. */
 const val DEFAULT_PALETTE_ID_LIGHT = "nordic_blue"
@@ -409,7 +417,7 @@ class SettingsRepository(
             return runCatching { json.decodeFromString<List<Profile>>(raw) }.getOrDefault(emptyList())
         }
         // Migration vom Single-Profile-Setup
-        val url = prefs[keyServerUrl].orEmpty().trim().trimEnd('/')
+        val url = cleanServerUrl(prefs[keyServerUrl].orEmpty())
         val token = prefs[keyServerToken].orEmpty()
         if (url.isNotBlank() && token.isNotBlank()) {
             return listOf(Profile(id = "default", label = "Standard", serverUrl = url, serverToken = token))
@@ -424,7 +432,7 @@ class SettingsRepository(
     suspend fun upsertProfile(label: String, url: String, token: String,
                               username: String = "",
                               makeActive: Boolean = true): String {
-        val cleanUrl = url.trim().trimEnd('/')
+        val cleanUrl = cleanServerUrl(url)
         val cleanTok = token.trim()
         val cleanUser = username.trim()
         val id = "p_" + (label.lowercase().replace(Regex("[^a-z0-9]+"), "_") + "_" +
@@ -446,7 +454,7 @@ class SettingsRepository(
             val list = loadProfilesWithMigration(prefs).map { p ->
                 if (p.id != id) p else p.copy(
                     label = label ?: p.label,
-                    serverUrl = (url ?: p.serverUrl).trim().trimEnd('/'),
+                    serverUrl = cleanServerUrl(url ?: p.serverUrl),
                     serverToken = (token ?: p.serverToken).trim(),
                     username = (username ?: p.username).trim(),
                 )
