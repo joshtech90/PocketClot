@@ -1056,7 +1056,9 @@ class ChatViewModel(
                     .getOrNull()
                 if (configured != false) {
                     if (configured == true) groqKeyConfirmed = true
-                    if (_state.value.voiceState == VoiceState.Idle) startRecordingInternal()
+                    // Direkt beginRecording: ein erneuter Weg ueber
+                    // startRecordingInternal endete hier am noch aktiven Job.
+                    if (_state.value.voiceState == VoiceState.Idle) beginRecording()
                 } else {
                     if (_state.value.autoMode) setAutoMode(false)
                     _state.update { it.copy(groqKeyMissing = true) }
@@ -1064,6 +1066,10 @@ class ChatViewModel(
             }
             return
         }
+        beginRecording()
+    }
+
+    private fun beginRecording() {
         if (!voiceRecorder.hasPermission()) {
             _state.update {
                 it.copy(voiceError = appContext.getString(R.string.voice_error_no_permission))
