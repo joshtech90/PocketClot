@@ -1018,6 +1018,28 @@ fun ChatScreen(
         )
     }
 
+    // Spracheingabe ohne Groq-Key: vor der Aufnahme erklaeren, wo es den
+    // (kostenlosen) Key gibt, statt nach dem Sprechen mit einem Fehler.
+    if (state.groqKeyMissing) {
+        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+        AlertDialog(
+            onDismissRequest = { vm.dismissGroqKeyHint() },
+            title = { Text(stringResource(de.smartzone.pocketclaude.R.string.voice_groq_hint_title)) },
+            text = { Text(stringResource(de.smartzone.pocketclaude.R.string.voice_groq_hint_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.dismissGroqKeyHint()
+                    onOpenSettings()
+                }) { Text(stringResource(de.smartzone.pocketclaude.R.string.voice_groq_hint_settings)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    runCatching { uriHandler.openUri("https://console.groq.com/keys") }
+                }) { Text(stringResource(de.smartzone.pocketclaude.R.string.voice_groq_hint_get_key)) }
+            },
+        )
+    }
+
     // Delete confirmation
     if (confirmDeleteOpen) {
         AlertDialog(

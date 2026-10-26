@@ -817,4 +817,8 @@
     <string name="chat_lock_pin_removed">PIN eliminado.</string>
     <string name="voice_chat_short">Chat de voz</string>
     <string name="voice_chat_long">Nuevo chat de voz</string>
+    <string name="voice_groq_hint_title">Configurar la entrada de voz</string>
+    <string name="voice_groq_hint_message" formatted="false">La entrada de voz usa Groq. Necesitas tu propia clave API de Groq, y es 100 % gratis (inicia sesión con Google, sin tarjeta de crédito).\n\nCrea una clave en console.groq.com/keys y pégala en Ajustes, en «Entrada de voz».</string>
+    <string name="voice_groq_hint_get_key">Obtener clave gratis</string>
+    <string name="voice_groq_hint_settings">Abrir ajustes</string>
 </resources>

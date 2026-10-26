@@ -130,6 +130,10 @@ data class ChatUiState(
     /** Letzter Voice-Fehler (Permission denied, Groq-Fehler, Timeout, …). UI
      *  zeigt das einmal als Snackbar und ruft `clearVoiceError()`. */
     val voiceError: String? = null,
+    /** Kein Groq-Key hinterlegt: UI zeigt vor der Aufnahme einen Hinweis mit
+     *  Link und Sprung in die Einstellungen, statt erst nach dem Sprechen
+     *  mit einem Fehler zu enden. */
+    val groqKeyMissing: Boolean = false,
     /** Auto-Modus: nach jedem Stream-Done wird automatisch vorgelesen, dann
      *  startet die Aufnahme von alleine wieder. User stoppt mit Toggle aus. */
     val autoMode: Boolean = false,
@@ -174,6 +178,10 @@ class ChatViewModel(
 
     /** Nummer der zuletzt hier gestarteten Aufnahme, siehe VoiceRecorder.session. */
     private var recordingSession = -1L
+    /** Einmal bestaetigt, dass ein Groq-Key da ist. Ein fehlender Key wird
+     *  bewusst nicht gemerkt: nach dem Eintragen soll es sofort gehen. */
+    private var groqKeyConfirmed = false
+    private var groqKeyCheck: Job? = null
 
     /** Laufender Auto-Mode-Loop, oder null wenn aus. */
     private var autoModeJob: Job? = null
@@ -1029,7 +1037,26 @@ class ChatViewModel(
 
     fun clearVoiceError() = _state.update { it.copy(voiceError = null) }
 
+    fun dismissGroqKeyHint() = _state.update { it.copy(groqKeyMissing = false) }
+
     private fun startRecordingInternal() {
+        if (!groqKeyConfirmed) {
+            // Erst fragen, dann aufnehmen. Ist der Server nicht erreichbar,
+            // trotzdem aufnehmen: die Transkription meldet den Fehler dann.
+            if (groqKeyCheck?.isActive == true) return
+            groqKeyCheck = viewModelScope.launch {
+                val configured = runCatching { apiClient.voiceConfig().configured }
+                    .getOrNull()
+                if (configured != false) {
+                    if (configured == true) groqKeyConfirmed = true
+                    if (_state.value.voiceState == VoiceState.Idle) startRecordingInternal()
+                } else {
+                    if (_state.value.autoMode) setAutoMode(false)
+                    _state.update { it.copy(groqKeyMissing = true) }
+                }
+            }
+            return
+        }
         if (!voiceRecorder.hasPermission()) {
             _state.update {
                 it.copy(voiceError = appContext.getString(R.string.voice_error_no_permission))

@@ -816,4 +816,8 @@
     <string name="chat_lock_pin_removed">PINを削除しました。</string>
     <string name="voice_chat_short">音声チャット</string>
     <string name="voice_chat_long">新しい音声チャット</string>
+    <string name="voice_groq_hint_title">音声入力の設定</string>
+    <string name="voice_groq_hint_message" formatted="false">音声入力には Groq を使います。ご自身の Groq API キーが必要ですが、100% 無料です（Google でログイン、クレジットカード不要）。\n\nconsole.groq.com/keys でキーを作成し、設定の「音声入力」に貼り付けてください。</string>
+    <string name="voice_groq_hint_get_key">無料キーを取得</string>
+    <string name="voice_groq_hint_settings">設定を開く</string>
 </resources>

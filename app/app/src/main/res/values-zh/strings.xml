@@ -816,4 +816,8 @@
     <string name="chat_lock_pin_removed">PIN 已移除。</string>
     <string name="voice_chat_short">语音聊天</string>
     <string name="voice_chat_long">新建语音聊天</string>
+    <string name="voice_groq_hint_title">设置语音输入</string>
+    <string name="voice_groq_hint_message" formatted="false">语音输入使用 Groq。你需要自己的 Groq API 密钥，完全免费（可用 Google 登录，无需信用卡）。\n\n在 console.groq.com/keys 创建密钥，然后粘贴到设置中的“语音输入”。</string>
+    <string name="voice_groq_hint_get_key">获取免费密钥</string>
+    <string name="voice_groq_hint_settings">打开设置</string>
 </resources>

@@ -818,4 +818,8 @@
     <string name="chat_lock_pin_removed">PIN supprimé.</string>
     <string name="voice_chat_short">Chat vocal</string>
     <string name="voice_chat_long">Nouveau chat vocal</string>
+    <string name="voice_groq_hint_title">Configurer la saisie vocale</string>
+    <string name="voice_groq_hint_message" formatted="false">La saisie vocale passe par Groq. Il te faut ta propre clé API Groq, 100 % gratuite (connexion avec Google, sans carte bancaire).\n\nCrée une clé sur console.groq.com/keys et colle-la dans les Réglages, rubrique « Saisie vocale ».</string>
+    <string name="voice_groq_hint_get_key">Clé gratuite</string>
+    <string name="voice_groq_hint_settings">Ouvrir les réglages</string>
 </resources>

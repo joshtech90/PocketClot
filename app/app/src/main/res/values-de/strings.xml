@@ -818,4 +818,8 @@
     <string name="settings_tts_status_fallback">%1$s ist gewählt, aber gerade nicht angemeldet. Bis dahin liest %2$s vor.</string>
     <string name="voice_chat_short">Sprach-Chat</string>
     <string name="voice_chat_long">Neuer Sprach-Chat</string>
+    <string name="voice_groq_hint_title">Spracheingabe einrichten</string>
+    <string name="voice_groq_hint_message" formatted="false">Die Spracheingabe läuft über Groq. Dafür brauchst du einen eigenen Groq-API-Key, der ist 100 % kostenlos (Anmeldung z. B. mit Google, keine Kreditkarte).\n\nKey auf console.groq.com/keys erstellen und in den Einstellungen unter „Spracheingabe“ einfügen.</string>
+    <string name="voice_groq_hint_get_key">Gratis-Key holen</string>
+    <string name="voice_groq_hint_settings">Zu den Einstellungen</string>
 </resources>
