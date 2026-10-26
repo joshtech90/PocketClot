@@ -11,6 +11,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.Call
 import okhttp3.Callback
@@ -213,7 +214,7 @@ class ApiClient(
 
     suspend fun imagesConfig(): ImageConfigDto = get("/images/config")
 
-    suspend fun setImageApiKey(apiKey: String): Map<String, String> =
+    suspend fun setImageApiKey(apiKey: String): JsonObject =
         putJson("/images/credentials", ImageCredentialsRequest(apiKey))
 
     suspend fun deleteImageApiKey() = delete("/images/credentials")
@@ -256,7 +257,7 @@ class ApiClient(
 
     suspend fun voiceConfig(): VoiceConfigDto = get("/voice/config")
 
-    suspend fun setVoiceApiKey(apiKey: String): Map<String, String> =
+    suspend fun setVoiceApiKey(apiKey: String): JsonObject =
         putJson("/voice/credentials", VoiceCredentialsRequest(apiKey))
 
     suspend fun deleteVoiceApiKey() = delete("/voice/credentials")
