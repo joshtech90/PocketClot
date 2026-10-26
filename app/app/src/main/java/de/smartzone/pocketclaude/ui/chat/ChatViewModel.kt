@@ -172,9 +172,12 @@ class ChatViewModel(
 
     /** Einmal-Events für den ChatScreen: transkribierter Text, der ins
      *  Input-Feld eingefügt werden soll (nur im manuellen Modus — im
-     *  Auto-Modus geht der Transkript direkt zu `send()`, ohne UI-Detour). */
-    private val _transcriptToInsert = MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val transcriptToInsert: SharedFlow<String> = _transcriptToInsert.asSharedFlow()
+     *  Auto-Modus geht der Transkript direkt zu `send()`, ohne UI-Detour).
+     *  `sendNow`: per Senden-Knopf beendetes Diktat, das Feld geht danach
+     *  gleich raus (samt schon getipptem Text und Anhaengen). */
+    data class Transcript(val text: String, val sendNow: Boolean)
+    private val _transcriptToInsert = MutableSharedFlow<Transcript>(extraBufferCapacity = 4)
+    val transcriptToInsert: SharedFlow<Transcript> = _transcriptToInsert.asSharedFlow()
 
     /** Nummer der zuletzt hier gestarteten Aufnahme, siehe VoiceRecorder.session. */
     private var recordingSession = -1L
@@ -1025,6 +1028,10 @@ class ChatViewModel(
         }
     }
 
+    /** Senden-Knopf waehrend des Diktats: Aufnahme beenden, transkribieren
+     *  und sofort abschicken, ein Tipp statt zwei (Wunsch von Bjoern). */
+    fun stopRecordingAndSend() = stopRecordingAndTranscribe(sendNow = true)
+
     /** Long-Press auf Mic während Recording: Abbrechen ohne zu transkribieren. */
     fun cancelRecording() {
         if (_state.value.voiceState != VoiceState.Recording) return
@@ -1089,7 +1096,7 @@ class ChatViewModel(
         }
     }
 
-    private fun stopRecordingAndTranscribe() {
+    private fun stopRecordingAndTranscribe(sendNow: Boolean = false) {
         // voiceState sofort auf Transcribing — der teure VoiceRecorder.stop()
         // (thread.join + MediaCodec-EOS-Drain + muxer.stop/release) darf NICHT
         // auf dem Main-Thread laufen (ANR-Risiko), daher off-thread in der Coroutine.
@@ -1140,7 +1147,7 @@ class ChatViewModel(
                     _state.update { it.copy(voiceState = VoiceState.Idle) }
                 } else {
                     _state.update { it.copy(voiceState = VoiceState.Idle) }
-                    _transcriptToInsert.emit(text)
+                    _transcriptToInsert.emit(Transcript(text, sendNow))
                 }
             } catch (e: Exception) {
                 _state.update {

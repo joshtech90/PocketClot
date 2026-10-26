@@ -105,6 +105,7 @@ internal fun ChatComposer(
     voiceEnabled: Boolean,
     onMicTap: () -> Unit,
     onMicCancel: () -> Unit,
+    onRecordAndSend: () -> Unit = {},
     imageMode: Boolean = false,
     onImageModeChange: (Boolean) -> Unit = {},
 ) {
@@ -264,6 +265,14 @@ internal fun ChatComposer(
                         )
                         when {
                             sending -> RoundAction(PocketIcons.Stop, stringResource(R.string.stop), true, onStop)
+                            // Waehrend des Diktats: beenden und gleich senden,
+                            // wie bei ChatGPT. Beim Transkribieren ausgegraut.
+                            voiceState != VoiceState.Idle -> RoundAction(
+                                PocketIcons.ArrowUpward,
+                                stringResource(R.string.send),
+                                enabled = voiceState == VoiceState.Recording && !anyUploading,
+                                onClick = onRecordAndSend,
+                            )
                             hasContent || anyUploading -> RoundAction(
                                 PocketIcons.ArrowUpward,
                                 stringResource(R.string.send),

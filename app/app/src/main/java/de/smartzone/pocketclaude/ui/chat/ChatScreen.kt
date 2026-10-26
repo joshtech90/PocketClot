@@ -412,7 +412,15 @@ fun ChatScreen(
     // im Auto-Modus geht der Text direkt zu send(), nicht über input).
     LaunchedEffect(Unit) {
         vm.transcriptToInsert.collect { transcript ->
-            input = if (input.isBlank()) transcript else "$input $transcript"
+            input = if (input.isBlank()) transcript.text else "$input ${transcript.text}"
+            // Wie der Senden-Knopf: nicht, solange ein Anhang noch hochlaedt,
+            // sonst ginge er stumm verloren. Dann bleibt der Text im Feld.
+            val now = vm.state.value
+            if (transcript.sendNow && !now.isStreaming && now.pending.none { it.uploading }) {
+                val text = input
+                input = ""
+                vm.send(text)
+            }
         }
     }
     LaunchedEffect(state.voiceError) {
@@ -956,6 +964,7 @@ fun ChatScreen(
                     voiceEnabled = voiceEnabled,
                     onMicTap = handleMicTap,
                     onMicCancel = { vm.cancelRecording() },
+                    onRecordAndSend = { vm.stopRecordingAndSend() },
                 )
             }
         }

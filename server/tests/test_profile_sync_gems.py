@@ -175,3 +175,18 @@ def test_defaults_migration_sets_opus_high_once(ctx):
     asyncio.run(db.kv_set_many({"chatModel": "sonnet"}, scope=uid))
     asyncio.run(server._migrate_defaults_opus_high())
     assert asyncio.run(db.kv_get_all(scope=uid))["chatModel"] == "sonnet"
+
+
+def test_new_user_gets_defaults_immediately(ctx):
+    """Vom Admin angelegte Konten haben Opus/Hoch und Grok Leo sofort, nicht
+    erst nach dem naechsten Neustart."""
+    c, h = ctx["client"], ctx["admin_h"]
+    r = c.post("/users", headers=h, json={"name": f"Neu{uuid.uuid4().hex[:6]}",
+                                          "password": "passwort-3"})
+    assert r.status_code == 200, r.text
+    kv = asyncio.run(db.kv_get_all(scope=r.json()["id"]))
+    assert kv["chatModel"] == server.claude_engine.DEFAULT_CLAUDE_MODEL
+    assert kv["effort"] == "high"
+    assert json.loads(kv["effortByFamily"]) == {"claude": "high"}
+    assert kv[server._KV_TTS_PROVIDER] == server.tts.PROVIDER_GROK
+    assert kv["ttsVoice"] == server.tts.DEFAULT_VOICE_GROK

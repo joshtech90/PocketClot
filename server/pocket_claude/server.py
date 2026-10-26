@@ -120,6 +120,45 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     yield
 
 
+async def _apply_grok_default(uid: str) -> bool:
+    """Vorlesen mit Grok Leo, einmal pro Nutzer (Merker). True = gesetzt."""
+    async with _settings_lock(uid):
+        kv = await db.kv_get_all(scope=uid)
+        if (kv.get(_KV_TTS_GROK_MIGRATED) or "").strip() == "1":
+            return False
+        await db.kv_set_many({
+            _KV_TTS_PROVIDER: tts.PROVIDER_GROK,
+            # Die Clients merken sich die Stimme im selben Speicher.
+            "ttsVoice": tts.DEFAULT_VOICE_GROK,
+            _KV_TTS_GROK_MIGRATED: "1",
+        }, scope=uid)
+    return True
+
+
+async def _apply_opus_default(uid: str) -> bool:
+    """Vorauswahl Opus mit Denktiefe Hoch, einmal pro Nutzer (Merker).
+    Andere Familien bleiben, wie sie sind. True = gesetzt."""
+    async with _settings_lock(uid):
+        kv = await db.kv_get_all(scope=uid)
+        if (kv.get(_KV_DEFAULTS_OPUS_MIGRATED) or "").strip() == "1":
+            return False
+        try:
+            by_family = json.loads(kv.get("effortByFamily") or "{}")
+        except json.JSONDecodeError:
+            by_family = {}
+        if not isinstance(by_family, dict):
+            by_family = {}
+        by_family["claude"] = "high"
+        await db.kv_set_many({
+            "chatModel": claude_engine.DEFAULT_CLAUDE_MODEL,
+            "effort": "high",
+            "effortByFamily": json.dumps(by_family, separators=(",", ":")),
+            auth_modes.KV_DEFAULT_MODEL: claude_engine.DEFAULT_CLAUDE_MODEL,
+            _KV_DEFAULTS_OPUS_MIGRATED: "1",
+        }, scope=uid)
+    return True
+
+
 async def _migrate_tts_to_grok() -> None:
     """Stellt jeden Nutzer einmalig auf Grok mit der Stimme Leo um (Joschas
     Entscheidung vom 21.10.2026, fuer alle Konten).
@@ -139,17 +178,8 @@ async def _migrate_tts_to_grok() -> None:
                     uid = u.get("id")
                     if not uid:
                         continue
-                    async with _settings_lock(uid):
-                        kv = await db.kv_get_all(scope=uid)
-                        if (kv.get(_KV_TTS_GROK_MIGRATED) or "").strip() == "1":
-                            continue
-                        await db.kv_set_many({
-                            _KV_TTS_PROVIDER: tts.PROVIDER_GROK,
-                            # Die Clients merken sich die Stimme im selben Speicher.
-                            "ttsVoice": tts.DEFAULT_VOICE_GROK,
-                            _KV_TTS_GROK_MIGRATED: "1",
-                        }, scope=uid)
-                    umgestellt += 1
+                    if await _apply_grok_default(uid):
+                        umgestellt += 1
                 if umgestellt:
                     log.info("TTS-Umstellung auf Grok Leo: %d von %d Nutzern", umgestellt, len(users))
         except Exception as exc:  # noqa: BLE001 - darf den Server nie stoeren
@@ -175,25 +205,8 @@ async def _migrate_defaults_opus_high() -> None:
             uid = u.get("id")
             if not uid:
                 continue
-            async with _settings_lock(uid):
-                kv = await db.kv_get_all(scope=uid)
-                if (kv.get(_KV_DEFAULTS_OPUS_MIGRATED) or "").strip() == "1":
-                    continue
-                try:
-                    by_family = json.loads(kv.get("effortByFamily") or "{}")
-                except json.JSONDecodeError:
-                    by_family = {}
-                if not isinstance(by_family, dict):
-                    by_family = {}
-                by_family["claude"] = "high"
-                await db.kv_set_many({
-                    "chatModel": claude_engine.DEFAULT_CLAUDE_MODEL,
-                    "effort": "high",
-                    "effortByFamily": json.dumps(by_family, separators=(",", ":")),
-                    auth_modes.KV_DEFAULT_MODEL: claude_engine.DEFAULT_CLAUDE_MODEL,
-                    _KV_DEFAULTS_OPUS_MIGRATED: "1",
-                }, scope=uid)
-            umgestellt += 1
+            if await _apply_opus_default(uid):
+                umgestellt += 1
         if umgestellt:
             log.info("Vorauswahl Opus/Hoch fuer %d von %d Nutzern gesetzt", umgestellt, len(users))
     except Exception as exc:  # noqa: BLE001 - darf den Start nie verhindern
@@ -2891,6 +2904,10 @@ async def create_user_endpoint(body: dict, user=Depends(require_admin)):  # noqa
         name=name, password=password, is_admin=is_admin,
         must_change_password=True,  # bei Admin-Create immer
     )
+    # Neue Konten bekommen die Vorgaben sofort, nicht erst beim naechsten
+    # Neustart (Opus/Hoch) bzw. bis zu zehn Minuten spaeter (Grok Leo).
+    await _apply_opus_default(new_user["id"])
+    await _apply_grok_default(new_user["id"])
     out = _user_public(new_user)
     # Klartext-PW einmalig mitgeben, damit Admin es dem User mitteilen kann
     out["initial_password"] = password
