@@ -57,6 +57,7 @@ def test_live_segment_belongs_to_its_user(ctx, monkeypatch):
 @pytest.mark.parametrize("text", [
     "```python\nprint(1)\n```",
     "[^1]: https://example.com/quelle",
+    "\n\n**Quellen**\n1. [example.com](https://example.com)",
 ])
 def test_unspeakable_segment_is_rejected(ctx, text):
     c, alice, _ = ctx

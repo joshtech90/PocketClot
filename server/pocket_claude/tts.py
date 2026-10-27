@@ -213,6 +213,9 @@ def _strip_for_tts(text: str) -> str:
         return ""
     # Code-Blöcke entfernen (werden sonst als endlose Zeichenfolge vorgelesen)
     text = re.sub(r"```[\s\S]*?```", " ", text)
+    # Quellen-Block, den openai_engine ans Ende haengt (vor dem Fett-Entfernen) ("**Quellen**" plus
+    # Linkliste): nur Titel und Domains, beim Zuhoeren reines Rauschen.
+    text = re.sub(r"(?:^|\n)\s*\*\*Quellen\*\*\s*\n(?:\s*\d+\.\s.*(?:\n|$))*\s*$", "\n", text)
     # Inline-Code
     text = re.sub(r"`([^`]+)`", r"\1", text)
     # Bold/Italic-Marker
