@@ -719,3 +719,14 @@ sealed interface StreamEvent {
     ) : StreamEvent
     data class ErrorEvent(val message: String) : StreamEvent
 }
+
+/** POST /tts/live: ein Stueck der laufenden Antwort zum Vorlesen. */
+@Serializable
+data class LiveTtsRequestDto(
+    val text: String,
+    val voice: String? = null,
+    val rate: Float? = null,
+)
+
+@Serializable
+data class LiveTtsResponseDto(val id: String)

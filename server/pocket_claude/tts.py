@@ -231,6 +231,10 @@ def _strip_for_tts(text: str) -> str:
     text = re.sub(r"!\[[^\]]*\]\([^)]+\)", " ", text)
     # Bare URLs
     text = re.sub(r"https?://\S+", " ", text)
+    # Quellen-Fussnoten: Definitionen am Ende ganz raus, Verweise im Text
+    # ("[^1]") ebenso, sonst liest der Dienst die Zeichen vor.
+    text = re.sub(r"^\[\^[^\]]+\]:.*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\[\^[^\]]+\]", "", text)
     # Emojis komplett raus
     text = _EMOJI_PATTERN.sub("", text)
     # Mehrfache Leerzeichen / Newlines

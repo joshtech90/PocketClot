@@ -524,6 +524,20 @@ class ApiClient(
         return "$base/messages/$messageId/audio$q"
     }
 
+    /** Legt ein Stueck fuer das Vorlesen waehrend der Antwort an.
+     *  Wirft ApiException: 400 = nichts Sprechbares darin, 404 = der Server
+     *  kennt das Vorlesen waehrend der Antwort noch nicht (vor 27.10.2026). */
+    suspend fun createLiveTts(text: String, voice: String?, rate: Float?): String =
+        postJson<LiveTtsRequestDto, LiveTtsResponseDto>(
+            "/tts/live", LiveTtsRequestDto(text, voice?.takeIf { it.isNotBlank() }, rate),
+        ).id
+
+    suspend fun liveTtsUrl(segmentId: String): String {
+        val s = settings.current()
+        val token = if (s.serverToken.isNotBlank()) "?token=${Uri.encode(s.serverToken)}" else ""
+        return "${s.serverUrl}/tts/live/${Uri.encode(segmentId)}/audio$token"
+    }
+
     /** Auth-Headers für MediaPlayer-Streaming. */
     suspend fun authHeaders(): Map<String, String> =
         mapOf("Authorization" to authHeader())

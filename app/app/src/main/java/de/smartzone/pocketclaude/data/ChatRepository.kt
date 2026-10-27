@@ -133,6 +133,9 @@ class ChatRepository(
         api.importServerSettings(req)
     suspend fun audioUrl(messageId: Long, voice: String?, rate: Float? = null): String =
         api.audioUrl(messageId, voice, rate)
+    suspend fun createLiveTts(text: String, voice: String?, rate: Float?): String =
+        api.createLiveTts(text, voice, rate)
+    suspend fun liveTtsUrl(segmentId: String): String = api.liveTtsUrl(segmentId)
 
     // Backup-Endpoints (pass-through)
     suspend fun downloadBackup(password: String? = null): ByteArray =

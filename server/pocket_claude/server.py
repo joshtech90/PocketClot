@@ -1346,7 +1346,6 @@ async def tts_message_audio(
     Ausweichen auf den naechsten, wenn einer gerade nicht nutzbar ist.
     `rate` wird auf [0.25, 2.0] begrenzt; Vorgabe 1.0.
     """
-    provider, chunking_enabled = await _resolve_tts_provider(user["id"])
 
     # Message aus DB holen UND prüfen, dass die zugehörige Conversation dem
     # aktuellen User gehört. Sonst könnte ein User mit gültigem Token jede
@@ -1369,13 +1368,32 @@ async def tts_message_audio(
     if not content or not content.strip():
         raise HTTPException(400, "Message hat keinen Text.")
 
+    return await _tts_audio_response(user["id"], content, voice, rate, cache_message_id=message_id)
+
+
+async def _tts_audio_response(
+    user_id: str,
+    content: str,
+    voice: str | None,
+    rate: float | None,
+    cache_message_id: int | None = None,
+):
+    """Erzeugt das Vorlese-Audio fuer `content` und streamt es.
+
+    Gemeinsam fuer ganze Nachrichten und fuer Stuecke, die schon waehrend der
+    Antwort vorgelesen werden. Nur ganze Nachrichten nutzen den Zwischenspeicher.
+    """
+    provider, chunking_enabled = await _resolve_tts_provider(user_id)
     chosen_voice = (voice or tts.default_voice_for(provider)).strip()
     chosen_rate = rate if rate is not None else tts.DEFAULT_SPEED
     stream_media_type = tts.media_type_for(provider)
+    message_id = cache_message_id
 
     # Pre-Generation-Cache (provider ist Teil des Keys, damit MP3- und WAV-
     # Cache nicht kollidieren wenn der User mid-Session umschaltet).
-    cached = await tts_cache.get(message_id, chosen_voice, chosen_rate, provider)
+    cached = None
+    if message_id is not None:
+        cached = await tts_cache.get(message_id, chosen_voice, chosen_rate, provider)
     if cached is not None:
         log.info(
             "TTS-Cache HIT msg=%d voice=%s rate=%.2f provider=%s (%d KB, %s)",
@@ -1462,6 +1480,66 @@ async def tts_message_audio(
             # KEIN Content-Length — wir wissen die Länge erst am Ende.
         },
     )
+
+
+# ---------- Vorlesen waehrend der Antwort (seit 27.10.2026) ----------
+#
+# Im Sprachgespraech wartete das Vorlesen bis zum Ende der Antwort, im Mittel
+# gut 6 s, bei langen Antworten bis 30 s. Jetzt schickt die App fertige Stuecke
+# (erster Satz, dann Absaetze), solange Claude noch schreibt. Der Player holt
+# das Audio per GET, weil ExoPlayer nur eine URL abspielen kann; der Text
+# bleibt deshalb kurz hier liegen statt in der URL (die steht im Access-Log).
+
+from pydantic import BaseModel as _BaseModel, Field as _Field  # noqa: E402
+
+
+class LiveTtsRequest(_BaseModel):
+    text: str = _Field(max_length=20_000)
+    voice: str | None = None
+    rate: float | None = None
+
+
+_LIVE_TTS_TTL_SEC = 15 * 60
+_LIVE_TTS_MAX_ENTRIES = 500
+# id -> (user_id, text, voice, rate, angelegt)
+_live_tts: dict[str, tuple[str, str, str | None, float | None, float]] = {}
+
+
+def _live_tts_prune(now: float) -> None:
+    for key in [k for k, v in _live_tts.items() if now - v[4] > _LIVE_TTS_TTL_SEC]:
+        del _live_tts[key]
+    while len(_live_tts) >= _LIVE_TTS_MAX_ENTRIES:
+        del _live_tts[next(iter(_live_tts))]
+
+
+@app.post("/tts/live")
+async def tts_live_create(body: LiveTtsRequest, user=Depends(require_user)):
+    """Legt ein Textstueck zum Vorlesen an und gibt seine Kennung zurueck.
+
+    400, wenn nach dem Aufraeumen (Code, Links, Fussnoten) nichts Sprechbares
+    uebrig bleibt: die App ueberspringt das Stueck dann einfach.
+    """
+    if not tts._strip_for_tts(body.text):
+        raise HTTPException(400, "Nichts zum Vorlesen.")
+    now = _time.time()
+    _live_tts_prune(now)
+    seg_id = uuid.uuid4().hex
+    _live_tts[seg_id] = (user["id"], body.text, body.voice, body.rate, now)
+    return {"id": seg_id}
+
+
+@app.get("/tts/live/{seg_id}/audio")
+async def tts_live_audio(
+    seg_id: str,
+    token: str | None = None,  # noqa: ARG001 — von Dep konsumiert
+    user=Depends(require_user_header_or_query),
+):
+    entry = _live_tts.get(seg_id)
+    if entry is None or entry[0] != user["id"]:
+        raise HTTPException(404, "Vorlese-Stueck nicht gefunden.")
+    _, text, voice, rate, _ = entry
+    log.info("PC_FLOW: live-TTS seg=%s chars=%d", seg_id[:8], len(text))
+    return await _tts_audio_response(user["id"], text, voice, rate)
 
 
 # ---------- Image Generation (Google Gemini / Nano Banana) ----------
