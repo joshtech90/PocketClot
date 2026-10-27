@@ -1047,26 +1047,32 @@ class ChatViewModel(
     fun dismissGroqKeyHint() = _state.update { it.copy(groqKeyMissing = false) }
 
     private fun startRecordingInternal() {
-        if (!groqKeyConfirmed) {
-            // Erst fragen, dann aufnehmen. Ist der Server nicht erreichbar,
-            // trotzdem aufnehmen: die Transkription meldet den Fehler dann.
-            if (groqKeyCheck?.isActive == true) return
-            groqKeyCheck = viewModelScope.launch {
-                val configured = runCatching { apiClient.voiceConfig().configured }
-                    .getOrNull()
-                if (configured != false) {
-                    if (configured == true) groqKeyConfirmed = true
-                    // Direkt beginRecording: ein erneuter Weg ueber
-                    // startRecordingInternal endete hier am noch aktiven Job.
-                    if (_state.value.voiceState == VoiceState.Idle) beginRecording()
-                } else {
-                    if (_state.value.autoMode) setAutoMode(false)
-                    _state.update { it.copy(groqKeyMissing = true) }
-                }
-            }
+        if (groqKeyConfirmed) {
+            beginRecording()
             return
         }
-        beginRecording()
+        if (groqKeyCheck?.isActive == true) return
+        groqKeyCheck = viewModelScope.launch {
+            // Direkt beginRecording: ein erneuter Weg ueber
+            // startRecordingInternal endete hier am noch aktiven Job.
+            if (groqKeyUsable() && _state.value.voiceState == VoiceState.Idle) beginRecording()
+        }
+    }
+
+    /** Erst fragen, dann aufnehmen: true heisst, es darf aufgenommen werden.
+     *  Ist der Server nicht erreichbar, trotzdem aufnehmen, die Transkription
+     *  meldet den Fehler dann. Fehlt der Key, endet ein Auto-Modus und der
+     *  Hinweis erscheint. */
+    private suspend fun groqKeyUsable(): Boolean {
+        if (groqKeyConfirmed) return true
+        val configured = runCatching { apiClient.voiceConfig().configured }.getOrNull()
+        if (configured == false) {
+            if (_state.value.autoMode) setAutoMode(false)
+            _state.update { it.copy(groqKeyMissing = true) }
+            return false
+        }
+        if (configured == true) groqKeyConfirmed = true
+        return true
     }
 
     private fun beginRecording() {
@@ -1211,8 +1217,12 @@ class ChatViewModel(
                 waitUntilSettled()
                 if (!_state.value.autoMode) return
 
-                // Phase 1 — Recording starten
-                startRecordingInternal()
+                // Phase 1 — Recording starten. Die Key-Abfrage beim ersten Mal
+                // hier abwarten: lief sie im Hintergrund, galt der Start als
+                // gescheitert, der Auto-Modus ging aus, und kurz darauf
+                // startete die Abfrage ein normales Diktat (bis 0.6.2).
+                if (!groqKeyUsable() || !_state.value.autoMode) return
+                beginRecording()
                 if (_state.value.voiceState != VoiceState.Recording) {
                     _state.update { it.copy(autoMode = false) }
                     return

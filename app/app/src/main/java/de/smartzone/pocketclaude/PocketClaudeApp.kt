@@ -55,13 +55,17 @@ class PocketClaudeApp : Application() {
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
         override fun onActivityStarted(activity: Activity) {}
         override fun onActivityResumed(activity: Activity) {
-            if (resumedCount == 0) container.settingsSync.onForeground()
+            if (resumedCount == 0) {
+                container.settingsSync.onForeground()
+                container.drawerData.onForeground()
+            }
             resumedCount++
             isInForeground = resumedCount > 0
         }
         override fun onActivityPaused(activity: Activity) {
             resumedCount = (resumedCount - 1).coerceAtLeast(0)
             isInForeground = resumedCount > 0
+            if (resumedCount == 0) container.drawerData.onBackground()
         }
         override fun onActivityStopped(activity: Activity) {}
         override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}

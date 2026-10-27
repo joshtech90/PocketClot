@@ -158,17 +158,18 @@ fun ChatScreen(
     var rewindTarget by remember { mutableStateOf<MessageDto?>(null) }
     var autoSpeakDialogOpen by remember { mutableStateOf(false) }
 
-    // Drawer-State + Chat-Liste fürs Drawer (wird beim Öffnen aktualisiert)
+    // Drawer-State + Inhalt der Leiste. Der Inhalt liegt app-weit in
+    // DrawerData und ist beim Aufklappen schon da; abgeglichen wird im
+    // Hintergrund, hier zusaetzlich sobald die Leiste aufzugehen beginnt, und
+    // sofort, wenn ein Chat geoeffnet, umbenannt, angeheftet oder beantwortet
+    // wurde (neue Antwort = neue Reihenfolge).
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    var drawerChats by remember { mutableStateOf<List<ConversationDto>>(emptyList()) }
-    var drawerGems by remember { mutableStateOf<List<de.smartzone.pocketclaude.data.GemDto>>(emptyList()) }
-    LaunchedEffect(drawerState.currentValue, state.title) {
-        if (drawerState.currentValue == DrawerValue.Open) {
-            runCatching { container.chatRepository.list() }
-                .onSuccess { drawerChats = it }
-            runCatching { container.chatRepository.listGems() }
-                .onSuccess { drawerGems = it }
-        }
+    val drawerData by container.drawerData.state.collectAsState()
+    LaunchedEffect(drawerState.targetValue) {
+        if (drawerState.targetValue == DrawerValue.Open) container.drawerData.refresh()
+    }
+    LaunchedEffect(state.conversationId, state.title, state.pinned, state.isStreaming) {
+        if (!state.isStreaming) container.drawerData.refresh(force = true)
     }
 
     val defaultImageName = stringResource(de.smartzone.pocketclaude.R.string.chat_default_filename_image)
@@ -451,8 +452,8 @@ fun ChatScreen(
             ChatDrawerContent(
                 open = drawerState.targetValue == DrawerValue.Open,
                 currentCid = state.conversationId,
-                chats = drawerChats,
-                gems = drawerGems,
+                chats = drawerData.chats,
+                gems = drawerData.gems,
                 onNewChat = {
                     scope.launch { drawerState.close() }
                     onNewChat()

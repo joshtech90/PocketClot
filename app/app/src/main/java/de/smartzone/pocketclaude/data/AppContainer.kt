@@ -174,6 +174,9 @@ class AppContainer(context: Context) {
 
     val audioController: AudioController = AudioController(context, streamingHttpClient)
 
+    /** Inhalt der Seitenleiste, im Hintergrund aktuell gehalten. */
+    val drawerData: DrawerData = DrawerData(context, chatRepository, settingsRepository, appScope)
+
     /** Voice-Input (Mic → Groq Whisper). Eine globale Instanz reicht — es
      *  läuft sowieso nur eine Aufnahme zur Zeit, und der MediaRecorder wird
      *  beim Stop sauber freigegeben. Stateful zwischen Activities (Auto-Modus). */

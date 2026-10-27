@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,24 +90,19 @@ internal fun ChatDrawerContent(
         (context.applicationContext as de.smartzone.pocketclaude.PocketClaudeApp).container
     }
     val focusManager = LocalFocusManager.current
+    // Bilder-Eintrag und Profilbild kommen wie die Listen aus DrawerData,
+    // damit beim Aufklappen nichts mehr nachrutscht.
+    val data by container.drawerData.state.collectAsState()
+    val settings by container.settingsRepository.settingsFlow
+        .collectAsState(initial = de.smartzone.pocketclaude.data.AppSettings())
     // Bilder-Eintrag nur, wenn ueberhaupt ein Bild-Anbieter erreichbar ist.
-    var imageGenAvailable by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        runCatching { container.chatRepository.imagesConfig() }
-            .onSuccess { cfg -> imageGenAvailable = cfg.configured }
-    }
+    val imageGenAvailable = data.imagesAvailable
     // Profilbild statt Zahnrad unten rechts, wenn eines hinterlegt ist (wie
     // in der Web-UI). Die Version in der URL haelt den Bild-Cache aktuell.
-    var avatarUrl by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(open) {
-        if (!open) return@LaunchedEffect
-        runCatching { container.chatRepository.me() }.onSuccess { me ->
-            val s = container.settingsRepository.current()
-            avatarUrl = me.avatarVersion?.let { v ->
-                "${s.serverUrl}/users/${android.net.Uri.encode(me.id)}/avatar" +
-                    "?v=$v&token=${android.net.Uri.encode(s.serverToken)}"
-            }
-        }
+    val avatarUrl = data.avatarVersion?.let { v ->
+        val uid = data.userId ?: return@let null
+        "${settings.serverUrl}/users/${android.net.Uri.encode(uid)}/avatar" +
+            "?v=$v&token=${android.net.Uri.encode(settings.serverToken)}"
     }
 
     var query by remember { mutableStateOf("") }

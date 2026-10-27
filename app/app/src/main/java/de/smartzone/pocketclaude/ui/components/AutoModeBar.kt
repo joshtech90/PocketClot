@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -28,7 +28,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -44,21 +43,21 @@ import de.smartzone.pocketclaude.ui.theme.PocketIcons
  * Layout (oben → unten):
  *   1) Status-Text (groß, fett, je nach Phase: Höre zu / Claude denkt / Liest vor / …)
  *   2) Hinweis-Text (klein, je nach Phase: Tippe zum Senden / Tippe zum Sprechen)
- *   3) PocketVoiceOrb: Klumpen im Ring (140 dp, seit 22.10.2026 statt des
+ *   3) PocketVoiceOrb: Klumpen im Ring (120 dp, seit 22.10.2026 statt des
  *      Mikrofon-Knopfs, gleiche Bedienung, Stille-Countdown als Bogen am Ring)
  *   4) Exit-Button "Auto-Modus beenden"
  *
  * Status-Inferenz:
  *  - `voiceState=Recording` → Listening (User redet)
  *  - `voiceState=Transcribing` → Transcribing
- *  - `isStreaming` → Thinking
- *  - `ttsLoading` → Loading audio
  *  - `ttsPlaying` → Speaking
+ *  - `ttsLoading` → Loading audio
+ *  - `isStreaming` → Thinking
  *  - sonst → Idle (kurzer Settle-Moment zwischen Phasen)
  *
- * Höhe ≈ 280 dp + IME/NavBar-Inset — deckt damit grob die Höhe der virtuellen
- * Tastatur ab. Wenn die IME gerade noch ausgeht, zappelt die Bar einmal hoch,
- * was tolerabel ist (Auto-Mode-Start blendet die Tastatur direkt aus).
+ * Hoehe ≈ 250 dp + NavBar-Inset (vor dem 27.10.2026 rund 330 dp). Wenn die
+ * IME gerade noch ausgeht, zappelt die Bar einmal hoch, was tolerabel ist
+ * (Auto-Mode-Start blendet die Tastatur direkt aus).
  */
 @Composable
 fun AutoModeBar(
@@ -81,9 +80,11 @@ fun AutoModeBar(
     val phase = when {
         voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording -> AutoPhase.Listening
         voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Transcribing -> AutoPhase.Transcribing
-        isStreaming -> AutoPhase.Thinking
-        ttsLoading -> AutoPhase.LoadingAudio
+        // Vorlesen vor "denkt": seit dem 27.10.2026 beginnt das Vorlesen schon,
+        // waehrend die Antwort noch geschrieben wird.
         ttsPlaying -> AutoPhase.Speaking
+        ttsLoading -> AutoPhase.LoadingAudio
+        isStreaming -> AutoPhase.Thinking
         else -> AutoPhase.Idle
     }
 
@@ -122,107 +123,112 @@ fun AutoModeBar(
     val micEnabled = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording ||
         (voiceEnabled && voiceState != de.smartzone.pocketclaude.ui.chat.VoiceState.Transcribing)
 
+    // Vom Chat abgesetzt (Joscha 27.10.2026): eigene, etwas dunklere Flaeche
+    // mit einer Linie oben, statt nahtlos in den Verlauf ueberzugehen. Die
+    // Abstaende sind bewusst knapp, das Panel soll vom Chat wenig verdecken.
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-            .heightIn(min = 240.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        // Status-Crossfade verhindert Flacker beim Phase-Wechsel zwischen
-        // Höre zu / Claude denkt / Liest vor. Während Auto-Send-Countdown
-        // bleibt der Text auf „Höre zu" stehen — der Countdown lebt visuell
-        // als Ring um den Mic-Button.
-        Crossfade(targetState = statusRes, label = "auto-status") { res ->
-            Text(
-                text = stringResource(res),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-            )
-        }
-        // Hinweis-Zeile — feste Höhe damit nichts wackelt
-        Box(modifier = Modifier.heightIn(min = 20.dp)) {
-            if (hintRes != null) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // Status-Crossfade verhindert Flacker beim Phase-Wechsel zwischen
+            // Höre zu / Claude denkt / Liest vor. Während Auto-Send-Countdown
+            // bleibt der Text auf „Höre zu" stehen — der Countdown lebt visuell
+            // als Ring um den Mic-Button.
+            Crossfade(targetState = statusRes, label = "auto-status") { res ->
                 Text(
-                    text = stringResource(hintRes),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = stringResource(res),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
             }
-        }
-
-        Spacer(Modifier.size(4.dp))
-
-        PocketVoiceOrb(
-            phase = orbPhase,
-            recording = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording,
-            statusLabel = stringResource(statusRes),
-            onTap = onMicTap,
-            onCancel = onMicCancel,
-            enabled = micEnabled,
-            size = 140.dp,
-            progressFraction = ringFraction,
-        )
-
-        // Vorlesen abbrechen (Joscha 19.10.2026): nur waehrend die Antwort
-        // geladen oder vorgelesen wird. Der Loop wartet in Phase 6 genau auf
-        // das Ende der Wiedergabe und startet danach selbst die Aufnahme.
-        AnimatedVisibility(visible = phase == AutoPhase.LoadingAudio || phase == AutoPhase.Speaking) {
-            FilledTonalButton(onClick = onStopSpeaking) {
-                Icon(
-                    PocketIcons.Stop,
-                    contentDescription = null,
-                    modifier = Modifier.size(PocketIconSize.Small),
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.auto_mode_stop_speaking))
+            // Hinweis-Zeile — feste Höhe damit nichts wackelt
+            Box(modifier = Modifier.heightIn(min = 20.dp)) {
+                if (hintRes != null) {
+                    Text(
+                        text = stringResource(hintRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
-        }
 
-        Spacer(Modifier.size(4.dp))
-
-        // Auto-Send-Toggle: dezent unter dem Mic, damit der User entscheiden
-        // kann, ob die Aufnahme nach Stille selbst aufhört oder erst durch
-        // Mic-Tap. Klick auf die ganze Zeile = Toggle (größerer Hit-Bereich
-        // als nur der Switch).
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                stringResource(R.string.auto_mode_auto_send_label),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Der Ring liegt bei 80 % der Flaeche, der Rand darum bleibt fuer
+            // die Welle frei und wirkt schon wie Abstand.
+            PocketVoiceOrb(
+                phase = orbPhase,
+                recording = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording,
+                statusLabel = stringResource(statusRes),
+                onTap = onMicTap,
+                onCancel = onMicCancel,
+                enabled = micEnabled,
+                size = 120.dp,
+                progressFraction = ringFraction,
             )
-            Switch(
-                checked = autoSendEnabled,
-                onCheckedChange = onAutoSendChange,
-            )
-        }
 
-        // Exit-Button: dezent, aber direkt erreichbar.
-        TextButton(
-            onClick = onExitAutoMode,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        ) {
+            // Vorlesen abbrechen (Joscha 19.10.2026): nur waehrend die Antwort
+            // geladen oder vorgelesen wird. Der Loop wartet in Phase 6 genau auf
+            // das Ende der Wiedergabe und startet danach selbst die Aufnahme.
+            AnimatedVisibility(visible = phase == AutoPhase.LoadingAudio || phase == AutoPhase.Speaking) {
+                FilledTonalButton(
+                    onClick = onStopSpeaking,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                ) {
+                    Icon(
+                        PocketIcons.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.size(PocketIconSize.Small),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.auto_mode_stop_speaking))
+                }
+            }
+
+            // Auto-Send-Toggle: dezent unter dem Mic, damit der User entscheiden
+            // kann, ob die Aufnahme nach Stille selbst aufhört oder erst durch
+            // Mic-Tap.
             Row(
+                modifier = Modifier.padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(
-                    PocketIcons.Close,
-                    contentDescription = null,
-                    modifier = Modifier.size(PocketIconSize.Small),
+                Text(
+                    stringResource(R.string.auto_mode_auto_send_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(stringResource(R.string.auto_mode_exit))
+                Switch(
+                    checked = autoSendEnabled,
+                    onCheckedChange = onAutoSendChange,
+                )
+            }
+
+            // Exit-Button: dezent, aber direkt erreichbar.
+            TextButton(
+                onClick = onExitAutoMode,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        PocketIcons.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(PocketIconSize.Small),
+                    )
+                    Text(stringResource(R.string.auto_mode_exit))
+                }
             }
         }
     }
