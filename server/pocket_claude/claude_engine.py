@@ -868,6 +868,7 @@ async def stream_reply(
 
         # Streaming-Loop
         full_text_parts: list[str] = []
+        block_needs_gap = False
         new_session_id: str | None = None
         input_tokens = 0
         output_tokens = 0
@@ -935,6 +936,13 @@ async def stream_reply(
                     if delta_type == "text_delta":
                         text = delta.get("text", "")
                         if text:
+                            if block_needs_gap:
+                                # Neuer Textblock nach einem Werkzeug: sonst
+                                # klebt "Ich schaue nach.Hier ist ..." zusammen,
+                                # in der Anzeige wie beim Vorlesen.
+                                block_needs_gap = False
+                                yield {"type": "delta", "text": "\n\n"}
+                                full_text_parts.append("\n\n")
                             full_text_parts.append(text)
                             emitted_via_stream = True
                             yield {"type": "delta", "text": text}
@@ -948,6 +956,10 @@ async def stream_reply(
                     block = ev.get("content_block") or {}
                     btype = block.get("type")
                     log.info("Stream-Block start: type=%s", btype)
+                    block_needs_gap = (
+                        btype == "text" and bool(full_text_parts)
+                        and not full_text_parts[-1].endswith("\n")
+                    )
                 elif etype_inner == "content_block_stop":
                     yield {"type": "block_stop"}
 

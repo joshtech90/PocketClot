@@ -662,6 +662,12 @@ async def stream_reply(
                             if thinking_open:
                                 thinking_open = False
                                 yield {"type": "block_stop"}
+                            if (not round_text_parts and full_text_parts
+                                    and not full_text_parts[-1].endswith("\n")):
+                                # Text nach einem Werkzeug als neuer Absatz,
+                                # sonst klebt er an den Satz davor.
+                                full_text_parts.append("\n\n")
+                                yield {"type": "delta", "text": "\n\n"}
                             round_text_parts.append(text)
                             full_text_parts.append(text)
                             yield {"type": "delta", "text": text}
