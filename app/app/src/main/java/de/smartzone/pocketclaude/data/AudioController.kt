@@ -238,8 +238,12 @@ class AudioController(
             synchronized(this@AudioController) {
                 if (!first && !liveSession) return@withContext  // inzwischen gestoppt
                 val st = _state.value
-                if (st.loadingMessageId == null && st.playingMessageId == null) {
-                    _state.value = State(loadingMessageId = st.pausedMessageId ?: LIVE_MESSAGE_ID)
+                // Pausiert (Sperrbildschirm, Kopfhoerer) bleibt pausiert: das
+                // Stueck wird nur angehaengt. Das erste Stueck ersetzt alles.
+                if (first || (st.loadingMessageId == null && st.playingMessageId == null &&
+                        st.pausedMessageId == null)
+                ) {
+                    _state.value = State(loadingMessageId = LIVE_MESSAGE_ID)
                 }
                 val item = MediaItem.Builder()
                     .setUri(android.net.Uri.parse(url))
