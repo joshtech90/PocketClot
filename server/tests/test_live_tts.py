@@ -62,3 +62,17 @@ def test_live_segment_belongs_to_its_user(ctx, monkeypatch):
 def test_unspeakable_segment_is_rejected(ctx, text):
     c, alice, _ = ctx
     assert c.post("/tts/live", headers=alice, json={"text": text}).status_code == 400
+
+
+def test_expired_segment_is_gone(ctx, monkeypatch):
+    c, alice, _ = ctx
+    seg = c.post("/tts/live", headers=alice, json={"text": "Noch da?"}).json()["id"]
+    real = server._time.time
+    monkeypatch.setattr(server._time, "time", lambda: real() + server._LIVE_TTS_TTL_SEC + 1)
+    assert c.get(f"/tts/live/{seg}/audio", headers=alice).status_code == 404
+
+
+def test_oversized_voice_is_rejected(ctx):
+    c, alice, _ = ctx
+    r = c.post("/tts/live", headers=alice, json={"text": "Hallo du.", "voice": "x" * 10_000})
+    assert r.status_code == 422

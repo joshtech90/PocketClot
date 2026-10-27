@@ -45,9 +45,17 @@ internal object SpeechChunker {
     fun nextCut(text: String, from: Int, first: Boolean, blockEnd: Boolean = false, final: Boolean = false): Int {
         if (from >= text.length) return -1
         if (final) return text.length
-        if (blockEnd) return if (insideCodeFence(text, text.length)) -1 else text.length
-        return if (first) firstCut(text, from) else nextParagraphCut(text, from)
+        // Den Quellen-Block am Ende nie zerschneiden: der Server wirft ihn nur
+        // als Ganzes weg, ein abgetrennter Rest wuerde vorgelesen. Er kommt
+        // deshalb erst mit dem letzten Stueck.
+        val usable = SOURCES_BLOCK.find(text)?.range?.first ?: text.length
+        if (from >= usable) return -1
+        val head = text.substring(0, usable)
+        if (blockEnd) return if (insideCodeFence(head, head.length)) -1 else head.length
+        return if (first) firstCut(head, from) else nextParagraphCut(head, from)
     }
+
+    private val SOURCES_BLOCK = Regex("""(?:^|\n)[ \t]*\*\*Quellen\*\*""")
 
     private fun firstCut(text: String, from: Int): Int {
         var i = from
@@ -154,9 +162,21 @@ internal class LiveSpeaker(
         val ch = Channel<String>(Channel.UNLIMITED)
         queue = ch
         worker = scope.launch {
+            // Scheitert ein Stueck zweimal am Netz, geht es nicht verloren,
+            // sondern vor das naechste. Sonst fehlte mitten im Vorlesen ein
+            // Absatz, ohne dass es jemand merkt.
+            var carry = ""
             for (text in ch) {
                 if (status != Status.Active) continue
-                sendOne(text, voice, serverRate, playerRate)
+                val piece = carry + text
+                carry = if (sendOne(piece, voice, serverRate, playerRate)) "" else piece
+                if (carry.length > MAX_SEGMENT_CHARS) {
+                    Log.w("PC_TTS", "live segment dropped after repeated failures (${carry.length} chars)")
+                    carry = ""
+                }
+            }
+            if (carry.isNotEmpty() && status == Status.Active) {
+                sendOne(carry, voice, serverRate, playerRate)
             }
         }
     }
@@ -204,8 +224,8 @@ internal class LiveSpeaker(
         return wasActive
     }
 
-    /** Antwort abgebrochen oder Fehler: was schon in der Warteschlange
-     *  liegt, laeuft zu Ende, Neues kommt nicht dazu. */
+    /** Antwort abgebrochen oder Fehler: was schon im Player liegt, laeuft
+     *  zu Ende, Neues kommt nicht dazu. */
     fun end() {
         if (status == Status.Active) status = Status.Idle
         queue?.close()
@@ -213,30 +233,43 @@ internal class LiveSpeaker(
 
     private fun push(text: String) {
         cuts++
-        queue?.trySend(text)
+        // Der Server nimmt hoechstens 20.000 Zeichen je Stueck; ein riesiger
+        // Rest am Ende wird deshalb an Absaetzen bzw. Leerzeichen geteilt.
+        var rest = text
+        while (rest.length > MAX_SEGMENT_CHARS) {
+            val window = rest.substring(0, MAX_SEGMENT_CHARS)
+            val at = window.lastIndexOf("\n\n").takeIf { it > 0 }?.plus(2)
+                ?: window.lastIndexOf(' ').takeIf { it > 0 }?.plus(1)
+                ?: MAX_SEGMENT_CHARS
+            queue?.trySend(rest.substring(0, at))
+            rest = rest.substring(at)
+        }
+        if (rest.isNotEmpty()) queue?.trySend(rest)
     }
 
-    private suspend fun sendOne(text: String, voice: String?, serverRate: Float, playerRate: Float) {
+    /** true: erledigt (eingereiht, nichts Sprechbares oder Server zu alt).
+     *  false: zweimal am Netz gescheitert, spaeter nochmal versuchen. */
+    private suspend fun sendOne(text: String, voice: String?, serverRate: Float, playerRate: Float): Boolean {
         repeat(2) { attempt ->
             try {
                 val id = repo.createLiveTts(text, voice, serverRate)
                 val url = repo.liveTtsUrl(id)
-                if (status != Status.Active) return
+                if (status != Status.Active) return true
                 audio.enqueueLive(url, playerRate, first = enqueued == 0)
                 enqueued++
                 Log.d("PC_TTS", "live segment ${text.length} chars queued (#$enqueued)")
-                return
+                return true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ApiException) {
                 when (e.code) {
                     // Nichts Sprechbares darin (nur Code, nur Quellen).
-                    400, 422 -> return
+                    400 -> return true
                     // Server kennt das noch nicht: am Ende klassisch vorlesen.
                     404, 405 -> {
                         if (enqueued == 0) status = Status.Unsupported
                         Log.i("PC_TTS", "live TTS not supported by server (${e.code})")
-                        return
+                        return true
                     }
                 }
                 Log.w("PC_TTS", "live segment failed (${e.code}), attempt ${attempt + 1}")
@@ -244,5 +277,11 @@ internal class LiveSpeaker(
                 Log.w("PC_TTS", "live segment failed: ${e::class.java.simpleName}, attempt ${attempt + 1}")
             }
         }
+        return false
+    }
+
+    private companion object {
+        /** Unter der Server-Grenze von 20.000 Zeichen je Stueck. */
+        const val MAX_SEGMENT_CHARS = 12_000
     }
 }

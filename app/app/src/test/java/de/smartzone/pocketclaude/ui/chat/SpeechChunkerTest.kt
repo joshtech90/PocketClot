@@ -75,4 +75,14 @@ class SpeechChunkerTest {
             assertFalse("Codeblock zerschnitten: $c", c.split("```").size % 2 == 0)
         }
     }
+
+    @Test
+    fun sourcesBlockStaysInOnePiece() {
+        // Der Server wirft den Block nur als Ganzes weg; ein abgetrennter Rest
+        // ("Quelle 8") wuerde vorgelesen.
+        val sources = (1..8).joinToString("\n") { "$it. [Quelle $it mit langem Titel](https://example.com/$it)" }
+        val chunks = stream("$paragraph\n\n$paragraph\n\n**Quellen**\n$sources", step = 5)
+        assertEquals(1, chunks.count { "Quelle" in it })
+        assert(chunks.last().contains("**Quellen**") && chunks.last().endsWith("/8)"))
+    }
 }

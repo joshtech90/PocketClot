@@ -1495,8 +1495,8 @@ from pydantic import BaseModel as _BaseModel, Field as _Field  # noqa: E402
 
 class LiveTtsRequest(_BaseModel):
     text: str = _Field(max_length=20_000)
-    voice: str | None = None
-    rate: float | None = None
+    voice: str | None = _Field(default=None, max_length=64)
+    rate: float | None = _Field(default=None, ge=0.25, le=2.0)
 
 
 _LIVE_TTS_TTL_SEC = 15 * 60
@@ -1508,7 +1508,7 @@ _live_tts: dict[str, tuple[str, str, str | None, float | None, float]] = {}
 def _live_tts_prune(now: float) -> None:
     for key in [k for k, v in _live_tts.items() if now - v[4] > _LIVE_TTS_TTL_SEC]:
         del _live_tts[key]
-    while len(_live_tts) >= _LIVE_TTS_MAX_ENTRIES:
+    while len(_live_tts) > _LIVE_TTS_MAX_ENTRIES:
         del _live_tts[next(iter(_live_tts))]
 
 
@@ -1523,6 +1523,8 @@ async def tts_live_create(body: LiveTtsRequest, user=Depends(require_user)):
         raise HTTPException(400, "Nichts zum Vorlesen.")
     now = _time.time()
     _live_tts_prune(now)
+    if len(_live_tts) >= _LIVE_TTS_MAX_ENTRIES:
+        del _live_tts[next(iter(_live_tts))]
     seg_id = uuid.uuid4().hex
     _live_tts[seg_id] = (user["id"], body.text, body.voice, body.rate, now)
     return {"id": seg_id}
@@ -1534,6 +1536,7 @@ async def tts_live_audio(
     token: str | None = None,  # noqa: ARG001 — von Dep konsumiert
     user=Depends(require_user_header_or_query),
 ):
+    _live_tts_prune(_time.time())
     entry = _live_tts.get(seg_id)
     if entry is None or entry[0] != user["id"]:
         raise HTTPException(404, "Vorlese-Stueck nicht gefunden.")

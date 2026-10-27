@@ -57,8 +57,13 @@ class DrawerData(
     private val _state = MutableStateFlow(Snapshot())
     val state: StateFlow<Snapshot> = _state.asStateFlow()
 
-    private var lastRefreshAt = 0L
+    @Volatile private var lastRefreshAt = 0L
     private var pollJob: Job? = null
+
+    /** Zaehlt Konto- und Anmeldewechsel. Ein Abruf, der unter einer anderen
+     *  Generation begann, gehoert womoeglich zum vorigen Konto und wird
+     *  verworfen, auch bei A -> B -> A. */
+    private val generation = java.util.concurrent.atomic.AtomicInteger()
 
     init {
         // Profilwechsel und Login: die Liste gehoert zum Konto. Erst die
@@ -68,6 +73,9 @@ class DrawerData(
                 .map { it.activeProfileId to it.serverToken }
                 .distinctUntilChanged()
                 .collect { (profileId, token) ->
+                    // Sofort umschalten, nicht erst nach laufenden Abrufen:
+                    // die Netzaufrufe halten den Mutex nicht.
+                    generation.incrementAndGet()
                     mutex.withLock {
                         if (_state.value.profileId != profileId) {
                             _state.value = load(profileId)
@@ -100,11 +108,12 @@ class DrawerData(
         scope.launch { refreshNow(force) }
     }
 
-    private suspend fun refreshNow(force: Boolean) = mutex.withLock {
+    private suspend fun refreshNow(force: Boolean) {
         val now = System.currentTimeMillis()
-        if (!force && now - lastRefreshAt < THROTTLE_MS) return@withLock
+        if (!force && now - lastRefreshAt < THROTTLE_MS) return
+        val gen = generation.get()
         val s = settings.current()
-        if (!s.isConfigured) return@withLock
+        if (!s.isConfigured) return
         lastRefreshAt = now
         val profileId = s.activeProfileId
         val chats = runCatching { repo.list() }
@@ -114,8 +123,19 @@ class DrawerData(
         val images = runCatching { repo.imagesConfig().configured }.getOrNull()
         val me = runCatching { repo.me() }.getOrNull()
         // Waehrend des Abrufs kann das Profil gewechselt haben: dann gehoert
-        // das Ergebnis zum alten Konto und wird verworfen.
-        if (settings.current().activeProfileId != profileId) return@withLock
+        // das Ergebnis (ganz oder teilweise) zum alten Konto und wird verworfen.
+        mutex.withLock { apply(gen, profileId, chats, gems, images, me) }
+    }
+
+    private fun apply(
+        gen: Int,
+        profileId: String,
+        chats: List<ConversationDto>?,
+        gems: List<GemDto>?,
+        images: Boolean?,
+        me: MeDto?,
+    ) {
+        if (generation.get() != gen || _state.value.profileId != profileId) return
         val old = _state.value.takeIf { it.profileId == profileId } ?: Snapshot(profileId)
         val next = old.copy(
             chats = chats ?: old.chats,
