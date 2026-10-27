@@ -127,6 +127,13 @@ class AudioController(
                     // Wiedergabe wirklich vorbei → State zurücksetzen.
                     cleanupCurrent()
                     _state.value = State()
+                } else if (st.playingMessageId != null && controllerNow.playWhenReady) {
+                    // Puffert nur (naechstes Stueck laedt noch): kein Pause-
+                    // Zustand, sonst oeffnete der Auto-Modus schon das Mikrofon.
+                    _state.value = st.copy(
+                        playingMessageId = null,
+                        loadingMessageId = st.playingMessageId,
+                    )
                 } else if (st.playingMessageId != null) {
                     // Pause aus dem Spiel-Zustand (kann auch von System-Media-
                     // Controls kommen, Lock Screen / Notification). State syncen.
@@ -139,6 +146,16 @@ class AudioController(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            // Vorlesen waehrend der Antwort: ein kaputtes Stueck ueberspringen
+            // statt den Rest der Antwort zu verschweigen.
+            val c = controller
+            if (liveSession && c != null && c.hasNextMediaItem()) {
+                android.util.Log.w("PC_TTS", "live segment failed, skipping: ${error.message}")
+                c.seekToNextMediaItem()
+                c.prepare()
+                c.playWhenReady = true
+                return
+            }
             cleanupCurrent()
             _state.value = State(error = "Wiedergabe-Fehler: ${error.message}")
         }
@@ -158,6 +175,7 @@ class AudioController(
         // ExoPlayer-Cache. Bei Re-Listen → direkter Disk-Hit.
         currentJob?.cancel()
         cleanupCurrent()
+        liveSession = false
         _state.value = State(loadingMessageId = messageId)
 
         currentJob = scope.launch {
@@ -203,6 +221,77 @@ class AudioController(
         }
     }
 
+    /** Laeuft gerade eine Warteschlange aus Stuecken einer Antwort? */
+    @Volatile private var liveSession = false
+
+    /**
+     * Haengt ein Stueck der gerade entstehenden Antwort an (Vorlesen waehrend
+     * der Antwort). `first` beginnt eine neue Warteschlange und ersetzt, was
+     * vorher lief. Spaetere Stuecke werden nur angehaengt, auch wenn das
+     * vorige schon zu Ende ist (Pause, waehrend Claude etwa im Netz sucht):
+     * dann geht es mit dem neuen Stueck weiter. Kehrt erst zurueck, wenn das
+     * Stueck im Player liegt, damit die Reihenfolge stimmt.
+     */
+    suspend fun enqueueLive(url: String, speed: Float, first: Boolean) {
+        val c = awaitController() ?: return
+        withContext(Dispatchers.Main) {
+            synchronized(this@AudioController) {
+                if (!first && !liveSession) return@withContext  // inzwischen gestoppt
+                val st = _state.value
+                if (st.loadingMessageId == null && st.playingMessageId == null) {
+                    _state.value = State(loadingMessageId = st.pausedMessageId ?: LIVE_MESSAGE_ID)
+                }
+                val item = MediaItem.Builder()
+                    .setUri(android.net.Uri.parse(url))
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle("PocketClot")
+                            .setIsBrowsable(false)
+                            .setIsPlayable(true)
+                            .build()
+                    )
+                    .build()
+                if (first || c.mediaItemCount == 0) {
+                    liveSession = true
+                    c.setMediaItem(item)
+                    c.setPlaybackSpeed(speed.coerceIn(0.25f, 2.0f))
+                    c.prepare()
+                    c.playWhenReady = true
+                } else {
+                    c.addMediaItem(item)
+                    if (c.playbackState == Player.STATE_ENDED || c.playbackState == Player.STATE_IDLE) {
+                        c.seekTo(c.mediaItemCount - 1, 0L)
+                        c.prepare()
+                        c.playWhenReady = true
+                    }
+                }
+            }
+        }
+    }
+
+    /** Die Antwort hat jetzt ihre echte Kennung: Knoepfe an der Nachricht
+     *  zeigen dann das laufende Vorlesen. */
+    @Synchronized
+    fun relabelLive(messageId: Long) {
+        val st = _state.value
+        _state.value = st.copy(
+            loadingMessageId = st.loadingMessageId?.let { if (it == LIVE_MESSAGE_ID) messageId else it },
+            playingMessageId = st.playingMessageId?.let { if (it == LIVE_MESSAGE_ID) messageId else it },
+            pausedMessageId = st.pausedMessageId?.let { if (it == LIVE_MESSAGE_ID) messageId else it },
+        )
+    }
+
+    // Scheitert der Aufbau, meldet ensureController das im State; dann
+    // nicht ewig warten.
+    private suspend fun awaitController(): MediaController? =
+        kotlinx.coroutines.withTimeoutOrNull(10_000L) {
+            kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                scope.launch(Dispatchers.Main) {
+                    ensureController { c -> if (cont.isActive) cont.resumeWith(Result.success(c)) }
+                }
+            }
+        }
+
     /** Pause: behält Player-Position, Resume nimmt da wieder auf. */
     @Synchronized
     fun pause() {
@@ -236,6 +325,7 @@ class AudioController(
     fun stop() {
         currentJob?.cancel()
         currentJob = null
+        liveSession = false
         controller?.let {
             try { it.stop() } catch (_: Exception) {}
             try { it.clearMediaItems() } catch (_: Exception) {}
@@ -251,6 +341,11 @@ class AudioController(
         if (_state.value.error != null) {
             _state.value = _state.value.copy(error = null)
         }
+    }
+
+    companion object {
+        /** Kennung, solange die vorgelesene Antwort noch keine eigene hat. */
+        const val LIVE_MESSAGE_ID = Long.MIN_VALUE
     }
 
     fun release() {

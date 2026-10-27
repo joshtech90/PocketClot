@@ -681,6 +681,12 @@ async def stream_reply(
                 if not tool_acc:
                     break
 
+                # Text vor den Werkzeugen ("Ich schaue kurz nach.") ist ein
+                # fertiger Block: die App liest ihn vor, waehrend das Werkzeug
+                # laeuft, statt bis zum naechsten Satz zu warten (wie bei Claude).
+                if round_text_parts:
+                    yield {"type": "block_stop"}
+
                 if round_idx >= MAX_TOOL_ROUNDS:
                     aborted_tools = True
                     break

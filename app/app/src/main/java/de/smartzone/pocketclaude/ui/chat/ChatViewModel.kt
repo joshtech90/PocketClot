@@ -189,6 +189,9 @@ class ChatViewModel(
     /** Laufender Auto-Mode-Loop, oder null wenn aus. */
     private var autoModeJob: Job? = null
 
+    /** Vorlesen schon waehrend der Antwort, nur im Sprachgespraech. */
+    private val liveSpeaker = LiveSpeaker(viewModelScope, repo, audio)
+
     init {
         refresh()
         observeSettings()
@@ -682,6 +685,14 @@ class ChatViewModel(
             // anzeigt.
             val selected = _state.value.models.firstOrNull { it.key == modelKey }
             val effort = s.effortForModelKey(modelKey, selected, _state.value.chatEffort)
+            // Sprachgespraech: schon waehrend der Antwort vorlesen. Die
+            // Vorab-Erzeugung des Servers fuer die ganze Nachricht entfaellt
+            // dann, sie wuerde nur parallel dasselbe noch einmal erzeugen.
+            val live = _state.value.autoMode
+            if (live) {
+                val (serverRate, playerRate) = ttsRates(s.ttsSpeed)
+                liveSpeaker.begin(s.ttsVoice, serverRate, playerRate)
+            }
             repo.stream(
                 cid,
                 text,
@@ -691,7 +702,7 @@ class ChatViewModel(
                 systemPrompt = s.resolvedSystemPrompt,
                 // Server startet nach Done eine Pre-Generation für die
                 // gewählte Voice/Speed. Nächster Vorlesen-Tap = Cache-Hit.
-                ttsVoice = s.ttsVoice,
+                ttsVoice = if (live) null else s.ttsVoice,
                 ttsRate = s.ttsSpeed,
                 imageMode = imageMode,
             )
@@ -722,6 +733,7 @@ class ChatViewModel(
     fun stop() {
         streamJob?.cancel()
         streamJob = null
+        liveSpeaker.end()
         runCatching { StreamingService.stop(appContext) }
         finalizeStreaming()
     }
@@ -749,8 +761,9 @@ class ChatViewModel(
                 it.copy(isCompacting = false, hasMidSummary = true)
             }
 
-            is StreamEvent.Delta -> _state.update {
-                it.copy(streamingText = it.streamingText + ev.text)
+            is StreamEvent.Delta -> {
+                _state.update { it.copy(streamingText = it.streamingText + ev.text) }
+                liveSpeaker.onText(_state.value.streamingText)
             }
 
             is StreamEvent.ThinkingDelta -> _state.update {
@@ -769,8 +782,9 @@ class ChatViewModel(
 
             StreamEvent.BlockStop -> {
                 // Block-Stop kommt nach jedem content_block (Thinking oder Text).
-                // Wir machen nichts speziell — die State-Updates geben das UI
-                // genug Information.
+                // Endet ein Textblock, etwa der kurze Satz vor einer Websuche,
+                // wird er gleich vorgelesen statt bis zum naechsten Satz zu warten.
+                liveSpeaker.onText(_state.value.streamingText, blockEnd = true)
             }
 
             is StreamEvent.Done -> {
@@ -814,7 +828,11 @@ class ChatViewModel(
                         val s = settingsRepo.current()
                         val override = _state.value.autoSpeakOverride
                         val shouldSpeak = _state.value.autoMode || (override ?: s.ttsAutoSpeak)
-                        if (shouldSpeak) {
+                        // Lief das Vorlesen schon mit, nur noch den Rest
+                        // anhaengen; sonst wie bisher die ganze Nachricht.
+                        if (liveSpeaker.finish(finalText)) {
+                            audio.relabelLive(ev.assistantMessageId)
+                        } else if (shouldSpeak) {
                             speak(ev.assistantMessageId).join()
                         }
                     } finally {
@@ -824,6 +842,7 @@ class ChatViewModel(
             }
 
             is StreamEvent.ErrorEvent -> {
+                liveSpeaker.end()
                 _state.update {
                     it.copy(
                         isStreaming = false,
@@ -927,13 +946,7 @@ class ChatViewModel(
     fun speak(messageId: Long) = viewModelScope.launch {
         val s = settingsRepo.current()
         try {
-            // Gemini-Web kann die Sprechgeschwindigkeit nicht selbst aendern,
-            // die stellt hier der Player ein. Bei allen anderen Anbietern macht
-            // das der Server beim Erzeugen — dort waere ein zweites Mal Tempo
-            // genau ein Mal zu viel.
-            val webTts = repo.ttsProviderCached() == "gemini_web"
-            val serverRate = if (webTts) 1.0f else s.ttsSpeed
-            val playerRate = if (webTts) s.ttsSpeed else 1.0f
+            val (serverRate, playerRate) = ttsRates(s.ttsSpeed)
             val url = repo.audioUrl(messageId, s.ttsVoice, serverRate)
             val cacheKey = "audio-$messageId-${s.ttsVoice}-$serverRate"
             audio.play(messageId, url, cacheKey, speed = playerRate)
@@ -942,7 +955,18 @@ class ChatViewModel(
         }
     }
 
+    /** Gemini-Web kann die Sprechgeschwindigkeit nicht selbst aendern, die
+     *  stellt dann der Player ein. Bei allen anderen Anbietern macht das der
+     *  Server beim Erzeugen, dort waere ein zweites Mal Tempo genau ein Mal
+     *  zu viel. Liefert (Server-Tempo, Player-Tempo). */
+    private suspend fun ttsRates(speed: Float): Pair<Float, Float> {
+        val webTts = repo.ttsProviderCached() == "gemini_web"
+        return if (webTts) 1.0f to speed else speed to 1.0f
+    }
+
     fun stopSpeaking() {
+        // Auch waehrend die Antwort noch entsteht: keine weiteren Stuecke.
+        liveSpeaker.cancel()
         audio.stop()
     }
 
@@ -1184,6 +1208,9 @@ class ChatViewModel(
         if (enabled) {
             autoModeJob = viewModelScope.launch { runAutoModeLoop() }
         } else {
+            // Sprachgespraech beendet, waehrend die Antwort schon mitgelesen
+            // wird: das Vorlesen gehoert zum Gespraech und endet mit ihm.
+            if (liveSpeaker.cancel()) audio.stop()
             // Beim Ausschalten: laufende Aufnahme abbrechen (NICHT transkribieren).
             if (_state.value.voiceState == VoiceState.Recording) {
                 runCatching { voiceRecorder.cancel() }

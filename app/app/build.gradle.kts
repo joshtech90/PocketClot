@@ -35,8 +35,8 @@ android {
     if (project.hasProperty("legacyAppId")) applicationId = "de.smartzone.pocketclaude"
         minSdk = 31
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.6.2"
+        versionCode = 14
+        versionName = "0.6.3"
 
         vectorDrawables { useSupportLibrary = true }
     }
@@ -80,6 +80,8 @@ android {
 }
 
 dependencies {
+    // Nur fuer die reinen Logik-Tests unter src/test (SpeechChunker).
+    testImplementation("junit:junit:4.13.2")
     // Core
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
