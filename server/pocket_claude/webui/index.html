@@ -22,13 +22,13 @@
   })();
 </script>
 <link rel="stylesheet" href="palettes.css?v=20261022d">
-<link rel="stylesheet" href="style.css?v=20261022d">
+<link rel="stylesheet" href="style.css?v=20261028a">
 <!-- Feste Versionen mit Pruefsumme, vom eigenen Server statt vom CDN: blockiert ein
      Browser das CDN, blieb die Seite sonst leer. DOMPurify schuetzt auch den
      Gedaechtnis-Schluessel im Browser. Quelle: marked 12.0.2, DOMPurify 3.4.16 (jsdelivr). -->
 <script src="vendor/marked.min.js?v=12.0.2" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"></script>
 <script src="vendor/purify.min.js?v=3.4.16" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"></script>
-<script src="i18n.js?v=20261022d"></script>
+<script src="i18n.js?v=20261028a"></script>
 </head>
 <body>
 
@@ -375,8 +375,10 @@
         <!-- Sprachgespraech (Auto-Modus): ersetzt waehrend der Schleife das Eingabefeld -->
         <div id="voice-bar" class="voice-bar hidden" role="status" data-phase="idle">
           <!-- Klumpen im Ring (Entscheidung 22.10.2026): zeigt die Phase, keinen Pegel.
-               Der Stille-Countdown bleibt die Linie unten (#voice-silence). -->
-          <div class="voice-orb" aria-hidden="true"><img src="brand-mark.png?v=20261022d" alt=""></div>
+               Der Stille-Countdown bleibt die Linie unten (#voice-silence).
+               Seit 28.10.2026 auch Bedienflaeche: blau = du bist dran (Klick sendet),
+               grau = die KI ist dran (Klick beim Vorlesen unterbricht). -->
+          <button id="voice-orb" type="button" class="voice-orb" disabled><img src="brand-mark.png?v=20261022d" alt=""></button>
           <div class="voice-bar-text">
             <span id="voice-bar-text" class="voice-bar-title">Ich höre zu…</span>
             <span id="voice-bar-hint" class="voice-bar-hint"></span>
@@ -1072,7 +1074,7 @@
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden" role="status"></div>
 <script src="app.js?v=20261022e"></script>
-<script src="voice.js?v=20261022d"></script>
+<script src="voice.js?v=20261028a"></script>
 <script src="gems.js?v=20261022e"></script>
 <script src="images.js?v=20261022e"></script>
 <script src="settings.js?v=20261022d"></script>

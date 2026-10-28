@@ -1,6 +1,5 @@
 package de.smartzone.pocketclaude.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -18,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +41,9 @@ import de.smartzone.pocketclaude.ui.theme.PocketIcons
  *   1) Status-Text (groß, fett, je nach Phase: Höre zu / Claude denkt / Liest vor / …)
  *   2) Hinweis-Text (klein, je nach Phase: Tippe zum Senden / Tippe zum Sprechen)
  *   3) PocketVoiceOrb: Klumpen im Ring (120 dp, seit 22.10.2026 statt des
- *      Mikrofon-Knopfs, gleiche Bedienung, Stille-Countdown als Bogen am Ring)
+ *      Mikrofon-Knopfs, gleiche Bedienung, Stille-Countdown als Bogen am Ring).
+ *      Seit 28.10.2026 die einzige Bedienflaeche: waehrend des Vorlesens
+ *      unterbricht ein Tippen, der eigene Knopf "Vorlesen abbrechen" ist weg.
  *   4) Exit-Button "Auto-Modus beenden"
  *
  * Status-Inferenz:
@@ -72,7 +71,8 @@ fun AutoModeBar(
     onMicTap: () -> Unit,
     onMicCancel: () -> Unit,
     onExitAutoMode: () -> Unit,
-    /** Bricht das laufende Vorlesen ab; der Loop nimmt danach sofort wieder auf. */
+    /** Tippen auf den Klumpen waehrend des Vorlesens: unterbrechen, der Loop
+     *  hoert danach sofort wieder zu. */
     onStopSpeaking: () -> Unit,
     onAutoSendChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -109,19 +109,26 @@ fun AutoModeBar(
         AutoPhase.Listening -> if (autoSendEnabled) R.string.auto_mode_hint_listening_auto
                                else R.string.auto_mode_hint_listening
         AutoPhase.Idle -> R.string.auto_mode_hint_idle
-        // Während Claude denkt/spricht: Mic ist deaktiviert; Hinweis-Zeile bleibt leer,
+        AutoPhase.LoadingAudio, AutoPhase.Speaking -> R.string.auto_mode_hint_speaking
+        // Während die KI mitschreibt/denkt: Tippen tut nichts; Hinweis-Zeile bleibt leer,
         // damit nicht der Eindruck entsteht, der Tap würde was tun.
         else -> null
     }
 
     val orbPhase = when (phase) {
         AutoPhase.Listening -> VoiceOrbPhase.Listening
-        AutoPhase.Transcribing, AutoPhase.Thinking, AutoPhase.LoadingAudio -> VoiceOrbPhase.Working
-        AutoPhase.Speaking -> VoiceOrbPhase.Speaking
+        AutoPhase.Transcribing, AutoPhase.Thinking -> VoiceOrbPhase.Working
+        // Laden zaehlt schon als Vorlesen: gleiche Optik, gleiches Unterbrechen.
+        AutoPhase.LoadingAudio, AutoPhase.Speaking -> VoiceOrbPhase.Speaking
         AutoPhase.Idle -> VoiceOrbPhase.Idle
     }
-    val micEnabled = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording ||
-        (voiceEnabled && voiceState != de.smartzone.pocketclaude.ui.chat.VoiceState.Transcribing)
+    val interrupts = orbPhase == VoiceOrbPhase.Speaking
+    // Grau heisst "die KI ist dran" (Bjoern 28.10.2026): waehrend sie denkt,
+    // nimmt der Klumpen kein Tippen an. Vorher startete ein Tipp dort eine
+    // Aufnahme mitten in die laufende Antwort.
+    val orbEnabled = interrupts ||
+        voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording ||
+        (voiceEnabled && (phase == AutoPhase.Idle || phase == AutoPhase.Listening))
 
     // Vom Chat abgesetzt (Joscha 27.10.2026): eigene, etwas dunklere Flaeche
     // mit einer Linie oben, statt nahtlos in den Verlauf ueberzugehen. Die
@@ -169,30 +176,12 @@ fun AutoModeBar(
                 phase = orbPhase,
                 recording = voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording,
                 statusLabel = stringResource(statusRes),
-                onTap = onMicTap,
+                onTap = if (interrupts) onStopSpeaking else onMicTap,
                 onCancel = onMicCancel,
-                enabled = micEnabled,
+                enabled = orbEnabled,
                 size = 120.dp,
                 progressFraction = ringFraction,
             )
-
-            // Vorlesen abbrechen (Joscha 19.10.2026): nur waehrend die Antwort
-            // geladen oder vorgelesen wird. Der Loop wartet in Phase 6 genau auf
-            // das Ende der Wiedergabe und startet danach selbst die Aufnahme.
-            AnimatedVisibility(visible = phase == AutoPhase.LoadingAudio || phase == AutoPhase.Speaking) {
-                FilledTonalButton(
-                    onClick = onStopSpeaking,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                ) {
-                    Icon(
-                        PocketIcons.Stop,
-                        contentDescription = null,
-                        modifier = Modifier.size(PocketIconSize.Small),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.auto_mode_stop_speaking))
-                }
-            }
 
             // Auto-Send-Toggle: dezent unter dem Mic, damit der User entscheiden
             // kann, ob die Aufnahme nach Stille selbst aufhört oder erst durch

@@ -921,7 +921,7 @@ fun ChatScreen(
                     onMicTap = handleMicTap,
                     onMicCancel = { vm.cancelRecording() },
                     onExitAutoMode = { vm.setAutoMode(false) },
-                    onStopSpeaking = { vm.stopSpeaking() },
+                    onStopSpeaking = { vm.interruptSpeaking() },
                     onAutoSendChange = { enabled ->
                         scope.launch { container.settingsRepository.setAutoSendEnabled(enabled) }
                     },

@@ -664,6 +664,7 @@
     <string name="auto_mode_hint_idle">Toque para falar</string>
     <string name="auto_mode_exit">Sair do Auto-Modo</string>
     <string name="auto_mode_stop_speaking">Parar a leitura</string>
+    <string name="auto_mode_hint_speaking">Toque para interromper</string>
     <string name="auto_mode_status_sending_in">Enviando em %1$ds</string>
     <string name="auto_mode_auto_send_label">Auto-envio na pausa</string>
     <string name="settings_skills_loading">Carregando configurações de habilidades…</string>

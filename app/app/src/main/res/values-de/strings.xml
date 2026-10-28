@@ -667,6 +667,7 @@
     <string name="auto_mode_hint_idle">Tippen zum Sprechen</string>
     <string name="auto_mode_exit">Auto-Modus beenden</string>
     <string name="auto_mode_stop_speaking">Vorlesen abbrechen</string>
+    <string name="auto_mode_hint_speaking">Tippen zum Unterbrechen</string>
     <string name="auto_mode_status_sending_in">Senden in %1$ds</string>
     <string name="auto_mode_auto_send_label">Auto-Senden bei Pause</string>
     <string name="settings_skills_loading">Skill-Einstellungen werden geladen…</string>

@@ -970,6 +970,16 @@ class ChatViewModel(
         audio.stop()
     }
 
+    /** Sprachgespraech: Tippen auf den Klumpen waehrend des Vorlesens
+     *  (Wunsch von Bjoern 28.10.2026). Seit 0.6.3 liest die App schon vor,
+     *  waehrend die Antwort noch entsteht; dann endet auch die Antwort, sonst
+     *  wartete der Loop stumm auf ihr Ende, statt sofort wieder zuzuhoeren.
+     *  Der Text bis hierhin bleibt als abgebrochene Antwort im Verlauf. */
+    fun interruptSpeaking() {
+        stopSpeaking()
+        if (_state.value.isStreaming) stop()
+    }
+
     fun pauseSpeaking() {
         audio.pause()
     }

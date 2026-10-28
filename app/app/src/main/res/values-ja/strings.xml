@@ -664,6 +664,7 @@
     <string name="auto_mode_hint_idle">タップで話す</string>
     <string name="auto_mode_exit">オートモード終了</string>
     <string name="auto_mode_stop_speaking">読み上げを中止</string>
+    <string name="auto_mode_hint_speaking">タップで中断</string>
     <string name="auto_mode_status_sending_in">%1$d 秒後に送信</string>
     <string name="auto_mode_auto_send_label">沈黙で自動送信</string>
     <string name="settings_skills_loading">スキル設定を読み込み中…</string>

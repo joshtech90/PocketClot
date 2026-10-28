@@ -667,6 +667,7 @@
     <string name="auto_mode_hint_idle">Tap to speak</string>
     <string name="auto_mode_exit">End auto mode</string>
     <string name="auto_mode_stop_speaking">Stop reading aloud</string>
+    <string name="auto_mode_hint_speaking">Tap to interrupt</string>
     <string name="auto_mode_status_sending_in">Sending in %1$ds</string>
     <string name="auto_mode_auto_send_label">Auto-send on pause</string>
     <string name="settings_skills_loading">Loading skills settings…</string>

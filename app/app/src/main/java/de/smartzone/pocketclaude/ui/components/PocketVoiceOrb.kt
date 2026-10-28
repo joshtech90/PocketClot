@@ -21,9 +21,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -48,10 +55,14 @@ enum class VoiceOrbPhase { Idle, Listening, Working, Speaking }
  * Stille-Countdown (`progressFraction`), der sich als Bogen auf dem Ring
  * fuellt, genau wie vorher am Mikrofon-Knopf.
  *
- * - Idle: ruhiger Ring, Klumpen still.
- * - Listening: Ring kraeftiger, eine leise Welle laedt zum Sprechen ein.
- * - Working (schreibt mit, denkt, laedt Audio): der Klumpen atmet.
- * - Speaking: atmen und langsamere Welle.
+ * Seit dem 28.10.2026 (Wunsch von Bjoern) sagt die FARBE, wer dran ist:
+ * blau heisst "du kannst sprechen", grau heisst "die KI ist dran". Man soll
+ * keine Animation deuten muessen.
+ *
+ * - Idle: blau, ruhiger Ring, Klumpen still.
+ * - Listening: blau, Klumpen atmet, eine Welle laedt zum Sprechen ein.
+ * - Working (schreibt mit, denkt, laedt Audio): grau, der Klumpen atmet.
+ * - Speaking: grau, atmen und langsamere Welle. Tippen unterbricht.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -70,11 +81,16 @@ fun PocketVoiceOrb(
 ) {
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
-    val accent = MaterialTheme.colorScheme.primary
+    // 1 = blau (Nutzer ist dran), 0 = grau (KI ist dran). Weich ueberblendet,
+    // damit der Wechsel sichtbar ist, aber nicht springt.
+    val userTurn by animateFloatAsState(
+        targetValue = if (phase == VoiceOrbPhase.Idle || phase == VoiceOrbPhase.Listening) 1f else 0f,
+        animationSpec = tween(400),
+        label = "orb-turn",
+    )
+    val accent = lerp(MaterialTheme.colorScheme.outline, MaterialTheme.colorScheme.primary, userTurn)
 
-    // Gesperrt (denkt, liest vor, kein Diktat eingerichtet): der Ring wird
-    // blasser. Der Klumpen bleibt beim Arbeiten bewusst voll sichtbar, er
-    // zeigt ja gerade die Arbeit an.
+    // Kein Diktat eingerichtet: der Ring wird zusaetzlich blasser.
     val ringAlpha by animateFloatAsState(
         targetValue = when (phase) {
             VoiceOrbPhase.Listening -> 0.8f
@@ -112,6 +128,7 @@ fun PocketVoiceOrb(
 
     val description = when {
         recording -> stringResource(R.string.voice_mic_recording_cd)
+        enabled && phase == VoiceOrbPhase.Speaking -> stringResource(R.string.auto_mode_stop_speaking)
         enabled && (phase == VoiceOrbPhase.Idle || phase == VoiceOrbPhase.Listening) ->
             stringResource(R.string.voice_mic_idle_cd)
         else -> statusLabel
@@ -174,8 +191,27 @@ fun PocketVoiceOrb(
         }
         PocketThinkingBlob(
             size = size * (64f / 140f),
-            isThinking = phase == VoiceOrbPhase.Working || phase == VoiceOrbPhase.Speaking,
-            modifier = Modifier.alpha(if (enabled || phase != VoiceOrbPhase.Idle) 1f else 0.5f),
+            isThinking = phase != VoiceOrbPhase.Idle,
+            modifier = Modifier
+                .alpha(
+                    if (enabled || phase != VoiceOrbPhase.Idle) 1f - 0.4f * (1f - userTurn) else 0.5f
+                )
+                .saturation(userTurn),
         )
     }
 }
+
+/** Faerbt den Inhalt grau ein: 1 = Originalfarbe, 0 = ganz grau. Greift auch
+ *  beim statischen Markenzeichen, das der Klumpen im Ruhezustand zeigt. */
+private fun Modifier.saturation(value: Float): Modifier =
+    if (value >= 0.999f) this else drawWithContent {
+        val paint = Paint().apply {
+            colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(value) })
+        }
+        drawIntoCanvas { canvas ->
+            // Etwas groesser als die Flaeche: der Klumpen atmet bis 103 %.
+            canvas.saveLayer(Rect(Offset.Zero, size).inflate(size.minDimension * 0.25f), paint)
+            drawContent()
+            canvas.restore()
+        }
+    }

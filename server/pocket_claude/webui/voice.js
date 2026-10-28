@@ -11,6 +11,7 @@ window.PocketVoice = (() => {
   const barHint = $('voice-bar-hint');
   const barSend = $('voice-bar-send');
   const barStop = $('voice-bar-stop');
+  const orb = $('voice-orb');
   const autoSendBox = $('voice-auto-send');
   const silenceEl = $('voice-silence');
   const LS_AUTO_SEND = 'pc.voiceAutoSend';
@@ -224,6 +225,12 @@ window.PocketVoice = (() => {
       ? (autoSend ? t('voice_hint_listening_auto') : t('voice_hint_listening'))
       : phase === 'speaking' ? t('voice_hint_speaking') : '';
     barSend.classList.toggle('hidden', phase !== 'listening');
+    // Der Klumpen ist die Bedienflaeche: zuhoeren = senden, vorlesen = unterbrechen.
+    if (orb) {
+      orb.disabled = phase !== 'listening' && phase !== 'speaking';
+      orb.setAttribute('aria-label', phase === 'speaking' ? t('stop_reading')
+        : phase === 'listening' ? t('voice_send_now') : barText.textContent);
+    }
   }
   function showBar(on) {
     bar.classList.toggle('hidden', !on);
@@ -337,6 +344,13 @@ window.PocketVoice = (() => {
     });
   }
   barSend?.addEventListener('click', finishListening);
+  // Unterbrechen: der Loop wartet nur aufs Ende der Wiedergabe und hoert
+  // danach von selbst wieder zu (vorgelesen wird erst nach der Antwort).
+  orb?.addEventListener('click', () => {
+    if (!autoMode) return;
+    if (bar.dataset.phase === 'speaking') stopAudio();
+    else if (bar.dataset.phase === 'listening') finishListening();
+  });
   barStop?.addEventListener('click', () => { stopAutoMode(); stopAudio(); });
   if (autoSendBox) {
     autoSendBox.checked = autoSend;
