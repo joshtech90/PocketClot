@@ -39,7 +39,7 @@ import de.smartzone.pocketclaude.ui.theme.PocketIcons
  *
  * Layout (oben → unten):
  *   1) Status-Text (groß, fett, je nach Phase: Höre zu / Claude denkt / Liest vor / …)
- *   2) Hinweis-Text (klein, je nach Phase: Tippe zum Senden / Tippe zum Sprechen)
+ *   2) Hinweis-Text (klein, je nach Phase: Tippe zum Senden / Tippe zum Unterbrechen)
  *   3) PocketVoiceOrb: Klumpen im Ring (120 dp, seit 22.10.2026 statt des
  *      Mikrofon-Knopfs, gleiche Bedienung, Stille-Countdown als Bogen am Ring).
  *      Seit 28.10.2026 die einzige Bedienflaeche: waehrend des Vorlesens
@@ -64,7 +64,6 @@ fun AutoModeBar(
     isStreaming: Boolean,
     ttsLoading: Boolean,
     ttsPlaying: Boolean,
-    voiceEnabled: Boolean,
     autoSendEnabled: Boolean,
     autoSendSilenceMs: Long,
     silenceProgressMs: Long,
@@ -108,10 +107,10 @@ fun AutoModeBar(
     val hintRes = when (phase) {
         AutoPhase.Listening -> if (autoSendEnabled) R.string.auto_mode_hint_listening_auto
                                else R.string.auto_mode_hint_listening
-        AutoPhase.Idle -> R.string.auto_mode_hint_idle
         AutoPhase.LoadingAudio, AutoPhase.Speaking -> R.string.auto_mode_hint_speaking
-        // Während die KI mitschreibt/denkt: Tippen tut nichts; Hinweis-Zeile bleibt leer,
-        // damit nicht der Eindruck entsteht, der Tap würde was tun.
+        // Während die KI mitschreibt/denkt und im kurzen Übergang (Idle): Tippen
+        // tut nichts; Hinweis-Zeile bleibt leer, damit nicht der Eindruck
+        // entsteht, der Tap würde was tun.
         else -> null
     }
 
@@ -123,12 +122,13 @@ fun AutoModeBar(
         AutoPhase.Idle -> VoiceOrbPhase.Idle
     }
     val interrupts = orbPhase == VoiceOrbPhase.Speaking
-    // Grau heisst "die KI ist dran" (Bjoern 28.10.2026): waehrend sie denkt,
-    // nimmt der Klumpen kein Tippen an. Vorher startete ein Tipp dort eine
-    // Aufnahme mitten in die laufende Antwort.
+    // Der Klumpen sendet beim Zuhoeren und unterbricht beim Vorlesen, sonst
+    // nimmt er kein Tippen an. Aufnahmen startet im Sprachgespraech nur der
+    // Loop: ein Tipp im Uebergang (Idle) oder waehrend die KI denkt startete
+    // frueher eine Aufnahme an ihm vorbei, und die sendete dann trotz
+    // Auto-Senden nie von selbst (Sol 28.10.2026).
     val orbEnabled = interrupts ||
-        voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording ||
-        (voiceEnabled && (phase == AutoPhase.Idle || phase == AutoPhase.Listening))
+        voiceState == de.smartzone.pocketclaude.ui.chat.VoiceState.Recording
 
     // Vom Chat abgesetzt (Joscha 27.10.2026): eigene, etwas dunklere Flaeche
     // mit einer Linie oben, statt nahtlos in den Verlauf ueberzugehen. Die

@@ -368,6 +368,12 @@ window.PocketVoice = (() => {
     if (autoSendBox) autoSendBox.checked = autoSend;
   });
   setInterval(updateMicEnabled, 400);
+  // Vorlesen startet schon im done-Handler, die Schleife merkt es erst, wenn
+  // die Verbindung zu ist. Bis dahin waere der Klumpen grau gesperrt und das
+  // Unterbrechen unmoeglich (Sol 28.10.2026): Phase am Audio ablesen.
+  setInterval(() => {
+    if (autoMode && bar.dataset.phase === 'thinking' && isAudioBusy()) setPhase('speaking');
+  }, 300);
   setMicState('idle');
 
   // ---- Einstellungen: Groq-Schluessel und Transkriptions-Sprache ----

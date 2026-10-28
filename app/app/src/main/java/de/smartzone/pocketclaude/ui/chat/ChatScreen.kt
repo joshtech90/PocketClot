@@ -912,9 +912,8 @@ fun ChatScreen(
                 de.smartzone.pocketclaude.ui.components.AutoModeBar(
                     voiceState = state.voiceState,
                     isStreaming = state.isStreaming,
-                    ttsLoading = audioState.loadingMessageId != null,
+                    ttsLoading = audioState.loadingMessageId != null || state.speakPending,
                     ttsPlaying = audioState.playingMessageId != null,
-                    voiceEnabled = voiceEnabled,
                     autoSendEnabled = appSettings.autoSendEnabled,
                     autoSendSilenceMs = appSettings.autoSendSilenceMs,
                     silenceProgressMs = state.silenceProgressMs,

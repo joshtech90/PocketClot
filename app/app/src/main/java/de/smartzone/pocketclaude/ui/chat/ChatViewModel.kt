@@ -141,6 +141,10 @@ data class ChatUiState(
      *  Nur während Auto-Mode + autoSendEnabled relevant. Wenn ≥ silenceTarget,
      *  wird automatisch gestoppt + gesendet. 0 = Stille noch nicht begonnen. */
     val silenceProgressMs: Long = 0L,
+    /** Vorlesen nach der Antwort ist angestossen, der Player laedt aber noch
+     *  nicht: fuer das Sprachgespraech schon "Laden", also grau und
+     *  unterbrechbar (Sol 28.10.2026), sonst stand dort kurz blaues Idle. */
+    val speakPending: Boolean = false,
 ) {
     /** Die aktuell anvisierte Message-ID, oder null wenn kein Treffer. */
     val currentMatchMessageId: Long?
@@ -943,6 +947,10 @@ class ChatViewModel(
         )
     }
 
+    /** Letztes angestossenes Vorlesen; Unterbrechen bricht auch ein noch
+     *  ladendes ab, sonst finge es nach dem Tipp doch noch an. */
+    private var speakJob: Job? = null
+
     fun speak(messageId: Long) = viewModelScope.launch {
         val s = settingsRepo.current()
         try {
@@ -951,9 +959,10 @@ class ChatViewModel(
             val cacheKey = "audio-$messageId-${s.ttsVoice}-$serverRate"
             audio.play(messageId, url, cacheKey, speed = playerRate)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             _state.update { it.copy(errorMessage = appContext.getString(R.string.error_speak, e.message ?: "")) }
         }
-    }
+    }.also { speakJob = it }
 
     /** Gemini-Web kann die Sprechgeschwindigkeit nicht selbst aendern, die
      *  stellt dann der Player ein. Bei allen anderen Anbietern macht das der
@@ -967,6 +976,7 @@ class ChatViewModel(
     fun stopSpeaking() {
         // Auch waehrend die Antwort noch entsteht: keine weiteren Stuecke.
         liveSpeaker.cancel()
+        speakJob?.cancel()
         audio.stop()
     }
 
@@ -1409,6 +1419,10 @@ class ChatViewModel(
 
     /** Vorlesen nach einer Antwort ist angestossen, der Player weiss es noch nicht. */
     @Volatile private var speakPending = false
+        set(value) {
+            field = value
+            _state.update { it.copy(speakPending = value) }
+        }
 
     companion object {
         private const val MAX_ATTACHMENT_BYTES = 50L * 1024 * 1024
