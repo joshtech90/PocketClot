@@ -1054,6 +1054,16 @@ class ChatViewModel(
         }
     }
 
+    /** Tippen auf den Klumpen im Sprachgespraech, solange zugehoert wird:
+     *  nur senden. Aufnahmen startet dort allein der Loop; ein Tipp, der bei
+     *  traeger Anzeige noch auf "Zuhoeren" trifft, obwohl die Aufnahme schon
+     *  vorbei ist, startete sonst eine Aufnahme an ihm vorbei, und die
+     *  sendete trotz Auto-Senden nie von selbst (im Emulator nachgestellt,
+     *  28.10.2026). */
+    fun sendFromAutoMode() {
+        if (_state.value.voiceState == VoiceState.Recording) stopRecordingAndTranscribe()
+    }
+
     /** Neuer Sprach-Chat: Diktat sofort starten. Wer die Assistenten-Taste
      *  drueckt, will reden, deshalb endet ein noch laufendes Vorlesen aus dem
      *  vorigen Chat hier (sonst bricht der Voice-Guard die Aufnahme sofort ab). */

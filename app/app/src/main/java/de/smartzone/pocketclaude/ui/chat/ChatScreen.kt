@@ -917,7 +917,7 @@ fun ChatScreen(
                     autoSendEnabled = appSettings.autoSendEnabled,
                     autoSendSilenceMs = appSettings.autoSendSilenceMs,
                     silenceProgressMs = state.silenceProgressMs,
-                    onMicTap = handleMicTap,
+                    onMicTap = { vm.sendFromAutoMode() },
                     onMicCancel = { vm.cancelRecording() },
                     onExitAutoMode = { vm.setAutoMode(false) },
                     onStopSpeaking = { vm.interruptSpeaking() },
