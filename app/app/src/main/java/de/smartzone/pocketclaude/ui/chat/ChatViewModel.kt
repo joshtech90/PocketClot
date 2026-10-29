@@ -837,7 +837,7 @@ class ChatViewModel(
                         // Lief das Vorlesen schon mit, nur noch den Rest
                         // anhaengen; sonst wie bisher die ganze Nachricht.
                         if (suppressTurnSpeech) {
-                            liveSpeaker.cancel()
+                            liveSpeaker.finish(finalText)
                         } else if (liveSpeaker.finish(finalText)) {
                             audio.relabelLive(ev.assistantMessageId)
                         } else if (shouldSpeak && !suppressTurnSpeech) {
@@ -959,6 +959,7 @@ class ChatViewModel(
     fun setChatTtsSpeed(speed: Float?) = viewModelScope.launch {
         settingsRepo.setChatTtsSpeed(cid, speed)
         val s = settingsRepo.current()
+        cachedSettings = s
         audio.setSpeed(s.ttsSpeedByChat[cid] ?: s.ttsSpeed)
     }
 

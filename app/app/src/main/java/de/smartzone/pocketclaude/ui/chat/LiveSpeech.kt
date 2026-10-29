@@ -255,7 +255,7 @@ internal class LiveSpeaker(
                 val id = repo.createLiveTts(text, voice, serverRate)
                 val url = repo.liveTtsUrl(id)
                 if (status != Status.Active) return true
-                audio.enqueueLive(url, playerRate(), first = enqueued == 0)
+                audio.enqueueLive(url, playerRate, first = enqueued == 0)
                 enqueued++
                 Log.d("PC_TTS", "live segment ${text.length} chars queued (#$enqueued)")
                 return true

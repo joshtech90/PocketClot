@@ -48,6 +48,7 @@ class AudioController(
     private var currentJob: Job? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
+    private var playbackSpeed = 1.0f
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -176,12 +177,13 @@ class AudioController(
         currentJob?.cancel()
         cleanupCurrent()
         liveSession = false
+        playbackSpeed = speed.coerceIn(0.25f, 2.0f)
         _state.value = State(loadingMessageId = messageId)
 
         currentJob = scope.launch {
             try {
                 withContext(Dispatchers.Main) {
-                    startPlayback(messageId, url, cacheKey, speed)
+                    startPlayback(messageId, url, cacheKey)
                 }
             } catch (e: Exception) {
                 _state.value = State(error = e.message ?: e::class.java.simpleName)
@@ -189,14 +191,9 @@ class AudioController(
         }
     }
 
-    /**
-     * `speed` ist nur fuer Anbieter gedacht, die das Tempo NICHT selbst
-     * einstellen koennen (Gemini-Web). Alle anderen liefern das Audio bereits
-     * in der gewuenschten Geschwindigkeit, dort bleibt der Wert auf 1.0 —
-     * sonst wuerde das Tempo zweimal angewandt.
-     */
+    /** Audio kommt mit normalem Tempo; der Player regelt es ohne Neuladen. */
     @androidx.annotation.OptIn(UnstableApi::class)  // setCustomCacheKey
-    private fun startPlayback(messageId: Long, url: String, cacheKey: String?, speed: Float = 1.0f) {
+    private fun startPlayback(messageId: Long, url: String, cacheKey: String?) {
         if (_state.value.loadingMessageId != messageId) {
             return
         }
@@ -216,7 +213,7 @@ class AudioController(
                 builder.setCustomCacheKey(cacheKey)
             }
             c.setMediaItem(builder.build())
-            c.setPlaybackSpeed(speed.coerceIn(0.25f, 2.0f))
+            c.setPlaybackSpeed(playbackSpeed)
             c.prepare()
             c.playWhenReady = true
         }
@@ -233,7 +230,7 @@ class AudioController(
      * dann geht es mit dem neuen Stueck weiter. Kehrt erst zurueck, wenn das
      * Stueck im Player liegt, damit die Reihenfolge stimmt.
      */
-    suspend fun enqueueLive(url: String, speed: Float, first: Boolean) {
+    suspend fun enqueueLive(url: String, speed: () -> Float, first: Boolean) {
         val c = awaitController() ?: return
         withContext(Dispatchers.Main) {
             synchronized(this@AudioController) {
@@ -259,7 +256,8 @@ class AudioController(
                 if (first || c.mediaItemCount == 0) {
                     liveSession = true
                     c.setMediaItem(item)
-                    c.setPlaybackSpeed(speed.coerceIn(0.25f, 2.0f))
+                    playbackSpeed = speed().coerceIn(0.25f, 2.0f)
+                    c.setPlaybackSpeed(playbackSpeed)
                     c.prepare()
                     c.playWhenReady = true
                 } else {
@@ -300,7 +298,8 @@ class AudioController(
     /** Tempo sofort aendern, ohne die Wiedergabeposition zu verlieren. */
     fun setSpeed(speed: Float) {
         if (!speed.isFinite()) return
-        controller?.setPlaybackSpeed(speed.coerceIn(0.25f, 2.0f))
+        playbackSpeed = speed.coerceIn(0.25f, 2.0f)
+        controller?.setPlaybackSpeed(playbackSpeed)
     }
 
     /** Pause: behält Player-Position, Resume nimmt da wieder auf. */
