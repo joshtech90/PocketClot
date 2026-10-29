@@ -130,7 +130,9 @@ def konten() -> dict[str, dict]:
                     # Nur Dateinamen im Konten-Ordner, keine Pfade nach woanders
                     if not uid or not re.fullmatch(r"[A-Za-z0-9._-]+\.paket", name):
                         continue
-                    daten[str(uid)] = {"paket": pfad.parent / name, "export": bool(e.get("export"))}
+                    daten[str(uid)] = {"paket": pfad.parent / name, "export": bool(e.get("export")),
+                                       "export_empfaenger": (str(e["export_empfaenger"]) if "export_empfaenger" in e
+                                                              else str(roh.get("export_empfaenger") or ""))}
                 _KONTEN_CACHE.update(stempel=stempel, daten=daten, empfaenger=str(roh.get("export_empfaenger") or ""))
             except (OSError, ValueError, AttributeError) as exc:
                 log.warning("PC_WISSEN: Kontenliste nicht lesbar: %s", type(exc).__name__)
@@ -143,9 +145,11 @@ def konten() -> dict[str, dict]:
             for u in (settings.wissen_user_ids or "").split(",") if u.strip()}
 
 
-def export_empfaenger() -> str:
+def export_empfaenger(user_id: str | None = None) -> str:
     """Oeffentlicher Schluessel (X25519, base64url), an den Chat-Exporte verschluesselt werden."""
-    konten()
+    eintraege = konten()
+    if user_id is not None:
+        return str(eintraege.get(user_id, {}).get("export_empfaenger") or "")
     return _KONTEN_CACHE.get("empfaenger", "") if (settings.wissen_konten or "").strip() else ""
 
 
@@ -181,6 +185,9 @@ def suchen(paket: dict, anfrage: str, person: str = "", n: int = 6) -> list[dict
     abschnitte = [a for a in paket.get("abschnitte") or [] if isinstance(a, dict)]
     personen = [p for p in paket.get("personen") or [] if isinstance(p, dict)]
     q = set(woerter(anfrage))
+    # Markdown-Pakete ohne Personenindex: Person auch als Suchtext verwenden.
+    if person and not personen:
+        q.update(woerter(person))
     if not q and not person:
         return []
     if person:
@@ -210,6 +217,8 @@ def suchen(paket: dict, anfrage: str, person: str = "", n: int = 6) -> list[dict
                 haeufig[x] = haeufig.get(x, 0) + 1
         punkte = sum(math.log(1 + gesamt / vorkommen[x]) * (1 + math.log(c)) for x, c in haeufig.items())
         punkte /= math.sqrt(10 + len(w) / 50)
+        if person and not personen and pw and pw <= set(woerter(str(a.get("name", "")) + " " + str(a.get("text", "")), stamm=False)):
+            punkte += 6
         if a.get("id") in bonus:
             punkte += bonus[a["id"]] + (2 if str(a.get("titel", "")).startswith("Kernkarte") else 0)
         if ich_bezug and str(a.get("id", "")).startswith(("joscha:", "selbst:")):

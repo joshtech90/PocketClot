@@ -41,15 +41,23 @@ _STAND: dict[str, tuple] = {}
 _GENERATION: dict[str, int] = {}
 
 
-def _empfaenger() -> bytes | None:
-    s = wissen_tool.export_empfaenger().strip()
+def _empfaenger(user_id: str) -> bytes | None:
+    s = wissen_tool.export_empfaenger(user_id).strip()
     if not s:
         return None
     try:
-        k = base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+        k = base64.b64decode(s + "=" * (-len(s) % 4), altchars=b"-_", validate=True)
     except (binascii.Error, ValueError):
         return None
-    return k if len(k) == 32 else None
+    if len(k) != 32:
+        return None
+    # Auch formal 32 Byte lange Low-Order-Schluessel duerfen kein Konto blockieren.
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
+    try:
+        X25519PrivateKey.generate().exchange(X25519PublicKey.from_public_bytes(k))
+    except ValueError:
+        return None
+    return k
 
 
 def versiegeln(klar: bytes, empfaenger: bytes) -> bytes:
@@ -124,12 +132,17 @@ async def einmal() -> int:
     _aufraeumen(ordner, set(ziele))
     if not ziele:
         return 0
-    empfaenger = _empfaenger()
-    if empfaenger is None or ordner is None or not ordner.is_dir() or not os.access(ordner, os.W_OK):
+    if ordner is None or not ordner.is_dir() or not os.access(ordner, os.W_OK):
         log.warning("PC_WISSEN: Export eingerichtet, aber Empfaenger oder Ordner fehlt")
         return 0
     geschrieben = 0
     for uid in ziele:
+        empfaenger = _empfaenger(uid)
+        if empfaenger is None:
+            # Kein Fallback bei explizit kaputtem Kontoschluessel; alten Export entziehen.
+            verwerfen(uid)
+            log.warning("PC_WISSEN: Exportempfaenger eines Kontos ungueltig")
+            continue
         generation = _GENERATION.get(uid, 0)
         daten, stand = await _inhalt(uid)
         stand = (empfaenger, stand)   # neuer Empfaenger-Schluessel: neu versiegeln

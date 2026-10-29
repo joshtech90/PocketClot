@@ -259,3 +259,57 @@ def test_laufender_export_nach_sperre_wird_nicht_veroeffentlicht(monkeypatch, tm
         return await wissen_export.einmal()
     assert asyncio.run(ablauf()) == 0
     assert not (tmp_path / "aus" / f"{g}.export").exists()
+
+
+def test_markdown_personensuche_ohne_index_bevorzugt_den_genauen_namen():
+    paket = {'personen': [], 'abschnitte': [
+        {'id': f'selbst:{i}', 'name': 'Notizen', 'text': f'{name} mag Wandern.'}
+        for i, name in enumerate(['Anna', 'Bernd', 'Clara', 'Dora', 'Emil', 'Frank', 'Greta', 'Hannah'])]}
+    assert wissen_tool.suchen(paket, 'Vorlieben', person='Hannah')[0]['text'] == 'Hannah mag Wandern.'
+    assert wissen_tool.suchen(PAKET, 'Geschenke', person='Anna')[0]['id'] == 'anna'
+
+
+def test_exportempfaenger_sind_getrennt_und_defekte_konten_verlieren_den_export(monkeypatch, tmp_path):
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from pocket_claude import wissen_export
+    import pytest
+
+    alt, clivia = X25519PrivateKey.generate(), X25519PrivateKey.generate()
+    def pub(k):
+        return k.public_key().public_bytes_raw()
+    konten = {'usr_joscha': {'paket': 'wissen.paket', 'export': True},
+              'usr_kati': {'paket': 'kati.paket', 'export': True},
+              'usr_clivia': {'paket': 'clivia.paket', 'export': True, 'export_empfaenger': _b64(pub(clivia))}}
+    for n, kaputt in enumerate(('', 'kein-schluessel!', _b64(bytes(32)), None)):
+        konten[f'usr_defekt{n}'] = {'paket': f'defekt{n}.paket', 'export': True, 'export_empfaenger': kaputt}
+    (tmp_path / 'aus').mkdir()
+    for uid in konten:
+        (tmp_path / 'aus' / f'{uid}.export').write_bytes(b'PCX1veraltet')
+    _konten(monkeypatch, tmp_path, konten, _b64(pub(alt)))
+    monkeypatch.setattr(settings, 'wissen_export_dir', '')
+    monkeypatch.setattr(wissen_export, '_STAND', {})
+    monkeypatch.setattr(wissen_export, '_GENERATION', {})
+    async def inhalt(uid):
+        return {'user_id': uid, 'konversationen': []}, ()
+    monkeypatch.setattr(wissen_export, '_inhalt', inhalt)
+    assert asyncio.run(wissen_export.einmal()) == 3
+    def oeffnen(uid, privat):
+        roh = (tmp_path / 'aus' / f'{uid}.export').read_bytes()
+        ep, nonce = roh[4:36], roh[36:48]
+        k = HKDF(algorithm=hashes.SHA256(), length=32, salt=ep + pub(privat), info=wissen_export.INFO).derive(
+            privat.exchange(X25519PublicKey.from_public_bytes(ep)))
+        return json.loads(gzip.decompress(AESGCM(k).decrypt(nonce, roh[48:], b'PCX1' + ep)))
+    for uid in ('usr_joscha', 'usr_kati'):
+        assert oeffnen(uid, alt)['user_id'] == uid
+        with pytest.raises(InvalidTag):
+            oeffnen(uid, clivia)
+    assert oeffnen('usr_clivia', clivia)['user_id'] == 'usr_clivia'
+    with pytest.raises(InvalidTag):
+        oeffnen('usr_clivia', alt)
+    for uid in konten:
+        if uid.startswith('usr_defekt'):
+            assert not (tmp_path / 'aus' / f'{uid}.export').exists()
