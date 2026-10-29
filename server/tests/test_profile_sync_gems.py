@@ -145,6 +145,19 @@ def test_ui_settings_map_entries_merge(ctx):
     assert c.put("/ui-settings", headers=h, json={"theme": {"x": 1}}).status_code == 400
 
 
+def test_chat_speeds_merge_reset_and_stay_private(ctx):
+    c, alice, bob = ctx["client"], ctx["user_h"], ctx["admin_h"]
+    for values in ({"chat-a": 0.75}, {"chat-b": 1.5}, {"chat-a": 1.25}):
+        assert c.put("/ui-settings", headers=alice,
+                     json={"ttsSpeedByChat": values}).status_code == 200
+    speeds = c.get("/ui-settings", headers=alice).json()["settings"]["ttsSpeedByChat"]
+    assert json.loads(speeds) == {"chat-a": 1.25, "chat-b": 1.5}
+    assert "ttsSpeedByChat" not in c.get("/ui-settings", headers=bob).json()["settings"]
+    c.put("/ui-settings", headers=alice, json={"ttsSpeedByChat": {"chat-a": None}})
+    speeds = c.get("/ui-settings", headers=alice).json()["settings"]["ttsSpeedByChat"]
+    assert json.loads(speeds) == {"chat-b": 1.5}
+
+
 def test_migration_pins_existing_gem_chats(ctx):
     c, h, uid = ctx["client"], ctx["user_h"], ctx["user"]["id"]
     gid = _gem(c, h, model="sonnet", effort="medium")

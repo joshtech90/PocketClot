@@ -302,7 +302,7 @@ window.PocketVoice = (() => {
         await waitFor(() => !isAudioBusy(), signal, 250);
       }
     } finally {
-      stopAutoMode();
+      if (autoAbort?.signal === signal) stopAutoMode();
     }
   }
   function stopAutoMode() {

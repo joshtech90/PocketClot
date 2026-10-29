@@ -3919,7 +3919,7 @@
       voice_transcribing: "文字起こし中…",
     },
   };
-  const speedDefaults = { en: "Default speed", de: "Standardtempo", es: "Velocidad predeterminada", fr: "Vitesse par défaut", it: "Velocità predefinita", pt: "Velocidade padrão", zh: "默认语速" };
+  const speedDefaults = { en: "Default speed", de: "Standardtempo", es: "Velocidad predeterminada", fr: "Vitesse par défaut", ja: "標準の速度", "pt-BR": "Velocidade padrão", zh: "默认语速" };
   for (const [loc, label] of Object.entries(speedDefaults)) {
     if (STRINGS[loc]) STRINGS[loc].voice_speed_default = label;
   }

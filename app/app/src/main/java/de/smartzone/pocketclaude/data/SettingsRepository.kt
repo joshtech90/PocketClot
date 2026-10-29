@@ -104,6 +104,7 @@ data class AppSettings(
     val ttsAutoSpeak: Boolean = false,
     /** Wiedergabegeschwindigkeit [0.25 .. 2.0], Default 1.0. */
     val ttsSpeed: Float = 1.0f,
+    val ttsSpeedByChat: Map<String, Float> = emptyMap(),
     /** off | low | medium | high | xhigh | max — Denktiefe für Claude.
      *  `xhigh` ist Opus-4.7-only (fällt auf anderen Modellen auf `high` zurück);
      *  wir nutzen Opus 4.7, also ist es für uns ein echtes Extra-Level. */
@@ -243,6 +244,7 @@ class SettingsRepository(
     /** Per-Chat-Override für Auto-Speak. JSON: { "cid1": true, "cid2": false }.
      *  Wenn ein Chat KEINEN Eintrag hat → globaler ttsAutoSpeak greift. */
     private val keyTtsAutoSpeakPerChat = stringPreferencesKey("tts_auto_speak_per_chat")
+    private val keyTtsSpeedPerChat = stringPreferencesKey("tts_speed_per_chat")
     private val keyThemeMode = stringPreferencesKey("theme_mode")
     /** Alter, gemeinsamer Schluessel. Wird nur noch gelesen, um die Wahl eines
      *  Bestandsnutzers auf die beiden neuen Schluessel zu uebernehmen. */
@@ -311,6 +313,7 @@ class SettingsRepository(
             ttsVoice = prefs[keyTtsVoice].orEmpty().ifBlank { DEFAULT_TTS_VOICE },
             ttsAutoSpeak = (prefs[keyTtsAutoSpeak] ?: "false").toBooleanStrictOrNull() ?: false,
             ttsSpeed = (prefs[keyTtsSpeed] ?: 1.0f).coerceIn(0.25f, 2.0f),
+            ttsSpeedByChat = parseTtsSpeedMap(prefs[keyTtsSpeedPerChat]),
             effort = prefs[keyEffort]?.takeIf { it.isNotBlank() } ?: DEFAULT_EFFORT,
             systemPromptMode = SystemPromptMode.fromString(prefs[keySystemPromptMode]),
             customSystemPrompt = prefs[keyCustomSystemPrompt].orEmpty(),
@@ -643,6 +646,30 @@ class SettingsRepository(
         )
     }
 
+    // ---------- Per-Chat-Override: TTS Speed ----------
+
+    private fun parseTtsSpeedMap(raw: String?): Map<String, Float> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            json.decodeFromString<Map<String, Float>>(raw)
+                .filter { it.value.isFinite() }
+                .mapValues { it.value.coerceIn(0.25f, 2.0f) }
+        }.getOrDefault(emptyMap())
+    }
+
+    suspend fun setChatTtsSpeed(cid: String, speed: Float?) {
+        dataStore.edit { prefs ->
+            val map = parseTtsSpeedMap(prefs[keyTtsSpeedPerChat]).toMutableMap()
+            if (speed == null || !speed.isFinite()) map.remove(cid)
+            else map[cid] = speed.coerceIn(0.25f, 2.0f)
+            if (map.isEmpty()) prefs.remove(keyTtsSpeedPerChat)
+            else prefs[keyTtsSpeedPerChat] = json.encodeToString(map)
+        }
+        localEntriesChanged("ttsSpeedByChat", mapOf(cid to
+            if (speed == null || !speed.isFinite()) JsonNull
+            else JsonPrimitive(speed.coerceIn(0.25f, 2.0f))))
+    }
+
     // ---------- Settings Export / Import (App-Anteil) ----------
 
     /** Erzeugt ein Snapshot aller App-lokalen Settings für den Export.
@@ -660,6 +687,7 @@ class SettingsRepository(
             ttsVoice = prefs[keyTtsVoice].orEmpty().ifBlank { DEFAULT_TTS_VOICE },
             ttsAutoSpeak = (prefs[keyTtsAutoSpeak] ?: "false").toBooleanStrictOrNull() ?: false,
             ttsSpeed = (prefs[keyTtsSpeed] ?: 1.0f).coerceIn(0.25f, 2.0f),
+            ttsSpeedByChat = parseTtsSpeedMap(prefs[keyTtsSpeedPerChat]),
             effort = prefs[keyEffort]?.takeIf { it.isNotBlank() } ?: DEFAULT_EFFORT,
             systemPromptMode = (prefs[keySystemPromptMode] ?: SystemPromptMode.STANDARD.name),
             customSystemPrompt = prefs[keyCustomSystemPrompt].orEmpty(),
@@ -686,6 +714,7 @@ class SettingsRepository(
             prefs[keyTtsVoice] = s.ttsVoice
             prefs[keyTtsAutoSpeak] = s.ttsAutoSpeak.toString()
             prefs[keyTtsSpeed] = s.ttsSpeed.coerceIn(0.25f, 2.0f)
+            prefs[keyTtsSpeedPerChat] = json.encodeToString(s.ttsSpeedByChat.filterValues { it.isFinite() }.mapValues { it.value.coerceIn(0.25f, 2.0f) })
             prefs[keyEffort] = s.effort
             prefs[keySystemPromptMode] = s.systemPromptMode
             prefs[keyCustomSystemPrompt] = s.customSystemPrompt
@@ -744,6 +773,7 @@ class SettingsRepository(
         val CLEARED_VALUES = mapOf(
             "chatModel" to "",
             "autoSpeakByChat" to "{}",
+            "ttsSpeedByChat" to "{}",
             "defaultModelByFamily" to "{}",
         )
     }
@@ -759,6 +789,7 @@ class SettingsRepository(
         prefs[keyTtsSpeed]?.let { put("ttsSpeed", it.toString()) }
         prefs[keyTtsAutoSpeak]?.let { put("autoSpeak", it) }
         prefs[keyTtsAutoSpeakPerChat]?.let { put("autoSpeakByChat", it) }
+        prefs[keyTtsSpeedPerChat]?.let { put("ttsSpeedByChat", it) }
         prefs[keyCollapseLongUserMessages]?.let { put("collapseUserMsgs", it) }
         prefs[keyAutoSendEnabled]?.let { put("autoSend", it) }
         prefs[keyAutoSendSilenceMs]?.let { put("autoSendSilenceMs", it) }
@@ -787,6 +818,13 @@ class SettingsRepository(
         remote["autoSpeakByChat"]?.let { raw ->
             runCatching { json.decodeFromString<Map<String, Boolean>>(raw) }.getOrNull()
                 ?.let { prefs[keyTtsAutoSpeakPerChat] = json.encodeToString(it) }
+        }
+        remote["ttsSpeedByChat"]?.let { raw ->
+            runCatching {
+                json.decodeFromString<Map<String, Float>>(raw)
+                    .filter { it.value.isFinite() }
+                    .mapValues { it.value.coerceIn(0.25f, 2.0f) }
+            }.getOrNull()?.let { prefs[keyTtsSpeedPerChat] = json.encodeToString(it) }
         }
         remote["collapseUserMsgs"]?.toBooleanStrictOrNull()
             ?.let { prefs[keyCollapseLongUserMessages] = it.toString() }
@@ -857,6 +895,6 @@ class SettingsRepository(
  *  `UI_SETTING_KEYS` in server.py, ohne die reinen Web-Schluessel). */
 val SHARED_UI_KEYS: List<String> = listOf(
     "theme", "paletteLight", "paletteDark", "ttsVoice", "ttsSpeed", "autoSpeak",
-    "autoSpeakByChat", "collapseUserMsgs", "autoSend", "autoSendSilenceMs",
+    "autoSpeakByChat", "ttsSpeedByChat", "collapseUserMsgs", "autoSend", "autoSendSilenceMs",
     "spMode", "spCustom", "chatModel", "defaultModelByFamily", "effort", "effortByFamily",
 )

@@ -823,4 +823,5 @@
     <string name="voice_groq_hint_message" formatted="false">A entrada de voz usa o Groq. Você precisa da sua própria chave de API do Groq, e ela é 100% gratuita (login com Google, sem cartão de crédito).\n\nCrie uma chave em console.groq.com/keys e cole em Configurações, em \"Entrada de voz\".</string>
     <string name="voice_groq_hint_get_key">Pegar chave grátis</string>
     <string name="voice_groq_hint_settings">Abrir configurações</string>
+    <string name="voice_speed_default">Velocidade padrão</string>
 </resources>
