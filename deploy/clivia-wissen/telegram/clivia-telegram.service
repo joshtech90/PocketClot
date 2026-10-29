@@ -1,0 +1,10 @@
+[Unit]
+Description=Clivia verschluesselter Telegram-Wissenstransport
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/clivia-telegram/server.py
+WorkingDirectory=%h/clivia-telegram
+UMask=0077
+NoNewPrivileges=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+TimeoutStartSec=600
