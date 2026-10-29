@@ -1,0 +1,3 @@
+# Rechnerspezifische oeffentliche Parameter bleiben lokal (Repo ist oeffentlich).
+upload/*
+!upload/.gitignore
