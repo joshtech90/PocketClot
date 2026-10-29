@@ -309,9 +309,9 @@
     <string name="chat_skills_reset_default">Reset to default</string>
     <string name="chat_auto_speak_dialog_title">Auto-read for this chat</string>
     <string name="chat_auto_speak_dialog_body">Should PocketClot read replies in this chat automatically?</string>
-    <string name="chat_auto_speak_default_label">Default (%1$s)</string>
-    <string name="chat_auto_speak_always_on">Always on</string>
-    <string name="chat_auto_speak_always_off">Always off</string>
+    <string name="chat_auto_speak_default_label">Same as settings (%1$s)</string>
+    <string name="chat_auto_speak_always_on">On in this chat</string>
+    <string name="chat_auto_speak_always_off">Off in this chat</string>
     <string name="chat_close">Close</string>
     <string name="chat_untitled">(untitled)</string>
     <string name="chat_attach">Attach</string>

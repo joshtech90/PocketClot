@@ -453,7 +453,11 @@ function showPrompt({ title, text, placeholder = '', type = 'password', okLabel 
     els.promptTitle.textContent = title;
     els.promptText.textContent = text || '';
     els.promptText.classList.toggle('hidden', !text);
-    els.promptInput.type = type;
+    // Geheimes als maskiertes Textfeld: bei type=password fragt der Browser nach
+    // jeder PIN, ob er sie als Anmeldepasswort speichern soll.
+    const geheim = type === 'password';
+    els.promptInput.type = geheim ? 'text' : type;
+    els.promptInput.classList.toggle('secret-field', geheim);
     els.promptInput.placeholder = placeholder;
     els.promptInput.value = value;
     els.promptOk.textContent = okLabel;

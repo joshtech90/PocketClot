@@ -306,9 +306,9 @@
     <string name="chat_skills_reset_default">Rétablir les valeurs par défaut</string>
     <string name="chat_auto_speak_dialog_title">Lecture automatique pour cette discussion</string>
     <string name="chat_auto_speak_dialog_body">PocketClot doit-il lire les réponses de cette discussion automatiquement ?</string>
-    <string name="chat_auto_speak_default_label">Par défaut (%1$s)</string>
-    <string name="chat_auto_speak_always_on">Toujours activée</string>
-    <string name="chat_auto_speak_always_off">Toujours désactivée</string>
+    <string name="chat_auto_speak_default_label">Comme dans les réglages (%1$s)</string>
+    <string name="chat_auto_speak_always_on">Activée dans ce chat</string>
+    <string name="chat_auto_speak_always_off">Désactivée dans ce chat</string>
     <string name="chat_close">Fermer</string>
     <string name="chat_untitled">(sans titre)</string>
     <string name="chat_attach">Joindre</string>

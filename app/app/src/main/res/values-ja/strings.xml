@@ -306,9 +306,9 @@
     <string name="chat_skills_reset_default">デフォルトにリセット</string>
     <string name="chat_auto_speak_dialog_title">このチャットの自動読み上げ</string>
     <string name="chat_auto_speak_dialog_body">PocketClotはこのチャットで返信を自動的に読み上げますか？</string>
-    <string name="chat_auto_speak_default_label">デフォルト（%1$s）</string>
-    <string name="chat_auto_speak_always_on">常にオン</string>
-    <string name="chat_auto_speak_always_off">常にオフ</string>
+    <string name="chat_auto_speak_default_label">設定に従う（%1$s）</string>
+    <string name="chat_auto_speak_always_on">このチャットではオン</string>
+    <string name="chat_auto_speak_always_off">このチャットではオフ</string>
     <string name="chat_close">閉じる</string>
     <string name="chat_untitled">（タイトルなし）</string>
     <string name="chat_attach">添付</string>

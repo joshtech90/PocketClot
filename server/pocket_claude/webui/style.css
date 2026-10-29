@@ -92,6 +92,8 @@ a { color: var(--link); }
 svg use { fill: currentColor; }
 .mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
 .grow { flex: 1 1 auto; min-width: 0; }
+/* PIN, Schluessel: maskiert, aber kein type=password (sonst Passwort-Speichern-Dialog) */
+.secret-field { -webkit-text-security: disc; text-security: disc; }
 kbd {
   font-family: inherit; font-size: var(--fs-2xs);
   color: var(--text-muted);

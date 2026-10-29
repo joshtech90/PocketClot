@@ -22,13 +22,13 @@
   })();
 </script>
 <link rel="stylesheet" href="palettes.css?v=20261022d">
-<link rel="stylesheet" href="style.css?v=20261028a">
+<link rel="stylesheet" href="style.css?v=20261029a">
 <!-- Feste Versionen mit Pruefsumme, vom eigenen Server statt vom CDN: blockiert ein
      Browser das CDN, blieb die Seite sonst leer. DOMPurify schuetzt auch den
      Gedaechtnis-Schluessel im Browser. Quelle: marked 12.0.2, DOMPurify 3.4.16 (jsdelivr). -->
 <script src="vendor/marked.min.js?v=12.0.2" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"></script>
 <script src="vendor/purify.min.js?v=3.4.16" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"></script>
-<script src="i18n.js?v=20261028a"></script>
+<script src="i18n.js?v=20261029a"></script>
 </head>
 <body>
 
@@ -681,7 +681,7 @@
             <span class="set-hint" data-i18n="voice_section_hint">Dein eigener Groq-API-Key für Whisper Large v3 Turbo. Wird nur für Dich gespeichert, nie geteilt.</span>
           </div>
           <div class="set-row set-row-inputs">
-            <input id="voice-api-key-input" type="password" placeholder="gsk_…" autocomplete="off" class="input mono">
+            <input id="voice-api-key-input" type="text" placeholder="gsk_…" class="input secret-field mono" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false">
             <button id="voice-api-key-save" type="button" class="btn-secondary" data-i18n="save">Speichern</button>
             <button id="voice-api-key-delete" type="button" class="btn-ghost" data-i18n="remove">Entfernen</button>
           </div>
@@ -773,18 +773,18 @@
           </div>
           <div id="chat-lock-set-form" class="set-form hidden">
             <label class="field"><span data-i18n="chat_lock_pin">PIN (5 Ziffern)</span>
-              <input id="chat-lock-pin" type="password" inputmode="numeric" maxlength="5" autocomplete="off" class="input pin-input"></label>
+              <input id="chat-lock-pin" type="text" inputmode="numeric" maxlength="5" class="input secret-field pin-input" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <label class="field"><span data-i18n="chat_lock_pin_confirm">PIN bestätigen</span>
-              <input id="chat-lock-pin-confirm" type="password" inputmode="numeric" maxlength="5" autocomplete="off" class="input pin-input"></label>
+              <input id="chat-lock-pin-confirm" type="text" inputmode="numeric" maxlength="5" class="input secret-field pin-input" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <div class="row-gap"><button id="chat-lock-save" class="btn-secondary" type="button" data-i18n="chat_lock_set_pin">PIN festlegen</button></div>
           </div>
           <div id="chat-lock-change-form" class="set-form hidden">
             <label class="field"><span data-i18n="chat_lock_current_pin">Aktuelle PIN</span>
-              <input id="chat-lock-current" type="password" inputmode="numeric" maxlength="5" autocomplete="off" class="input pin-input"></label>
+              <input id="chat-lock-current" type="text" inputmode="numeric" maxlength="5" class="input secret-field pin-input" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <label class="field"><span data-i18n="chat_lock_new_pin">Neue PIN</span>
-              <input id="chat-lock-new" type="password" inputmode="numeric" maxlength="5" autocomplete="off" class="input pin-input"></label>
+              <input id="chat-lock-new" type="text" inputmode="numeric" maxlength="5" class="input secret-field pin-input" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <label class="field"><span data-i18n="chat_lock_pin_confirm">PIN bestätigen</span>
-              <input id="chat-lock-new-confirm" type="password" inputmode="numeric" maxlength="5" autocomplete="off" class="input pin-input"></label>
+              <input id="chat-lock-new-confirm" type="text" inputmode="numeric" maxlength="5" class="input secret-field pin-input" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <div class="row-gap">
               <button id="chat-lock-change" class="btn-secondary" type="button" data-i18n="chat_lock_change_pin">PIN ändern</button>
               <button id="chat-lock-remove" class="btn-ghost" type="button" data-i18n="chat_lock_remove_pin">PIN entfernen</button>
@@ -801,7 +801,7 @@
           </div>
           <div class="set-form">
             <label class="field"><span data-i18n="memory_key_label">Gedächtnis-Schlüssel</span>
-              <input id="memory-key-input" type="password" autocomplete="off" spellcheck="false" class="input mono"></label>
+              <input id="memory-key-input" type="text" spellcheck="false" class="input secret-field mono" autocomplete="off" data-lpignore="true" data-1p-ignore></label>
             <div class="row-gap">
               <button id="memory-key-save" class="btn-secondary" type="button" data-i18n="memory_key_save">Speichern</button>
               <button id="memory-key-remove" class="btn-ghost hidden" type="button" data-i18n="memory_key_remove">Entfernen</button>
@@ -866,7 +866,7 @@
           <div id="claude-auth-apikey-form" class="set-form hidden">
             <p class="set-hint" id="claude-auth-apikey-current"></p>
             <div class="row-gap">
-              <input id="claude-anthropic-key" type="password" placeholder="sk-ant-…" autocomplete="off" class="input mono grow">
+              <input id="claude-anthropic-key" type="text" placeholder="sk-ant-…" class="input secret-field mono grow" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false">
               <button id="claude-anthropic-save" class="btn-secondary" type="button" data-i18n="save">Speichern</button>
               <button id="claude-anthropic-clear" class="btn-ghost" type="button" data-i18n="clear">Leeren</button>
             </div>
@@ -877,9 +877,9 @@
             <label class="field"><span data-i18n="aws_access_key_id">Access key ID</span>
               <input id="bedrock-akid" class="input" type="text" placeholder="AKIA…" autocomplete="off"></label>
             <label class="field"><span data-i18n="aws_secret_access_key">Secret access key</span>
-              <input id="bedrock-secret" class="input" type="password" autocomplete="off"></label>
+              <input id="bedrock-secret" class="input secret-field" type="text" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <label class="field"><span data-i18n="aws_session_token">Session token (STS, optional)</span>
-              <input id="bedrock-session" class="input" type="password" autocomplete="off"></label>
+              <input id="bedrock-session" class="input secret-field" type="text" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false"></label>
             <label class="field"><span data-i18n="bedrock_opus_model">Opus model ID</span>
               <input id="bedrock-opus" class="input" type="text" placeholder="us.anthropic.claude-opus-4-7"> <!-- ki-modelle: ok (Bedrock-Beispiel) --></label>
             <label class="field"><span data-i18n="bedrock_sonnet_model">Sonnet model ID</span>
@@ -990,7 +990,7 @@
     </div>
     <div class="modal-body">
       <p id="prompt-text" class="prompt-text"></p>
-      <input id="prompt-input" class="input" type="password" placeholder="">
+      <input id="prompt-input" class="input secret-field" type="text" placeholder="" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false">
     </div>
     <div class="modal-footer">
       <button id="prompt-cancel" type="button" class="btn-ghost" data-i18n="cancel">Abbrechen</button>
@@ -1073,7 +1073,7 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden" role="status"></div>
-<script src="app.js?v=20261022e"></script>
+<script src="app.js?v=20261029a"></script>
 <script src="voice.js?v=20261028a"></script>
 <script src="gems.js?v=20261022e"></script>
 <script src="images.js?v=20261022e"></script>

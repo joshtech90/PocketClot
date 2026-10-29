@@ -306,9 +306,9 @@
     <string name="chat_skills_reset_default">重置为默认</string>
     <string name="chat_auto_speak_dialog_title">本次聊天自动朗读</string>
     <string name="chat_auto_speak_dialog_body">PocketClot 是否应在本次聊天中自动朗读回复?</string>
-    <string name="chat_auto_speak_default_label">默认(%1$s)</string>
-    <string name="chat_auto_speak_always_on">始终开启</string>
-    <string name="chat_auto_speak_always_off">始终关闭</string>
+    <string name="chat_auto_speak_default_label">跟随设置（%1$s）</string>
+    <string name="chat_auto_speak_always_on">此聊天中开启</string>
+    <string name="chat_auto_speak_always_off">此聊天中关闭</string>
     <string name="chat_close">关闭</string>
     <string name="chat_untitled">(未命名)</string>
     <string name="chat_attach">附件</string>
