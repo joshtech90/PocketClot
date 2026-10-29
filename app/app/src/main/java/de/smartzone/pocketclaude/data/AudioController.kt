@@ -201,6 +201,7 @@ class AudioController(
             return
         }
         ensureController { c ->
+            if (_state.value.loadingMessageId != messageId) return@ensureController
             val builder = MediaItem.Builder()
                 .setUri(android.net.Uri.parse(url))
                 .setMediaMetadata(
@@ -295,6 +296,12 @@ class AudioController(
                 }
             }
         }
+
+    /** Tempo sofort aendern, ohne die Wiedergabeposition zu verlieren. */
+    fun setSpeed(speed: Float) {
+        if (!speed.isFinite()) return
+        controller?.setPlaybackSpeed(speed.coerceIn(0.25f, 2.0f))
+    }
 
     /** Pause: behält Player-Position, Resume nimmt da wieder auf. */
     @Synchronized

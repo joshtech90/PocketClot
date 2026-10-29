@@ -22,13 +22,13 @@
   })();
 </script>
 <link rel="stylesheet" href="palettes.css?v=20261022d">
-<link rel="stylesheet" href="style.css?v=20261029a">
+<link rel="stylesheet" href="style.css?v=20261029b">
 <!-- Feste Versionen mit Pruefsumme, vom eigenen Server statt vom CDN: blockiert ein
      Browser das CDN, blieb die Seite sonst leer. DOMPurify schuetzt auch den
      Gedaechtnis-Schluessel im Browser. Quelle: marked 12.0.2, DOMPurify 3.4.16 (jsdelivr). -->
 <script src="vendor/marked.min.js?v=12.0.2" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"></script>
 <script src="vendor/purify.min.js?v=3.4.16" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL"></script>
-<script src="i18n.js?v=20261029a"></script>
+<script src="i18n.js?v=20261029b"></script>
 </head>
 <body>
 
@@ -382,6 +382,12 @@
           <div class="voice-bar-text">
             <span id="voice-bar-text" class="voice-bar-title">Ich höre zu…</span>
             <span id="voice-bar-hint" class="voice-bar-hint"></span>
+          </div>
+          <div class="voice-speed">
+            <label for="voice-speed" data-i18n="speed">Geschwindigkeit</label>
+            <input id="voice-speed" type="range" min="0.25" max="2" step="0.05" value="1">
+            <output id="voice-speed-value" for="voice-speed">1.00×</output>
+            <button id="voice-speed-reset" type="button" class="btn-ghost" data-i18n="voice_speed_default">Standard</button>
           </div>
           <div class="voice-actions">
             <button id="voice-bar-send" type="button" class="btn-primary" data-i18n="voice_send_now">Senden</button>
@@ -1073,7 +1079,7 @@
 
 <audio id="audio-player" preload="none"></audio>
 <div id="toast" class="toast hidden" role="status"></div>
-<script src="app.js?v=20261029a"></script>
+<script src="app.js?v=20261029b"></script>
 <script src="voice.js?v=20261028a"></script>
 <script src="gems.js?v=20261022e"></script>
 <script src="images.js?v=20261022e"></script>

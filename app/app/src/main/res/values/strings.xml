@@ -823,4 +823,5 @@
     <string name="voice_groq_hint_message" formatted="false">Voice input uses Groq. You need your own Groq API key for it, and it is 100% free (sign in with Google, no credit card).\n\nCreate a key at console.groq.com/keys and paste it in Settings under Voice input.</string>
     <string name="voice_groq_hint_get_key">Get free key</string>
     <string name="voice_groq_hint_settings">Open settings</string>
+    <string name="voice_speed_default">Default speed</string>
 </resources>

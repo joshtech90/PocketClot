@@ -1655,3 +1655,7 @@ label.set-row { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+.voice-speed { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; max-width: 440px; flex-wrap: wrap; font-size: var(--fs-md); }
+.voice-speed input { flex: 1; min-width: 80px; accent-color: var(--accent); }
+.voice-speed output { min-width: 44px; font-variant-numeric: tabular-nums; }

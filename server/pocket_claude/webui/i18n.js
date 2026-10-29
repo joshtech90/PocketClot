@@ -3919,6 +3919,10 @@
       voice_transcribing: "文字起こし中…",
     },
   };
+  const speedDefaults = { en: "Default speed", de: "Standardtempo", es: "Velocidad predeterminada", fr: "Vitesse par défaut", it: "Velocità predefinita", pt: "Velocidade padrão", zh: "默认语速" };
+  for (const [loc, label] of Object.entries(speedDefaults)) {
+    if (STRINGS[loc]) STRINGS[loc].voice_speed_default = label;
+  }
   for (const loc of Object.keys(STRINGS_DESKTOP)) Object.assign(STRINGS[loc], STRINGS_DESKTOP[loc]);
   // ---- Ende Desktop-Umbau ----
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +65,10 @@ fun AutoModeBar(
     isStreaming: Boolean,
     ttsLoading: Boolean,
     ttsPlaying: Boolean,
+    ttsSpeed: Float,
+    ttsSpeedIsOverride: Boolean,
+    onTtsSpeedChange: (Float) -> Unit,
+    onTtsSpeedReset: () -> Unit,
     autoSendEnabled: Boolean,
     autoSendSilenceMs: Long,
     silenceProgressMs: Long,
@@ -182,6 +187,26 @@ fun AutoModeBar(
                 size = 120.dp,
                 progressFraction = ringFraction,
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(R.string.settings_speed_label), style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = ttsSpeed,
+                    onValueChange = onTtsSpeedChange,
+                    valueRange = 0.25f..2.0f,
+                    steps = 34,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(String.format(java.util.Locale.getDefault(), "%.2f×", ttsSpeed),
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+            TextButton(onClick = onTtsSpeedReset, enabled = ttsSpeedIsOverride) {
+                Text(stringResource(R.string.voice_speed_default))
+            }
 
             // Auto-Send-Toggle: dezent unter dem Mic, damit der User entscheiden
             // kann, ob die Aufnahme nach Stille selbst aufhört oder erst durch

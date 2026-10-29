@@ -152,7 +152,7 @@ internal class LiveSpeaker(
     private var worker: Job? = null
 
     /** Neue Antwort: ab jetzt mitlesen. */
-    fun begin(voice: String?, serverRate: Float, playerRate: Float) {
+    fun begin(voice: String?, serverRate: Float, playerRate: () -> Float) {
         worker?.cancel()
         queue?.close()
         status = Status.Active
@@ -249,13 +249,13 @@ internal class LiveSpeaker(
 
     /** true: erledigt (eingereiht, nichts Sprechbares oder Server zu alt).
      *  false: zweimal am Netz gescheitert, spaeter nochmal versuchen. */
-    private suspend fun sendOne(text: String, voice: String?, serverRate: Float, playerRate: Float): Boolean {
+    private suspend fun sendOne(text: String, voice: String?, serverRate: Float, playerRate: () -> Float): Boolean {
         repeat(2) { attempt ->
             try {
                 val id = repo.createLiveTts(text, voice, serverRate)
                 val url = repo.liveTtsUrl(id)
                 if (status != Status.Active) return true
-                audio.enqueueLive(url, playerRate, first = enqueued == 0)
+                audio.enqueueLive(url, playerRate(), first = enqueued == 0)
                 enqueued++
                 Log.d("PC_TTS", "live segment ${text.length} chars queued (#$enqueued)")
                 return true

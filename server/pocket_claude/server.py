@@ -2078,7 +2078,7 @@ UI_SETTING_KEYS: frozenset[str] = frozenset({
     "chatModel",           # Vorauswahl fuer neue Chats, "" = Claude
     "defaultModelByFamily",  # JSON {"claude": "opus", ...}
     "spMode", "spCustom",  # System-Prompt-Modus und eigener Text
-    "ttsVoice", "ttsSpeed", "autoSpeak",
+    "ttsVoice", "ttsSpeed", "ttsSpeedByChat", "autoSpeak",
     "autoSpeakByChat",     # JSON {"<cid>": true}
     "collapseUserMsgs",
     "autoSend", "autoSendSilenceMs",
@@ -2090,7 +2090,7 @@ _UI_SETTING_MAX_LEN = 64_000
 # `null` entfernt einen Eintrag. Sonst wuerde ein Geraet mit altem Stand beim
 # Umstellen EINER Familie die anderen zuruecksetzen. Ein String ersetzt weiter
 # das Ganze (aeltere Clients, Import, Erstabgleich).
-_UI_MAP_KEYS = frozenset({"effortByFamily", "defaultModelByFamily", "autoSpeakByChat"})
+_UI_MAP_KEYS = frozenset({"effortByFamily", "defaultModelByFamily", "autoSpeakByChat", "ttsSpeedByChat"})
 # Lesen, Zusammenfuehren und Schreiben pro User am Stueck, sonst verliert von
 # zwei gleichzeitigen Aenderungen verschiedener Eintraege eine. Der Server
 # laeuft als ein Prozess, ein asyncio-Lock reicht.

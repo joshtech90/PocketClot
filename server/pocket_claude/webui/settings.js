@@ -323,6 +323,7 @@
   });
   ttsSpeed.addEventListener('input', () => {
     state.ttsSpeed = parseFloat(ttsSpeed.value);
+    updateAudioSpeed();
     ttsSpeedLabel.textContent = state.ttsSpeed.toFixed(2) + '×';
     localStorage.setItem(LS.ttsSpeed, String(state.ttsSpeed));
     queueSettingsPush();
@@ -743,6 +744,7 @@
       tts_voice: state.ttsVoice,
       tts_auto_speak: state.autoSpeak,
       tts_speed: state.ttsSpeed,
+      tts_speed_per_chat: state.ttsSpeedByChat,
       effort: state.effortByFamily.claude || state.effort,
       system_prompt_mode: state.spMode,
       custom_system_prompt: state.spCustom,
@@ -768,6 +770,10 @@
     if (app.tts_speed) { state.ttsSpeed = Number(app.tts_speed) || 1; localStorage.setItem(LS.ttsSpeed, String(state.ttsSpeed)); }
     if (app.system_prompt_mode) { state.spMode = app.system_prompt_mode; localStorage.setItem(LS.spMode, state.spMode); }
     if (typeof app.custom_system_prompt === 'string') { state.spCustom = app.custom_system_prompt; localStorage.setItem(LS.spCustom, state.spCustom); }
+    if (app.tts_speed_per_chat) {
+      state.ttsSpeedByChat = validChatSpeeds(app.tts_speed_per_chat);
+      localStorage.setItem(LS.ttsSpeedByChat, JSON.stringify(state.ttsSpeedByChat));
+    }
     if (app.tts_auto_speak_per_chat && typeof app.tts_auto_speak_per_chat === 'object') {
       state.autoSpeakByChat = app.tts_auto_speak_per_chat;
       localStorage.setItem(LS.autoSpeakByChat, JSON.stringify(state.autoSpeakByChat));

@@ -235,6 +235,7 @@ window.PocketVoice = (() => {
   function showBar(on) {
     bar.classList.toggle('hidden', !on);
     els.inputForm.classList.toggle('hidden', on);
+    if (on) renderSpeed();
   }
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -307,12 +308,38 @@ window.PocketVoice = (() => {
   function stopAutoMode() {
     if (!autoMode && bar.classList.contains('hidden')) return;
     autoMode = false;
+    state.suppressTurnSpeech = true;
+    stopAudio();
     if (autoAbort) { autoAbort.abort(); autoAbort = null; }
     cancelRecording();
     finishListening();
     showBar(false);
     setSilence(0);
   }
+  const speedInput = $('voice-speed');
+  const speedValue = $('voice-speed-value');
+  const speedReset = $('voice-speed-reset');
+  function renderSpeed() {
+    if (!speedInput) return;
+    speedInput.value = chatTtsSpeed();
+    speedValue.textContent = chatTtsSpeed().toFixed(2) + '×';
+    speedReset.disabled = !Object.hasOwn(validChatSpeeds(state.ttsSpeedByChat), state.cid);
+  }
+  speedInput?.addEventListener('input', () => {
+    if (!state.cid) return;
+    state.ttsSpeedByChat = { ...validChatSpeeds(state.ttsSpeedByChat), [state.cid]: Number(speedInput.value) };
+    localStorage.setItem(LS.ttsSpeedByChat, JSON.stringify(state.ttsSpeedByChat));
+    updateAudioSpeed();
+    renderSpeed();
+    queueSettingsPush();
+  });
+  speedReset?.addEventListener('click', () => {
+    delete state.ttsSpeedByChat[state.cid];
+    localStorage.setItem(LS.ttsSpeedByChat, JSON.stringify(state.ttsSpeedByChat));
+    updateAudioSpeed();
+    renderSpeed();
+    queueSettingsPush();
+  });
   function toggleAutoMode() {
     if (autoMode) { stopAutoMode(); stopAudio(); }
     else startAutoMode();
@@ -366,6 +393,8 @@ window.PocketVoice = (() => {
   document.addEventListener('pc:settings-synced', () => {
     autoSend = localStorage.getItem(LS_AUTO_SEND) === 'true';
     if (autoSendBox) autoSendBox.checked = autoSend;
+    renderSpeed();
+    updateAudioSpeed();
   });
   setInterval(updateMicEnabled, 400);
   // Vorlesen startet schon im done-Handler, die Schleife merkt es erst, wenn

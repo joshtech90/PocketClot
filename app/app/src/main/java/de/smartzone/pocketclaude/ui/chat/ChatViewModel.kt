@@ -674,6 +674,7 @@ class ChatViewModel(
             StreamingService.start(appContext, _state.value.title.ifBlank { null }, cid)
         }
 
+        suppressTurnSpeech = false
         streamJob = viewModelScope.launch {
             val s = settingsRepo.current()
             // Das Modell DIESES Chats gewinnt vor der globalen Wahl. Ein
@@ -694,8 +695,9 @@ class ChatViewModel(
             // dann, sie wuerde nur parallel dasselbe noch einmal erzeugen.
             val live = _state.value.autoMode
             if (live) {
-                val (serverRate, playerRate) = ttsRates(s.ttsSpeed)
-                liveSpeaker.begin(s.ttsVoice, serverRate, playerRate)
+                liveSpeaker.begin(s.ttsVoice, 1.0f) {
+                    cachedSettings?.let { it.ttsSpeedByChat[cid] ?: it.ttsSpeed } ?: s.ttsSpeed
+                }
             }
             repo.stream(
                 cid,
@@ -707,7 +709,7 @@ class ChatViewModel(
                 // Server startet nach Done eine Pre-Generation für die
                 // gewählte Voice/Speed. Nächster Vorlesen-Tap = Cache-Hit.
                 ttsVoice = if (live) null else s.ttsVoice,
-                ttsRate = s.ttsSpeed,
+                ttsRate = 1.0f,
                 imageMode = imageMode,
             )
                 // Ein Verbindungsabbruch kommt schon als ErrorEvent an; die
@@ -834,9 +836,11 @@ class ChatViewModel(
                         val shouldSpeak = _state.value.autoMode || (override ?: s.ttsAutoSpeak)
                         // Lief das Vorlesen schon mit, nur noch den Rest
                         // anhaengen; sonst wie bisher die ganze Nachricht.
-                        if (liveSpeaker.finish(finalText)) {
+                        if (suppressTurnSpeech) {
+                            liveSpeaker.cancel()
+                        } else if (liveSpeaker.finish(finalText)) {
                             audio.relabelLive(ev.assistantMessageId)
-                        } else if (shouldSpeak) {
+                        } else if (shouldSpeak && !suppressTurnSpeech) {
                             speak(ev.assistantMessageId).join()
                         }
                     } finally {
@@ -950,11 +954,19 @@ class ChatViewModel(
     /** Letztes angestossenes Vorlesen; Unterbrechen bricht auch ein noch
      *  ladendes ab, sonst finge es nach dem Tipp doch noch an. */
     private var speakJob: Job? = null
+    private var suppressTurnSpeech = false
+
+    fun setChatTtsSpeed(speed: Float?) = viewModelScope.launch {
+        settingsRepo.setChatTtsSpeed(cid, speed)
+        val s = settingsRepo.current()
+        audio.setSpeed(s.ttsSpeedByChat[cid] ?: s.ttsSpeed)
+    }
 
     fun speak(messageId: Long) = viewModelScope.launch {
         val s = settingsRepo.current()
         try {
-            val (serverRate, playerRate) = ttsRates(s.ttsSpeed)
+            val serverRate = 1.0f
+            val playerRate = s.ttsSpeedByChat[cid] ?: s.ttsSpeed
             val url = repo.audioUrl(messageId, s.ttsVoice, serverRate)
             val cacheKey = "audio-$messageId-${s.ttsVoice}-$serverRate"
             audio.play(messageId, url, cacheKey, speed = playerRate)
@@ -963,15 +975,6 @@ class ChatViewModel(
             _state.update { it.copy(errorMessage = appContext.getString(R.string.error_speak, e.message ?: "")) }
         }
     }.also { speakJob = it }
-
-    /** Gemini-Web kann die Sprechgeschwindigkeit nicht selbst aendern, die
-     *  stellt dann der Player ein. Bei allen anderen Anbietern macht das der
-     *  Server beim Erzeugen, dort waere ein zweites Mal Tempo genau ein Mal
-     *  zu viel. Liefert (Server-Tempo, Player-Tempo). */
-    private suspend fun ttsRates(speed: Float): Pair<Float, Float> {
-        val webTts = repo.ttsProviderCached() == "gemini_web"
-        return if (webTts) 1.0f to speed else speed to 1.0f
-    }
 
     fun stopSpeaking() {
         // Auch waehrend die Antwort noch entsteht: keine weiteren Stuecke.
@@ -1240,7 +1243,8 @@ class ChatViewModel(
         } else {
             // Sprachgespraech beendet, waehrend die Antwort schon mitgelesen
             // wird: das Vorlesen gehoert zum Gespraech und endet mit ihm.
-            if (liveSpeaker.cancel()) audio.stop()
+            suppressTurnSpeech = true
+            stopSpeaking()
             // Beim Ausschalten: laufende Aufnahme abbrechen (NICHT transkribieren).
             if (_state.value.voiceState == VoiceState.Recording) {
                 runCatching { voiceRecorder.cancel() }

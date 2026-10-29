@@ -23,6 +23,7 @@ const LS = {
   spCustom:   'pc.spCustom',
   ttsVoice:   'pc.ttsVoice',
   ttsSpeed:   'pc.ttsSpeed',
+  ttsSpeedByChat: 'pc.ttsSpeedByChat',
   autoSpeak:  'pc.autoSpeak',
   autoSpeakByChat: 'pc.autoSpeakByChat',
   sidebar:    'pc.sidebarCollapsed',
@@ -93,6 +94,7 @@ const state = {
   // in diesem Browser: die Erlaubnis dafuer gilt ohnehin je Browser.
   notify: localStorage.getItem('pc.notify') === 'true',
   autoSpeakByChat: readJson(LS.autoSpeakByChat, {}),
+  ttsSpeedByChat: readJson(LS.ttsSpeedByChat, {}),
   collapseUserMsgs: (localStorage.getItem(LS.collapseUserMsgs) ?? 'true') !== 'false',
 
   me: null,
@@ -654,6 +656,12 @@ async function loadServerSettings() {
       state.collapseUserMsgs = boolFrom(s.collapseUserMsgs);
       localStorage.setItem(LS.collapseUserMsgs, String(state.collapseUserMsgs));
     }
+    if (s.ttsSpeedByChat) {
+      try {
+        state.ttsSpeedByChat = validChatSpeeds(JSON.parse(s.ttsSpeedByChat));
+        localStorage.setItem(LS.ttsSpeedByChat, JSON.stringify(state.ttsSpeedByChat));
+      } catch (_) {}
+    }
     if (s.autoSpeakByChat) {
       try {
         const m = JSON.parse(s.autoSpeakByChat);
@@ -706,6 +714,7 @@ function settingsPayload() {
     ttsSpeed: String(state.ttsSpeed),
     autoSpeak: String(state.autoSpeak),
     autoSpeakByChat: JSON.stringify(state.autoSpeakByChat),
+    ttsSpeedByChat: JSON.stringify(state.ttsSpeedByChat),
     collapseUserMsgs: String(state.collapseUserMsgs),
     sidebar: localStorage.getItem(LS.sidebar) || '0',
     chatModel: state.chatModel,
@@ -747,7 +756,7 @@ async function pushSettingsNow() {
     return false;
   }
 }
-const SETTINGS_MAP_KEYS = new Set(['effortByFamily', 'autoSpeakByChat']);
+const SETTINGS_MAP_KEYS = new Set(['effortByFamily', 'autoSpeakByChat', 'ttsSpeedByChat']);
 /** Geaenderte Eintraege zweier JSON-Objekte; entfernte als null. */
 function mapDiff(beforeJson, afterJson) {
   let a, b;
@@ -2665,6 +2674,7 @@ async function sendMessage(rawText, opts = {}) {
   // abgeloest, darf sein Aufraeumen den neuen Turn nicht mehr anfassen.
   const turn = ++_turnSeq;
   state.turn = turn;
+  state.suppressTurnSpeech = false;
   console.log('PC_SSE: submit START cid=%s content_len=%d image_mode=%s', cidAtSubmit, content.length, imageMode);
   try {
     await streamReply(content, atts.map((a) => a.id), imageMode, turn);
@@ -2891,7 +2901,7 @@ function handleSseEvent(raw) {
       refreshChatList();
       // Vorlesen: im Sprachgespraech immer, sonst nach Chat- bzw. Standardwahl.
       const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
-      if (msgId && (voiceLoop || autoSpeakFor(state.cid))) speak(msgId);
+      if (msgId && !state.suppressTurnSpeech && (voiceLoop || autoSpeakFor(state.cid))) speak(msgId);
       notifyDone(state.messages[state.messages.length - 1]);
       break;
     }
@@ -2924,11 +2934,19 @@ function setAudioState(msgId, status) {
   state.audio = { msgId: status === 'idle' ? null : msgId, status };
   renderTtsSlots();
 }
-/** Wie in der App: bei Gemini Web macht der Abspieler das Tempo (der Server
- *  kann es dort nicht), bei allen anderen Anbietern der Server. */
-function ttsRates() {
-  const web = state.ttsProvider === 'gemini_web';
-  return { server: web ? 1.0 : state.ttsSpeed, player: web ? state.ttsSpeed : 1.0 };
+function validChatSpeeds(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, v]) =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0.25 && v <= 2));
+}
+function chatTtsSpeed() {
+  return validChatSpeeds(state.ttsSpeedByChat)[state.cid] ?? state.ttsSpeed;
+}
+/** Native-rate audio lets speed changes keep the current position, for every provider. */
+function ttsRates() { return { server: 1.0, player: chatTtsSpeed() }; }
+function updateAudioSpeed() {
+  els.audio.defaultPlaybackRate = chatTtsSpeed();
+  els.audio.playbackRate = chatTtsSpeed();
 }
 function isCurrentChatLocked() {
   return !!(state.cid && state.chatLocked && !state.unlockedCids.has(state.cid));

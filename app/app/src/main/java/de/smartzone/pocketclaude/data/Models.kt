@@ -234,6 +234,7 @@ data class AppSettingsExportDto(
     @SerialName("tts_voice") val ttsVoice: String = DEFAULT_TTS_VOICE,
     @SerialName("tts_auto_speak") val ttsAutoSpeak: Boolean = false,
     @SerialName("tts_speed") val ttsSpeed: Float = 1.0f,
+    @SerialName("tts_speed_per_chat") val ttsSpeedByChat: Map<String, Float> = emptyMap(),
     val effort: String = DEFAULT_EFFORT,
     @SerialName("system_prompt_mode") val systemPromptMode: String = "STANDARD",
     @SerialName("custom_system_prompt") val customSystemPrompt: String = "",
