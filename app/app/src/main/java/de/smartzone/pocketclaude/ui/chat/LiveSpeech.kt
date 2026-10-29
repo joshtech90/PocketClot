@@ -227,7 +227,7 @@ internal class LiveSpeaker(
     /** Antwort abgebrochen oder Fehler: was schon im Player liegt, laeuft
      *  zu Ende, Neues kommt nicht dazu. */
     fun end() {
-        if (status == Status.Active) status = Status.Idle
+        status = Status.Idle
         queue?.close()
     }
 
