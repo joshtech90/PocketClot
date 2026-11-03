@@ -125,3 +125,38 @@ def test_claude_fetch_uses_same_reader_and_memory_guard(api, monkeypatch):
             result = await client.call_tool("web_fetch", {"url": "https://reddit.com/r/Android"})
             assert result.isError and "gesperrt" in str(result) and "Battery life" not in str(result)
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('location', [
+    '/r/Android/comments/abc123/battery/',
+    'http://100.64.0.1/private',
+    'https://reddit.com.evil.example/steal',
+])
+def test_share_link_validates_redirect_before_oauth(api, location):
+    requests = []
+    def handler(req):
+        requests.append(req)
+        if '/s/' in req.url.path:
+            assert req.url.host == 'www.reddit.com'
+            assert 'Authorization' not in req.headers
+            return httpx.Response(302, headers={'Location': location})
+        if req.url.path == '/api/v1/access_token':
+            return httpx.Response(200, json={'access_token': 'access-test', 'expires_in': 3600})
+        assert req.url.host == 'oauth.reddit.com'
+        return httpx.Response(200, json=listing())
+    api(handler)
+    result = asyncio.run(web_tool.fetch('https://www.reddit.com/r/Android/s/Share123'))
+    assert result['ok'] == location.startswith('/r/')
+    if not result['ok']:
+        assert len(requests) == 1
+
+
+def test_claude_routes_only_reddit_away_from_builtin_fetch():
+    from pocket_claude import claude_engine
+    hook = claude_engine._reddit_nativ_sperren()['PreToolUse'][0].hooks[0]
+    async def run():
+        assert await hook({'tool_input': {'url': 'https://example.org/'}}, 'x', None) == {}
+        blocked = await hook({'tool_input': {'url': 'https://www.reddit.com/r/Android'}}, 'x', None)
+        assert blocked['hookSpecificOutput']['permissionDecision'] == 'deny'
+        assert 'mcp__pocket__web_fetch' in blocked['hookSpecificOutput']['permissionDecisionReason']
+    asyncio.run(run())

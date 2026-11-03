@@ -547,6 +547,22 @@ def _nach_erinnern_sperren(zustand: dict) -> dict:
                                        hooks=[pruefen])]}
 
 
+def _reddit_nativ_sperren() -> dict:
+    """Keep Claude's general fetch, but route Reddit through our OAuth reader."""
+    from claude_agent_sdk import HookMatcher
+    from pocket_claude import reddit_api
+
+    async def pruefen(eingabe, tool_use_id, kontext):  # noqa: ARG001
+        url = str((eingabe.get("tool_input") or {}).get("url") or "")
+        if reddit_api.is_reddit_url(url):
+            return {"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": "Reddit wird ueber die API gelesen. "
+                                            "Verwende mcp__pocket__web_fetch fuer diese Adresse."}}
+        return {}
+    return {"PreToolUse": [HookMatcher(matcher="^WebFetch$", hooks=[pruefen])]}
+
+
 # ---------- Bild-Werkzeug fuer den Claude-Pfad ----------
 
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
@@ -595,7 +611,11 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
 
     from pocket_claude import web_tool as _web_tool
 
-    @tool(_web_tool.FETCH_TOOL_NAME, _web_tool.FETCH_TOOL_DESCRIPTION, _web_tool.FETCH_PARAMETERS)
+    @tool(_web_tool.FETCH_TOOL_NAME,
+          "Liest Reddit ueber die Reddit-API. Fuer ALLE Reddit-Adressen dieses Werkzeug "
+          "verwenden, fuer andere Seiten WebFetch. Suche: https://www.reddit.com/search?q=BEGRIFF "
+          "oder https://www.reddit.com/r/SUBREDDIT/search?q=BEGRIFF.",
+          _web_tool.FETCH_PARAMETERS)
     async def _web_fetch(args: dict) -> dict:
         # Defence in depth: the shared memory hook also blocks this MCP tool.
         if wissen_zustand is not None and wissen_zustand.get("erinnert"):
@@ -757,8 +777,6 @@ async def stream_reply(
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server
             allowed_tools.extend(werkzeug_namen)
-            if "mcp__pocket__web_fetch" in werkzeug_namen:
-                allowed_tools.remove("WebFetch")
 
         # "Bild erstellen" aus dem Plus-Menue: der Hinweis haengt nur an diesem
         # Turn. Ohne verfuegbares Werkzeug waere er eine leere Aufforderung.
@@ -870,8 +888,12 @@ async def stream_reply(
         )
         if mcp_servers:
             options_kwargs["mcp_servers"] = mcp_servers
+        hooks = _nach_erinnern_sperren(wissen_zustand) if mit_wissen else {}
+        if "mcp__pocket__web_fetch" in werkzeug_namen:
+            hooks.setdefault("PreToolUse", []).extend(_reddit_nativ_sperren()["PreToolUse"])
+        if hooks:
+            options_kwargs["hooks"] = hooks
         if mit_wissen:
-            options_kwargs["hooks"] = _nach_erinnern_sperren(wissen_zustand)
             options_kwargs["extra_args"] = {"no-session-persistence": None}
         # cli_path: global installiertes `claude` (Dein Login + Sessions) statt SDK-Bundle
         resolved_cli = settings.claude_binary or shutil.which("claude")

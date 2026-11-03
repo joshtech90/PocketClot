@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -12,6 +13,8 @@ from typing import Any
 import httpx
 
 from pocket_claude.config import settings
+
+log = logging.getLogger(__name__)
 
 USER_AGENT = "pocket_claude:v1.0 (read-only reddit client)"
 OAUTH_TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
@@ -56,7 +59,7 @@ class RedditCredential:
         self.access_token: str | None = None
         self.expires_at: float = 0.0
         self.lock = asyncio.Lock()
-        self.auth_failed: bool = False
+        self.auth_failed_until: float = 0.0
 
     def is_token_valid(self) -> bool:
         return bool(self.access_token and time.monotonic() < self.expires_at)
@@ -116,7 +119,8 @@ def _get_credentials() -> list[RedditCredential]:
         _credentials_file_path = file_path
         _credentials_file_mtime = mtime
         return _credentials_cache
-    except Exception:
+    except Exception as exc:
+        log.warning("PC_REDDIT: credential file unreadable (%s)", type(exc).__name__)
         return []
 
 
@@ -140,6 +144,8 @@ def _parse_and_validate_url(raw_url: str) -> tuple[str, dict[str, str]]:
         if not re.fullmatch(r"/[A-Za-z0-9]+", path):
             raise ValueError("Invalid Reddit shortlink")
         target = "/comments" + path
+    elif re.fullmatch(r"/gallery/[A-Za-z0-9]+", path):
+        target = "/comments/" + path.rsplit("/", 1)[1]
     elif match := POST_ROUTE.fullmatch(path):
         target = "/comments/" + match[1]
         if match[2]:
@@ -187,7 +193,7 @@ async def _ensure_token(cred: RedditCredential, client: httpx.AsyncClient) -> bo
                 _apply_rate_limit(resp.headers)
                 return False
             if resp.status_code == 401:
-                cred.auth_failed = True
+                cred.auth_failed_until = time.monotonic() + 900
                 return False
             if resp.status_code != 200:
                 raise ValueError("Reddit authentication is unavailable")
@@ -196,7 +202,7 @@ async def _ensure_token(cred: RedditCredential, client: httpx.AsyncClient) -> bo
             raise ValueError(error)
         payload = json.loads(body)
         if payload.get("error") == "invalid_client":
-            cred.auth_failed = True
+            cred.auth_failed_until = time.monotonic() + 900
             return False
         token = payload.get("access_token")
         if not isinstance(token, str) or not token:
@@ -309,13 +315,30 @@ async def fetch(url: str) -> dict:
     try:
         return await asyncio.wait_for(_fetch_inner(url), GLOBAL_TIMEOUT)
     except (asyncio.TimeoutError, httpx.TimeoutException):
+        log.warning("PC_REDDIT: request timed out")
         return _failure("Der Reddit-Abruf hat zu lange gedauert.")
-    except Exception:
+    except Exception as exc:
+        log.warning("PC_REDDIT: fetch failed (%s)", type(exc).__name__)
         return _failure("Reddit konnte nicht ueber die API gelesen werden. "
                         "Bitte pruefe die Adresse und versuche es spaeter erneut.")
 
 
 async def _fetch_inner(url: str) -> dict:
+    # Reddit's mobile share URLs redirect to a canonical post address.
+    # Resolve only this fixed host without auth, then validate the destination
+    # through the same strict route parser before any OAuth token is acquired.
+    parsed = urllib.parse.urlsplit(url.strip())
+    if (is_reddit_url(url) and re.fullmatch(r"/r/[A-Za-z0-9_]+/s/[A-Za-z0-9]+/?", parsed.path)):
+        if (parsed.username is not None or parsed.password is not None
+                or parsed.port not in (None, 80, 443) or parsed.scheme not in ("http", "https")):
+            raise ValueError("Invalid share URL")
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False,
+                                     headers={"User-Agent": USER_AGENT}) as client:
+            async with client.stream("GET", "https://www.reddit.com" + parsed.path) as response:
+                if response.status_code not in (301, 302, 303, 307, 308) or not response.headers.get("location"):
+                    return _failure("Der Reddit-Teilen-Link konnte nicht aufgeloest werden. "
+                                    "Bitte oeffne ihn und kopiere die vollstaendige Beitragsadresse.")
+                url = urllib.parse.urljoin("https://www.reddit.com", response.headers["location"])
     target_path, params = _parse_and_validate_url(url)
     if time.monotonic() < _rate_limit_cooldown_until:
         return _failure("Reddit begrenzt die Anfragen. Bitte spaeter erneut versuchen.")
@@ -327,7 +350,7 @@ async def _fetch_inner(url: str) -> dict:
         headers={"User-Agent": USER_AGENT},
     ) as client:
         for cred in creds:
-            if cred.auth_failed:
+            if time.monotonic() < cred.auth_failed_until:
                 continue
             # Retry an expired/revoked access token once with the same client.
             # Only authentication failures may fall back to another key.
@@ -343,12 +366,13 @@ async def _fetch_inner(url: str) -> dict:
                     if resp.status_code == 401:
                         cred.access_token = None
                         if attempt == 1:
-                            cred.auth_failed = True
+                            cred.auth_failed_until = time.monotonic() + 900
                         continue
                     if resp.status_code == 429:
                         _apply_rate_limit(resp.headers)
                         return _failure("Reddit begrenzt die Anfragen. Bitte spaeter erneut versuchen.")
                     if resp.status_code != 200:
+                        log.warning("PC_REDDIT: API HTTP %d", resp.status_code)
                         return _failure(f"Reddit hat mit HTTP {resp.status_code} geantwortet.")
                     body, error = await _read_bounded_stream(resp)
                 if error:
@@ -359,4 +383,5 @@ async def _fetch_inner(url: str) -> dict:
                     canonical += "?" + urllib.parse.urlencode({"q": params["q"]})
                 sources = [{"title": "Reddit", "url": u} for u in (urls or [canonical])]
                 return {"ok": True, "text": text, "sources": sources}
+    log.warning("PC_REDDIT: all configured clients failed authentication")
     return _failure("Keiner der eingerichteten Reddit-Zugaenge konnte sich anmelden.")
