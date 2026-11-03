@@ -31,7 +31,7 @@ from sse_starlette.sse import EventSourceResponse
 from pocket_claude import attachments as attachments_mod
 from pocket_claude import (
     __version__, auth_modes, backup, claude_engine, db, gateways,
-    image_engine, image_tool, openai_engine, system_prompts, tts, tts_cache,
+    image_engine, image_tool, ki_modelle, openai_engine, system_prompts, tts, tts_cache,
     usage, voice,
 )
 from pocket_claude.auth import (
@@ -588,6 +588,13 @@ async def list_chat_models(
     # wenn es nicht kuratiert ist. Sonst haelt die App es faelschlich fuer
     # verschwunden und setzt den Chat auf ein anderes Modell zurueck.
     wanted = (include or "").strip()
+    if (wanted and not any(m.key == wanted for m in models)
+            and claude_engine.is_allowed_model(wanted)):
+        models.append(ChatModelDto(
+            key=wanted, family="claude", label=ki_modelle.anzeigename(wanted),
+            efforts=list(claude_engine.CLAUDE_EFFORTS), default_effort="high",
+            supports_vision=True, gateway_label="",
+        ))
     if wanted and not any(m.key == wanted for m in gw_models):
         extra = next((m for m in await gateways.list_models(curated=False)
                       if m.key == wanted), None)

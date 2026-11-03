@@ -82,3 +82,23 @@ def test_skills_dialog_shows_gem_skills(ctx):
     # Chat-Override zuruecknehmen faellt auf das Gem zurueck, nicht auf den User
     got = c.put(f"/conversations/{cid}/skills", headers=h, json={"skills": None}).json()
     assert got["skills"]["web_search"] is False
+
+
+def test_fable_is_hidden_but_existing_chat_keeps_its_model(ctx, monkeypatch):
+    c, h = ctx
+
+    async def no_models(**kwargs):
+        return []
+
+    async def no_status():
+        return []
+
+    monkeypatch.setattr(server.gateways, "list_models", no_models)
+    monkeypatch.setattr(server.gateways, "status", no_status)
+    assert "fable" not in {m["key"] for m in c.get("/chat/models", headers=h).json()["models"]}
+    models = c.get("/chat/models?include=fable", headers=h).json()["models"]
+    fable = next(m for m in models if m["key"] == "fable")
+    assert fable["family"] == "claude" and "Fable" in fable["label"]
+    cid = c.post("/conversations", headers=h, json={}).json()["id"]
+    assert c.patch(f"/conversations/{cid}", headers=h, json={"chat_model": "fable"}).status_code == 200
+    assert c.get(f"/conversations/{cid}", headers=h).json()["chat_model"] == "fable"

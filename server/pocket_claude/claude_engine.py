@@ -181,7 +181,7 @@ def _process_error_client_message(exit_code: int | None, diagnostic: str) -> str
 
 # Waehlbare Claude-Modelle fuer den Modell-Picker in App und Web-UI.
 # Seit 24.09.2026 aus dem Modell-Register (`ki_modelle.json`, Kopie aus dem
-# Projekt AI Worker). Schluessel sind Familien (`opus`, `fable` ...), keine
+# Projekt AI Worker). Schluessel sind Familien (`opus`, `sonnet` ...), keine
 # Versionsnummern: ein gespeichertes `opus` bekommt so immer die neueste
 # Generation, und eine neue Generation braucht hier keine Code-Aenderung.
 # Die App-Liste (`ClaudeModels.kt`) ist nur Offline-Fallback.
