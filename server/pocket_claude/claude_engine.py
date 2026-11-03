@@ -621,7 +621,12 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
         if wissen_zustand is not None and wissen_zustand.get("erinnert"):
             return {"content": [{"type": "text", "text": "Webabrufe sind nach einer "
                                 "Abfrage des privaten Gedaechtnisses gesperrt."}], "is_error": True}
-        result = await _web_tool.fetch(str((args or {}).get("url") or ""))
+        from pocket_claude import reddit_api
+        url = str((args or {}).get("url") or "")
+        if not reddit_api.is_reddit_url(url):
+            return {"content": [{"type": "text", "text": "Dieses Werkzeug liest nur Reddit. "
+                                "Fuer andere Seiten WebFetch verwenden."}], "is_error": True}
+        result = await _web_tool.fetch(url)
         return {"content": [{"type": "text", "text": result.get("text") or ""}],
                 "is_error": not result.get("ok", False)}
 

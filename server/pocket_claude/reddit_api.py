@@ -27,6 +27,10 @@ MAX_OUTPUT_CHARS = 12000
 ALLOWED_HOSTS = {
     "www.reddit.com",
     "old.reddit.com",
+    "np.reddit.com",
+    "sh.reddit.com",
+    "amp.reddit.com",
+    "i.reddit.com",
     "new.reddit.com",
     "m.reddit.com",
     "oauth.reddit.com",

@@ -137,8 +137,6 @@ def test_share_link_validates_redirect_before_oauth(api, location):
     def handler(req):
         requests.append(req)
         if '/s/' in req.url.path:
-            assert req.url.host == 'www.reddit.com'
-            assert 'Authorization' not in req.headers
             return httpx.Response(302, headers={'Location': location})
         if req.url.path == '/api/v1/access_token':
             return httpx.Response(200, json={'access_token': 'access-test', 'expires_in': 3600})
@@ -146,6 +144,8 @@ def test_share_link_validates_redirect_before_oauth(api, location):
         return httpx.Response(200, json=listing())
     api(handler)
     result = asyncio.run(web_tool.fetch('https://www.reddit.com/r/Android/s/Share123'))
+    assert requests[0].url.host == 'www.reddit.com'
+    assert 'authorization' not in requests[0].headers
     assert result['ok'] == location.startswith('/r/')
     if not result['ok']:
         assert len(requests) == 1
@@ -160,3 +160,17 @@ def test_claude_routes_only_reddit_away_from_builtin_fetch():
         assert blocked['hookSpecificOutput']['permissionDecision'] == 'deny'
         assert 'mcp__pocket__web_fetch' in blocked['hookSpecificOutput']['permissionDecisionReason']
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("status", [200, 403])
+def test_unresolved_share_link_gives_useful_error(api, status):
+    requests = []
+    def handler(req):
+        requests.append(req)
+        return httpx.Response(status, text="No redirect")
+    api(handler)
+    result = asyncio.run(web_tool.fetch("https://www.reddit.com/r/Android/s/Share123"))
+    assert not result["ok"] and "vollstaendige Beitragsadresse" in result["text"]
+    assert len(requests) == 1
+    assert requests[0].url.host == "www.reddit.com"
+    assert "authorization" not in requests[0].headers
