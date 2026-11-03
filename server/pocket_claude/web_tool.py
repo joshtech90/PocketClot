@@ -29,7 +29,7 @@ from typing import Any
 
 import httpx
 
-from pocket_claude import gateways
+from pocket_claude import gateways, reddit_api
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,10 @@ SEARCH_PARAMETERS: dict[str, Any] = {
 FETCH_TOOL_DESCRIPTION = (
     "Ruft eine konkrete Webseite ab und liefert ihren Text zurueck. Nutze das "
     "Werkzeug, wenn eine bestimmte Adresse gelesen werden soll, etwa eine "
-    "Quelle aus einer vorherigen Suche."
+    "Quelle aus einer vorherigen Suche. Reddit-Adressen werden ueber die "
+    "Reddit-API gelesen, inklusive Beitraegen und Kommentaren. Fuer Reddit-Suchen "
+    "nutze https://www.reddit.com/search?q=SUCHBEGRIFF oder "
+    "https://www.reddit.com/r/SUBREDDIT/search?q=SUCHBEGRIFF&restrict_sr=on."
 )
 
 FETCH_PARAMETERS: dict[str, Any] = {
@@ -354,6 +357,11 @@ async def _fetch_inner(url: str) -> dict:
             parsed = httpx.URL(current)
             if parsed.scheme not in ("http", "https"):
                 raise _BlockedUrl("Nur http- und https-Adressen werden abgerufen.")
+            # Also dispatch after public redirects (e.g. Reddit share links).
+            # The Reddit adapter validates routes and sends credentials only to
+            # fixed API hosts, never to the supplied URL.
+            if reddit_api.configured() and reddit_api.is_reddit_url(current):
+                return await reddit_api.fetch(current)
             await asyncio.to_thread(_check_host, parsed.host or "")
 
             async with cli.stream("GET", current) as r:

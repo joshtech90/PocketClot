@@ -543,7 +543,7 @@ def _nach_erinnern_sperren(zustand: dict) -> dict:
                                             "sind Webabrufe und Bilder in dieser Antwort gesperrt."}}
         return {}
     # Auch die Bilderzeugung: ihr Prompt geht an einen weiteren Anbieter
-    return {"PreToolUse": [HookMatcher(matcher="WebFetch|WebSearch|mcp__pocket__generate_image",
+    return {"PreToolUse": [HookMatcher(matcher="WebFetch|WebSearch|mcp__pocket__web_fetch|mcp__pocket__generate_image",
                                        hooks=[pruefen])]}
 
 
@@ -552,7 +552,8 @@ def _nach_erinnern_sperren(zustand: dict) -> dict:
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
                             collected: list[dict], events: "asyncio.Queue",
                             mit_bild: bool = True, mit_wissen: bool = False,
-                            wissen_zustand: dict | None = None, wissen_schluessel: str | None = None):
+                            wissen_zustand: dict | None = None, wissen_schluessel: str | None = None,
+                            mit_web: bool = False):
     """Registriert `generate_image` als In-Process-MCP-Werkzeug.
 
     Die Claude-Agent-SDK kann Werkzeuge direkt im Server-Prozess ausfuehren, ohne
@@ -563,7 +564,7 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
     Rueckgabe: (mcp_server, tool_name) oder (None, None), wenn die SDK das nicht
     kann. Ein Fehler hier darf den Chat nie kippen.
     """
-    if user_id is None or not (mit_bild or mit_wissen):
+    if user_id is None or not (mit_bild or mit_wissen or mit_web):
         return None, []
     try:
         from claude_agent_sdk import create_sdk_mcp_server, tool
@@ -592,7 +593,22 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
         result = await _wissen_tool.run(user_id, args or {}, wissen_schluessel)
         return {"content": [{"type": "text", "text": result.get("text") or ""}]}
 
+    from pocket_claude import web_tool as _web_tool
+
+    @tool(_web_tool.FETCH_TOOL_NAME, _web_tool.FETCH_TOOL_DESCRIPTION, _web_tool.FETCH_PARAMETERS)
+    async def _web_fetch(args: dict) -> dict:
+        # Defence in depth: the shared memory hook also blocks this MCP tool.
+        if wissen_zustand is not None and wissen_zustand.get("erinnert"):
+            return {"content": [{"type": "text", "text": "Webabrufe sind nach einer "
+                                "Abfrage des privaten Gedaechtnisses gesperrt."}], "is_error": True}
+        result = await _web_tool.fetch(str((args or {}).get("url") or ""))
+        return {"content": [{"type": "text", "text": result.get("text") or ""}],
+                "is_error": not result.get("ok", False)}
+
     werkzeuge, namen = [], []
+    if mit_web:
+        werkzeuge.append(_web_fetch)
+        namen.append(f"mcp__pocket__{_web_tool.FETCH_TOOL_NAME}")
     if mit_bild:
         werkzeuge.append(_generate_image)
         namen.append(f"mcp__pocket__{_image_tool.TOOL_NAME}")
@@ -731,14 +747,18 @@ async def stream_reply(
         image_events: asyncio.Queue = asyncio.Queue()
         mcp_servers: dict = {}
         wissen_zustand: dict = {}
+        from pocket_claude import reddit_api
         img_server, werkzeug_namen = _build_image_mcp_server(
             user_id, image_defaults, image_attachments, image_events,
             mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
             wissen_zustand=wissen_zustand, wissen_schluessel=wissen_schluessel,
+            mit_web=bool(sk.get("web_fetch", True) and reddit_api.configured()),
         )
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server
             allowed_tools.extend(werkzeug_namen)
+            if "mcp__pocket__web_fetch" in werkzeug_namen:
+                allowed_tools.remove("WebFetch")
 
         # "Bild erstellen" aus dem Plus-Menue: der Hinweis haengt nur an diesem
         # Turn. Ohne verfuegbares Werkzeug waere er eine leere Aufforderung.

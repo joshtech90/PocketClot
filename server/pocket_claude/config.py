@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     context_warning_ratio: float = 0.85
     max_context_tokens: int = 200_000
 
+    # Read-only Reddit OAuth credentials, in a private JSON file outside Git.
+    reddit_credentials_file: str = ""
+
     # Logging
     log_level: str = "INFO"
 
