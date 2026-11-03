@@ -20,7 +20,6 @@ object ClaudeModels {
      */
     val all: List<Option> = listOf(
         Option("opus", "Opus"),
-        Option("fable", "Fable"),
         Option("sonnet", "Sonnet"),
         Option("haiku", "Haiku"),
     )
@@ -30,6 +29,7 @@ object ClaudeModels {
      * Hier stehen sie nur, damit die Titelzeile einen lesbaren Namen zeigt.
      */
     private val legacy: List<Option> = listOf(
+        Option("fable", "Fable"), // Nur Anzeige bestehender Chats, keine Auswahl.
         Option("claude-opus-5", "Opus"),  // ki-modelle: ok (alte gespeicherte IDs)
         Option("claude-fable-5", "Fable"),  // ki-modelle: ok (alte gespeicherte IDs)
         Option("claude-sonnet-5", "Sonnet"),  // ki-modelle: ok (alte gespeicherte IDs)

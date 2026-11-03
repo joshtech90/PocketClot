@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -554,6 +555,13 @@ async def stream_reply(
                     "stream": True,
                     "stream_options": {"include_usage": True},
                 }
+                if model.family == "gpt":
+                    # Gleicher Chat und alle Werkzeug-Runden bekommen denselben
+                    # Routing-Schluessel. Keine Namen/IDs an den Anbieter geben.
+                    identity = json.dumps([user_id, cid], separators=(",", ":"))
+                    payload["prompt_cache_key"] = "pocketclot-" + hashlib.sha256(
+                        identity.encode("utf-8")
+                    ).hexdigest()[:48]
                 if reasoning_effort:
                     payload["reasoning_effort"] = reasoning_effort
                 if tools:
@@ -857,8 +865,8 @@ async def stream_reply(
             except Exception as exc:  # noqa: BLE001 - Statistik darf nie den Chat kippen
                 log.warning("PC_GW: usage.record fehlgeschlagen: %s", exc)
 
-        log.info("PC_GW: stream_reply DONE cid=%s msg=%s in=%d out=%d imgs=%d",
-                 cid, msg_id, tokens_in, tokens_out, len(image_attachments))
+        log.info("PC_GW: stream_reply DONE cid=%s msg=%s in=%d out=%d cr=%d imgs=%d",
+                 cid, msg_id, tokens_in, tokens_out, tokens_cached, len(image_attachments))
         yield {
             "type": "done",
             "assistant_message_id": msg_id,

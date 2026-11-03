@@ -7,7 +7,6 @@
 // der Server loest `opus` immer auf die neueste Generation auf.
 const CLAUDE_MODELS = [
   { id: 'opus',   label: 'Opus (neueste Generation)' },
-  { id: 'fable',  label: 'Fable (neueste Generation)' },
   { id: 'sonnet', label: 'Sonnet (neueste Generation)' },
   { id: 'haiku',  label: 'Haiku (neueste Generation)' },
 ];

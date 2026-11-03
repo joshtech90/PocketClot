@@ -339,7 +339,9 @@ def _substitute_placeholders(prompt: str) -> str:
     Wenn künftig weitere Platzhalter dazukommen, hier ergänzen.
     """
     from datetime import datetime as _dt, timezone as _tz
-    now = _dt.now(_tz.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # Minutengenaue Zeit im Systemprompt entwertet den gecachten Verlauf.
+    # Das Tagesdatum reicht fuer den Wissensstand-Hinweis der Standardprompts.
+    now = _dt.now(_tz.utc).strftime("%Y-%m-%d UTC")
     return (
         prompt
         .replace("{{currentDateTime}}", now)

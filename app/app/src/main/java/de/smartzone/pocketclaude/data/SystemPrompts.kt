@@ -369,7 +369,8 @@ fun effectiveSystemPrompt(
 
 /** Ersetzt Platzhalter im fertigen Prompt-String. Aktuell nur `__CURRENT_DATETIME__`. */
 private fun substituteSystemPromptPlaceholders(prompt: String): String {
+    // Stabil innerhalb eines Tages, damit Folgefragen den Prompt-Cache nutzen.
     val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC)
-        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'"))
+        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd 'UTC'"))
     return prompt.replace("__CURRENT_DATETIME__", now)
 }

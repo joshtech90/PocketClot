@@ -15,6 +15,7 @@ def test_picker_nennt_familien_mit_aktuellem_namen():
     picker = dict(ki_modelle.picker())
     assert list(picker)[0] == "opus"
     assert picker["opus"] == daten["opus"]["name"]
+    assert "fable" not in picker
     assert all("-" not in key for key in picker)  # keine Versionsnummern als Schluessel
 
 
@@ -57,7 +58,7 @@ def test_ohne_register_laufen_bestandschats_weiter(tmp_path, monkeypatch):
         assert ki_modelle.ist_claude_modell("claude-opus-4-8")
         assert ki_modelle.ist_claude_modell("claude-opus-5[1m]")
         assert ki_modelle.fuer_cli("claude-opus-5") == "opus"
-        assert [k for k, _ in ki_modelle.picker()] == ["opus", "fable", "sonnet", "haiku"]
+        assert [k for k, _ in ki_modelle.picker()] == ["opus", "sonnet", "haiku"]
         assert not ki_modelle.ist_claude_modell("gpt-5.6-sol")
     finally:
         ki_modelle._alle.cache_clear()

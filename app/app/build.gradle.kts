@@ -35,8 +35,8 @@ android {
     if (project.hasProperty("legacyAppId")) applicationId = "de.smartzone.pocketclaude"
         minSdk = 31
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.6.6"
+        versionCode = 18
+        versionName = "0.6.7"
 
         vectorDrawables { useSupportLibrary = true }
     }

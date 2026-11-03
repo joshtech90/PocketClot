@@ -32,9 +32,8 @@ _RUECKFALL = {
     "haiku": {"anbieter": "claude", "name": "Haiku", "cli_alias": "haiku"},
 }
 
-# Reihenfolge im Picker: Opus ist das Alltagsmodell, Fable das staerkere fuer
-# die schwersten Aufgaben, Sonnet das schnellere, Haiku das kleinste.
-PICKER_REIHENFOLGE = ("opus", "fable", "sonnet", "haiku")
+# Fable bleibt nur fuer gespeicherte Chats lesbar, wird aber nicht angeboten.
+PICKER_REIHENFOLGE = ("opus", "sonnet", "haiku")
 
 
 @lru_cache(maxsize=1)
