@@ -271,7 +271,7 @@ async def _build_messages(
     # Gateway in einen Kontext-Fehler laufen zu lassen.
     drop_images_before = -1
     if sys_tokens + sum(est[first:]) > budget:
-        drop_images_before = len(rows) - 1
+        drop_images_before = len(rows) - 2  # die aktuelle Nachricht bleibt ganz
         log.info("PC_GW: Budget zu eng, Bilder aelterer Nachrichten werden weggelassen")
 
     history: list[dict] = []

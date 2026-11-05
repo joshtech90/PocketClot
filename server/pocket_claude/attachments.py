@@ -237,7 +237,7 @@ async def pdf_zeichen(att: dict) -> int:
             seiten = await _pdf_seiten(att)
             if len(_pdf_laengen) >= _PDF_LAENGEN_MAX:
                 _pdf_laengen.clear()
-            _pdf_laengen[key] = sum(len(s) for s in seiten)
+            _pdf_laengen[key] = pdf_text.textlaenge(seiten)
         return _pdf_laengen[key]
     except (OSError, pdf_text.PdfFehler):
         return 0

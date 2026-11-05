@@ -116,6 +116,15 @@ def hat_text(pages: list[str]) -> bool:
     return any(pages)
 
 
+def _block(number: int, body: str) -> str:
+    return f"[Seite {number}]\n{body}" if body else f"[Seite {number}: kein Text, vielleicht ein Bild]"
+
+
+def textlaenge(pages: list[str]) -> int:
+    """So lang wird der Text samt Seitenmarken. Dafuer zaehlt das Kontextbudget."""
+    return sum(len(_block(number, body)) + 2 for number, body in enumerate(pages, 1))
+
+
 def seitenangabe(spec: object) -> tuple[int, int | None] | None:
     """Liest "12" oder "12-30". Nichts angegeben heisst `None`, also von vorn."""
     if spec is None or str(spec).strip() == "":
@@ -148,8 +157,7 @@ def ausschnitt(pages: list[str], bereich: tuple[int, int | None] | None,
     used = 0
     last = start
     for number in range(start, end + 1):
-        body = pages[number - 1] or "(kein Text auf dieser Seite, vielleicht ein Bild)"
-        block = f"[Seite {number}]\n{body}"
+        block = _block(number, pages[number - 1])
         if blocks and used + len(block) > max_chars:
             break
         if len(block) > max_chars:

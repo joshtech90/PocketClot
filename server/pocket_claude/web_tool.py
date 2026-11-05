@@ -407,6 +407,8 @@ async def _body_chunks(r: httpx.Response):
             out = entpacker.decompress(data, 65536)
             if out:
                 yield out
+            if entpacker.eof:
+                return  # Danach folgendes wie httpx ignorieren, sonst drehte die Schleife leer
             data = entpacker.unconsumed_tail
             if not data and len(out) < 65536:
                 break

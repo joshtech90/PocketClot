@@ -150,6 +150,12 @@ def test_packbombe_belegt_keinen_speicher(netz, monkeypatch, ctype, url):
     assert "A" * 100 not in result["text"] or "gekuerzt" in result["text"]
 
 
+def test_mehrteilige_gzip_antwort_haengt_nicht(netz):
+    netz(gzip.compress(b"<html>Erster Teil " + b"A" * 70_000 + b"</html>") + gzip.compress(b"zweiter"),
+         ctype="text/html", encoding="gzip")
+    assert "Erster Teil" in asyncio.run(web_tool.fetch("https://example.org/"))["text"]
+
+
 def test_mehrfach_gepackte_antwort_wird_nicht_gelesen(netz):
     netz(gzip.compress(gzip.compress(b"%PDF-1.4\n" + b"A" * 1000)), encoding="gzip, gzip")
     result = asyncio.run(web_tool.fetch(URL))
@@ -209,8 +215,8 @@ def test_eingebauter_abruf_gibt_pdf_links_weiter(url, gesperrt):
 def _anhang(tmp_path, body: bytes, name: str = "befund.pdf") -> dict:
     pfad = tmp_path / name
     pfad.write_bytes(body)
-    return {"filename": name, "mime_type": "application/pdf", "path": str(pfad),
-            "size_bytes": len(body)}
+    return {"id": name.removesuffix(".pdf"), "filename": name, "mime_type": "application/pdf",
+            "path": str(pfad), "size_bytes": len(body)}
 
 
 def _inhalt(att: dict) -> str:
@@ -277,6 +283,39 @@ def test_kompakte_pdfs_im_verlauf_halten_das_kontextbudget_ein(tmp_path, monkeyp
     assert gesamt // 4 <= budget + 600  # die neueste Nachricht bleibt immer ganz
     assert "Frage 11" in out[-1]["content"] and "Seite 39" in out[-1]["content"]
     assert "Seite 39" not in out[0]["content"] or len(out) == 1
+
+
+def _verlauf(monkeypatch, atts: dict, rows: list[dict], kontext: int) -> list[dict]:
+    async def nachrichten(_cid):
+        return rows
+
+    async def anhaenge(ids):
+        return [atts[a] for a in ids]
+
+    monkeypatch.setattr(openai_engine.db, "list_messages", nachrichten)
+    monkeypatch.setattr(openai_engine.db, "get_attachments", anhaenge)
+    modell = SimpleNamespace(context_length=kontext, supports_vision=False)
+    return asyncio.run(openai_engine._build_messages("c", rows[-1]["id"], "", modell, None))
+
+
+def test_bei_engem_budget_bleibt_das_aktuelle_pdf_und_aeltere_fallen_weg(tmp_path, monkeypatch):
+    pdf_text._cache.clear()
+    alt = _anhang(tmp_path, pdf_bytes(*["Alter Inhalt im Dokument"] * 40), "alt.pdf")
+    neu = _anhang(tmp_path, pdf_bytes(*["Neuer Inhalt im Dokument"] * 40), "neu.pdf")
+    rows = [{"id": 1, "role": "user", "content": "Frage alt", "attachment_ids": ["alt"]},
+            {"id": 2, "role": "user", "content": "Frage neu", "attachment_ids": ["neu"]}]
+    out = _verlauf(monkeypatch, {"alt": alt, "neu": neu}, rows, kontext=500)
+    assert "Neuer Inhalt" in out[-1]["content"]
+    assert "Alter Inhalt" not in out[0]["content"] and "Platzgruenden" in out[0]["content"]
+
+
+def test_pdf_aus_vielen_leeren_seiten_zaehlt_im_budget(tmp_path):
+    """Seitenmarken landen auch im Prompt, ein Deckblatt mit 3000 Leerseiten kostet Platz."""
+    pdf_text._cache.clear()
+    att = _anhang(tmp_path, pdf_bytes("Deckblatt", *[""] * 3000))
+    zeichen = asyncio.run(attachments.pdf_zeichen(att))
+    block = asyncio.run(attachments.pdf_block(att))
+    assert zeichen >= len(block) - 200 and zeichen > 50_000
 
 
 def test_budget_ohne_bekannte_laenge_zaehlt_die_obergrenze_ohne_die_platte_zu_lesen():
