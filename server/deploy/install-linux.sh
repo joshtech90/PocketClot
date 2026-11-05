@@ -86,7 +86,7 @@ if $is_debian; then
     apt-get update -qq
     apt-get install -y --no-install-recommends \
         python3 python3-venv python3-pip \
-        curl ca-certificates git
+        curl ca-certificates git poppler-utils
     if ! $claude_already_present; then
         # nodejs/npm separately: if a version is already installed (e.g. via
         # NodeSource), don't overwrite — the NodeSource packages already bundle
@@ -99,7 +99,7 @@ if $is_debian; then
     fi
 elif $is_redhat; then
     dnf install -y python3 python3-pip python3-virtualenv \
-        curl ca-certificates git
+        curl ca-certificates git poppler-utils
     if ! $claude_already_present; then
         if ! command -v node >/dev/null 2>&1; then
             dnf install -y nodejs npm

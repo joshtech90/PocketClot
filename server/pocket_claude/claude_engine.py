@@ -24,6 +24,7 @@ import logging
 import shutil
 from typing import AsyncIterator
 
+import httpx
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
@@ -547,6 +548,31 @@ def _nach_erinnern_sperren(zustand: dict) -> dict:
                                        hooks=[pruefen])]}
 
 
+def _pdf_url(url: str) -> bool:
+    try:
+        return httpx.URL(url).path.lower().endswith(".pdf")
+    except (httpx.InvalidURL, TypeError):
+        return False
+
+
+def _pdf_nativ_sperren() -> dict:
+    """PDFs gehen an unseren Leser: WebFetch legt sie nur als Datei ab.
+
+    Oeffnen koennte Claude sie dann nur mit Read, und das bleibt ausserhalb von
+    Anhaengen bewusst aus: Es koennte jede Datei des Servers lesen.
+    """
+    from claude_agent_sdk import HookMatcher
+
+    async def pruefen(eingabe, tool_use_id, kontext):  # noqa: ARG001
+        if _pdf_url(str((eingabe.get("tool_input") or {}).get("url") or "")):
+            return {"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": "PDFs liest dieses Werkzeug nicht. "
+                                            "Verwende mcp__pocket__web_fetch fuer diese Adresse."}}
+        return {}
+    return {"PreToolUse": [HookMatcher(matcher="^WebFetch$", hooks=[pruefen])]}
+
+
 def _reddit_nativ_sperren() -> dict:
     """Keep Claude's general fetch, but route Reddit through our OAuth reader."""
     from claude_agent_sdk import HookMatcher
@@ -609,24 +635,31 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
         result = await _wissen_tool.run(user_id, args or {}, wissen_schluessel)
         return {"content": [{"type": "text", "text": result.get("text") or ""}]}
 
+    from pocket_claude import reddit_api as _reddit_api
     from pocket_claude import web_tool as _web_tool
 
-    @tool(_web_tool.FETCH_TOOL_NAME,
-          "Liest Reddit ueber die Reddit-API. Fuer ALLE Reddit-Adressen dieses Werkzeug "
-          "verwenden, fuer andere Seiten WebFetch. Suche: https://www.reddit.com/search?q=BEGRIFF "
-          "oder https://www.reddit.com/r/SUBREDDIT/search?q=BEGRIFF.",
-          _web_tool.FETCH_PARAMETERS)
+    beschreibung = (
+        "Liest PDF-Dokumente aus dem Netz als Text. Fuer jede Adresse, hinter der ein PDF "
+        "liegt, dieses Werkzeug verwenden, auch wenn WebFetch nur meldet, es habe eine "
+        "Binaerdatei oder ein PDF gespeichert. Lange PDFs kommen seitenweise: das Ergebnis "
+        "nennt die Seitenzahl, weitere Seiten holst Du mit pages. Fuer normale Seiten WebFetch."
+    )
+    if _reddit_api.configured():
+        beschreibung += (
+            " Liest ausserdem Reddit ueber die Reddit-API: Fuer ALLE Reddit-Adressen dieses "
+            "Werkzeug verwenden. Suche: https://www.reddit.com/search?q=BEGRIFF "
+            "oder https://www.reddit.com/r/SUBREDDIT/search?q=BEGRIFF."
+        )
+
+    @tool(_web_tool.FETCH_TOOL_NAME, beschreibung, _web_tool.FETCH_PARAMETERS)
     async def _web_fetch(args: dict) -> dict:
         # Defence in depth: the shared memory hook also blocks this MCP tool.
         if wissen_zustand is not None and wissen_zustand.get("erinnert"):
             return {"content": [{"type": "text", "text": "Webabrufe sind nach einer "
                                 "Abfrage des privaten Gedaechtnisses gesperrt."}], "is_error": True}
-        from pocket_claude import reddit_api
-        url = str((args or {}).get("url") or "")
-        if not reddit_api.is_reddit_url(url):
-            return {"content": [{"type": "text", "text": "Dieses Werkzeug liest nur Reddit. "
-                                "Fuer andere Seiten WebFetch verwenden."}], "is_error": True}
-        result = await _web_tool.fetch(url)
+        args = args or {}
+        result = await _web_tool.fetch(str(args.get("url") or ""), pages=args.get("pages"),
+                                       nur_pdf=True)
         return {"content": [{"type": "text", "text": result.get("text") or ""}],
                 "is_error": not result.get("ok", False)}
 
@@ -777,7 +810,7 @@ async def stream_reply(
             user_id, image_defaults, image_attachments, image_events,
             mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
             wissen_zustand=wissen_zustand, wissen_schluessel=wissen_schluessel,
-            mit_web=bool(sk.get("web_fetch", True) and reddit_api.configured()),
+            mit_web=bool(sk.get("web_fetch", True)),
         )
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server
@@ -895,7 +928,9 @@ async def stream_reply(
             options_kwargs["mcp_servers"] = mcp_servers
         hooks = _nach_erinnern_sperren(wissen_zustand) if mit_wissen else {}
         if "mcp__pocket__web_fetch" in werkzeug_namen:
-            hooks.setdefault("PreToolUse", []).extend(_reddit_nativ_sperren()["PreToolUse"])
+            hooks.setdefault("PreToolUse", []).extend(_pdf_nativ_sperren()["PreToolUse"])
+            if reddit_api.configured():
+                hooks["PreToolUse"].extend(_reddit_nativ_sperren()["PreToolUse"])
         if hooks:
             options_kwargs["hooks"] = hooks
         if mit_wissen:

@@ -16,6 +16,8 @@ import base64
 import logging
 from pathlib import Path
 
+from pocket_claude import pdf_text
+
 log = logging.getLogger(__name__)
 
 
@@ -198,6 +200,39 @@ def looks_like_text(filename: str, mime: str) -> bool:
     if base in _TEXT_FILENAMES:
         return True
     return False
+
+
+def is_pdf(filename: str, mime: str) -> bool:
+    return "pdf" in (mime or "").lower() or (filename or "").lower().endswith(".pdf")
+
+
+async def pdf_block(att: dict) -> str:
+    """PDF-Anhang als Text fuer Modelle ohne eigenes Lesewerkzeug.
+
+    Der Verlauf wird bei diesen Modellen in jedem Turn neu gebaut, deshalb steht
+    das Ergebnis im Cache. Wirft nie: Ein kaputter Anhang darf den Turn nicht kippen.
+    """
+    filename = att.get("filename") or "Datei"
+    path = Path(att.get("path") or "")
+    try:
+        stat = path.stat()
+        key = f"anhang:{path}:{stat.st_mtime_ns}:{stat.st_size}"
+        seiten = pdf_text.aus_cache(key)
+        if seiten is None:
+            seiten = await pdf_text.seiten(str(path))
+            pdf_text.merken(key, seiten)
+    except OSError:
+        return f"[PDF '{filename}' ist auf dem Server nicht mehr vorhanden.]"
+    except pdf_text.PdfFehler as exc:
+        return f"[PDF '{filename}': {exc}]"
+    if not pdf_text.hat_text(seiten):
+        return (f"[PDF '{filename}' hat keinen lesbaren Text, es ist vermutlich ein Scan. "
+                f"Dieses Modell kann es nicht lesen, Claude kann es als Bild ansehen.]")
+    text, _, last = pdf_text.ausschnitt(seiten, None, MAX_TEXT_ATTACHMENT_BYTES)
+    rest = (f"\n[... gekuerzt, Seite {last + 1} bis {len(seiten)} fehlen ...]"
+            if last < len(seiten) else "")
+    return (f"--- Anhang: **{filename}** (PDF, {len(seiten)} Seiten, als Text) ---\n"
+            f"{text}{rest}\n--- Ende Anhang ---")
 
 
 def _bildformat(head: bytes) -> str | None:

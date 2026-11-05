@@ -25,11 +25,12 @@ import ipaddress
 import logging
 import re
 import socket
+import tempfile
 from typing import Any
 
 import httpx
 
-from pocket_claude import gateways, reddit_api
+from pocket_claude import gateways, pdf_text, reddit_api
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +51,14 @@ FETCH_TOTAL_SECONDS = 45.0
 FETCH_MAX_CHARS = 12_000
 FETCH_MAX_BYTES = 3_000_000
 MAX_REDIRECTS = 4
+
+# PDFs duerfen groesser sein als Seiten: Abgeschnitten waeren sie unlesbar. Zum
+# Kontextfenster kommt immer nur ein Ausschnitt, der Rest ist per `pages` abrufbar.
+PDF_MAX_BYTES = 50_000_000
+PDF_MAX_CHARS = 40_000
+# Manche Server kennzeichnen PDFs nur als allgemeine Binaerdatei.
+_UNSPECIFIC_TYPES = {"", "application/octet-stream", "binary/octet-stream",
+                     "application/download", "application/force-download"}
 
 SEARCH_TOOL_DESCRIPTION = (
     "Sucht im Internet und liefert eine zusammengefasste Antwort mit Quellen. "
@@ -75,7 +84,9 @@ SEARCH_PARAMETERS: dict[str, Any] = {
 FETCH_TOOL_DESCRIPTION = (
     "Ruft eine konkrete Webseite ab und liefert ihren Text zurueck. Nutze das "
     "Werkzeug, wenn eine bestimmte Adresse gelesen werden soll, etwa eine "
-    "Quelle aus einer vorherigen Suche. Reddit-Adressen werden ueber die "
+    "Quelle aus einer vorherigen Suche. PDF-Dokumente werden als Text gelesen, "
+    "lange PDFs seitenweise: das Ergebnis nennt die Seitenzahl, weitere Seiten "
+    "holst Du mit `pages`. Reddit-Adressen werden ueber die "
     "Reddit-API gelesen, inklusive Beitraegen und Kommentaren. Fuer Reddit-Suchen "
     "nutze https://www.reddit.com/search?q=SUCHBEGRIFF oder "
     "https://www.reddit.com/r/SUBREDDIT/search?q=SUCHBEGRIFF&restrict_sr=on."
@@ -87,6 +98,10 @@ FETCH_PARAMETERS: dict[str, Any] = {
         "url": {
             "type": "string",
             "description": "Die vollstaendige Adresse, beginnend mit http:// oder https://.",
+        },
+        "pages": {
+            "type": "string",
+            "description": "Nur bei PDFs: gewuenschte Seiten, zum Beispiel 12 oder 12-30.",
         },
     },
     "required": ["url"],
@@ -317,20 +332,27 @@ def _html_to_text(html: str) -> str:
     return _NL_RE.sub("\n\n", text).strip()
 
 
-async def fetch(url: str) -> dict:
-    """Ruft eine Seite ab und gibt ihren Text zurueck.
+async def fetch(url: str, pages: object = None, nur_pdf: bool = False) -> dict:
+    """Ruft eine Seite oder ein PDF ab und gibt den Text zurueck.
+
+    `pages` waehlt bei PDFs die Seiten. `nur_pdf` lehnt normale Seiten ab, das
+    braucht der Claude-Pfad: Dort bleiben sie beim eingebauten WebFetch.
 
     Rueckgabe wie `search()`, und wie dort wird NIE geworfen: ein Werkzeug, das
     eine Ausnahme durchreicht, wuerde den ganzen Chat-Turn abbrechen statt nur
     eine Meldung zu erzeugen, die das Modell dem Nutzer erklaeren kann.
     """
     try:
-        return await asyncio.wait_for(_fetch_inner(url), timeout=FETCH_TOTAL_SECONDS)
+        return await asyncio.wait_for(_fetch_inner(url, pages, nur_pdf),
+                                      timeout=FETCH_TOTAL_SECONDS)
     except asyncio.TimeoutError:
         return {"ok": False, "sources": [],
                 "text": "Die Seite hat zu lange gebraucht und wurde abgebrochen."}
     except _BlockedUrl as exc:
         log.info("PC_WEB: Abruf abgelehnt fuer %r: %s", url[:120], exc)
+        return {"ok": False, "sources": [], "text": str(exc)}
+    except pdf_text.PdfFehler as exc:
+        log.info("PC_PDF: %r nicht gelesen: %s", url[:120], exc)
         return {"ok": False, "sources": [], "text": str(exc)}
     except Exception as exc:  # noqa: BLE001 - siehe Docstring
         log.warning("PC_WEB: Abruf %r fehlgeschlagen: %s: %s",
@@ -339,15 +361,77 @@ async def fetch(url: str) -> dict:
                 "text": "Die Seite konnte nicht geladen werden."}
 
 
-async def _fetch_inner(url: str) -> dict:
+def _pdf_ergebnis(current: str, seiten: list[str], pages: object) -> dict:
+    """Formuliert das Werkzeug-Ergebnis fuer ein gelesenes PDF."""
+    if not pdf_text.hat_text(seiten):
+        return {"ok": False, "sources": [], "text": (
+            f"Dieses PDF hat {len(seiten)} Seiten, aber keinen lesbaren Text, es ist "
+            f"vermutlich ein Scan. Sag das dem Nutzer: Als Anhang im Chat kann Claude "
+            f"es als Bild lesen."
+        )}
+    text, first, last = pdf_text.ausschnitt(
+        seiten, pdf_text.seitenangabe(pages), PDF_MAX_CHARS)
+    total = len(seiten)
+    weiter = ""
+    if last < total:
+        weiter = (f"\n\n[Das PDF geht weiter. Naechste Seiten mit "
+                  f"pages=\"{last + 1}-{min(last + 20, total)}\" abrufen.]")
+    log.info("PC_PDF: %r -> Seite %d-%d von %d", current[:120], first, last, total)
+    return {
+        "ok": True,
+        "text": f"PDF von {current}, {total} Seiten, hier Seite {first} bis {last}:"
+                f"\n\n{text}{weiter}",
+        "sources": [{"title": str(httpx.URL(current).host or current), "url": current}],
+    }
+
+
+async def _read_pdf(r: httpx.Response, pruefen: bool) -> bytes | None:
+    """Laedt ein PDF. Mit `pruefen` wird abgebrochen, wenn es am Anfang keins ist."""
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in r.aiter_bytes():
+        total += len(chunk)
+        if total > PDF_MAX_BYTES:
+            raise pdf_text.PdfFehler("Dieses PDF ist zu gross, um es hier zu lesen.")
+        chunks.append(chunk)
+        if pruefen and total >= 1024:
+            if b"%PDF-" not in b"".join(chunks)[:1024]:
+                return None
+            pruefen = False
+    raw = b"".join(chunks)
+    if pruefen and b"%PDF-" not in raw[:1024]:
+        return None
+    return raw
+
+
+async def _pdf_lesen(raw: bytes) -> list[str]:
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as datei:
+        def schreiben() -> None:
+            datei.write(raw)
+            datei.flush()
+        await asyncio.to_thread(schreiben)
+        return await pdf_text.seiten(datei.name)
+
+
+async def _fetch_inner(url: str, pages: object = None, nur_pdf: bool = False) -> dict:
     """Der eigentliche Abruf. Redirects werden von Hand verfolgt, damit jede
     Zwischenstation dieselbe Pruefung durchlaeuft: sonst genuegte ein
     oeffentlicher Kurzlink, der auf eine interne Adresse zeigt."""
     url = (url or "").strip()
     if not url:
         return {"ok": False, "text": "Es wurde keine Adresse angegeben.", "sources": []}
+    pdf_text.seitenangabe(pages)  # Falsche Angabe: melden, bevor geladen wird
+
+    # Beim Blaettern nicht jedes Mal neu laden. Hierhin kommt nur, was schon
+    # die Sperren fuer interne Adressen passiert hat.
+    gelesen = pdf_text.aus_cache(url)
+    if gelesen is not None:
+        return _pdf_ergebnis(gelesen[0], gelesen[1], pages)
 
     current = url
+    pdf_raw: bytes | None = None
+    kein_pdf = ("Unter dieser Adresse liegt kein PDF. "
+                "Fuer normale Seiten WebFetch verwenden.")
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(FETCH_TIMEOUT, connect=8.0),
         follow_redirects=False,
@@ -380,6 +464,14 @@ async def _fetch_inner(url: str) -> dict:
                             "text": f"Die Seite hat mit HTTP {r.status_code} geantwortet."}
 
                 ctype = (r.headers.get("content-type") or "").lower()
+                mime = ctype.split(";")[0].strip()
+                unspezifisch = mime in _UNSPECIFIC_TYPES
+                if "pdf" in mime or unspezifisch:
+                    pdf_raw = await _read_pdf(r, pruefen=unspezifisch)
+                    if pdf_raw is not None:
+                        break
+                if nur_pdf:
+                    return {"ok": False, "sources": [], "text": kein_pdf}
                 if not (ctype.startswith("text/") or "json" in ctype or "xml" in ctype):
                     return {"ok": False, "sources": [], "text": (
                         f"Unter dieser Adresse liegt kein Text, sondern "
@@ -406,6 +498,11 @@ async def _fetch_inner(url: str) -> dict:
         else:
             return {"ok": False, "sources": [],
                     "text": "Die Adresse leitet zu oft weiter."}
+
+    if pdf_raw is not None:
+        seiten = await _pdf_lesen(pdf_raw)
+        pdf_text.merken(url, (current, seiten))
+        return _pdf_ergebnis(current, seiten, pages)
 
     body = raw.decode(encoding, errors="replace")
     text = _html_to_text(body) if "html" in ctype else body.strip()

@@ -124,6 +124,8 @@ async def _message_content(
             text_ids.append(aid)
         elif mime.startswith("image/"):
             image_atts.append(att)
+        elif att_mod.is_pdf(filename, mime):
+            notes.append(await att_mod.pdf_block(att))
         else:
             notes.append(
                 f"[Datei '{filename}' kann dieses Modell nicht oeffnen. "
@@ -183,6 +185,9 @@ def _rough_text_tokens(row: dict, attachments_by_id: dict[str, dict],
         if att_mod.is_audio(att.get("filename") or "", mime):
             total += len(att_mod.transcript_for_prompt(att)) // 4 + 20
         elif att_mod.looks_like_text(att.get("filename") or "", mime):
+            total += min(att.get("size_bytes") or 0, att_mod.MAX_TEXT_ATTACHMENT_BYTES) // 4
+        elif att_mod.is_pdf(att.get("filename") or "", mime):
+            # Obergrenze: Wieviel Text im PDF steckt, zeigt erst das Auslesen.
             total += min(att.get("size_bytes") or 0, att_mod.MAX_TEXT_ATTACHMENT_BYTES) // 4
         elif mime.startswith("image/"):
             total += IMAGE_TOKEN_ESTIMATE
@@ -789,7 +794,8 @@ async def stream_reply(
                             tool_text = res["text"]
                             _collect_sources(res, web_sources)
                         elif want_fetch and name == web_tool.FETCH_TOOL_NAME:
-                            res = await web_tool.fetch(str(args.get("url") or ""))
+                            res = await web_tool.fetch(str(args.get("url") or ""),
+                                                       pages=args.get("pages"))
                             tool_text = res["text"]
                             _collect_sources(res, web_sources)
                         else:
