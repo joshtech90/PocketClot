@@ -26,6 +26,7 @@ import logging
 import re
 import socket
 import tempfile
+import zlib
 from typing import Any
 
 import httpx
@@ -385,11 +386,37 @@ def _pdf_ergebnis(current: str, seiten: list[str], pages: object) -> dict:
     }
 
 
+async def _body_chunks(r: httpx.Response):
+    """Liefert den Inhalt stueckweise und packt je Schritt hoechstens 64 KB aus.
+
+    `r.aiter_bytes()` entpackt erst alles, was gerade angekommen ist. Wenige Bytes
+    koennen so zu Gigabytes werden, bevor eine Groessenpruefung drankommt, und zwar
+    im Serverprozess. Mehrfach gepackte Antworten werden gar nicht erst gelesen.
+    """
+    encoding = (r.headers.get("content-encoding") or "").strip().lower()
+    if encoding in ("", "identity"):
+        async for chunk in r.aiter_raw():
+            yield chunk
+        return
+    if encoding not in ("gzip", "x-gzip"):
+        raise ValueError(f"Nicht unterstuetzte Kompression: {encoding[:40]}")
+    entpacker = zlib.decompressobj(wbits=31)
+    async for chunk in r.aiter_raw():
+        data = chunk
+        while True:
+            out = entpacker.decompress(data, 65536)
+            if out:
+                yield out
+            data = entpacker.unconsumed_tail
+            if not data and len(out) < 65536:
+                break
+
+
 async def _read_pdf(r: httpx.Response, pruefen: bool) -> bytes | None:
     """Laedt ein PDF. Mit `pruefen` wird abgebrochen, wenn es am Anfang keins ist."""
     chunks: list[bytes] = []
     total = 0
-    async for chunk in r.aiter_bytes():
+    async for chunk in _body_chunks(r):
         total += len(chunk)
         if total > PDF_MAX_BYTES:
             raise pdf_text.PdfFehler("Dieses PDF ist zu gross, um es hier zu lesen.")
@@ -435,7 +462,8 @@ async def _fetch_inner(url: str, pages: object = None, nur_pdf: bool = False) ->
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(FETCH_TIMEOUT, connect=8.0),
         follow_redirects=False,
-        headers={"User-Agent": "PocketClot/1.0 (+Chat-Assistent)"},
+        headers={"User-Agent": "PocketClot/1.0 (+Chat-Assistent)",
+                 "Accept-Encoding": "gzip"},
     ) as cli:
         for _ in range(MAX_REDIRECTS + 1):
             parsed = httpx.URL(current)
@@ -481,11 +509,11 @@ async def _fetch_inner(url: str, pages: object = None, nur_pdf: bool = False) ->
                 # Stueckweise lesen und hart abschneiden. `r.content` wuerde die
                 # ganze Antwort erst in den Speicher holen und AUSPACKEN; eine
                 # als gzip getarnte Bombe koennte damit den Server umwerfen,
-                # bevor die Groessenpruefung ueberhaupt drankommt.
+                # bevor die Groessenpruefung ueberhaupt drankommt. Siehe `_body_chunks`.
                 chunks: list[bytes] = []
                 total = 0
                 truncated = False
-                async for chunk in r.aiter_bytes():
+                async for chunk in _body_chunks(r):
                     total += len(chunk)
                     if total > FETCH_MAX_BYTES:
                         chunks.append(chunk[: max(0, FETCH_MAX_BYTES - (total - len(chunk)))])

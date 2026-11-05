@@ -206,21 +206,51 @@ def is_pdf(filename: str, mime: str) -> bool:
     return "pdf" in (mime or "").lower() or (filename or "").lower().endswith(".pdf")
 
 
-async def pdf_block(att: dict) -> str:
+def _pdf_key(att: dict) -> str:
+    path = Path(att.get("path") or "")
+    stat = path.stat()
+    return f"anhang:{path}:{stat.st_mtime_ns}:{stat.st_size}"
+
+
+async def _pdf_seiten(att: dict) -> list[str]:
+    """Der Verlauf wird bei den Gateways in jedem Turn neu gebaut: daher der Cache."""
+    key = _pdf_key(att)
+    seiten = pdf_text.aus_cache(key)
+    if seiten is None:
+        seiten = await pdf_text.seiten(str(att.get("path") or ""))
+        pdf_text.merken(key, seiten)
+    return seiten
+
+
+# Textlaenge je PDF-Anhang. Die Dateigroesse taugt nicht fuer das Kontextbudget:
+# Stark komprimierte 50 KB koennen 250.000 Zeichen Text enthalten. Nur Zahlen, das
+# bleibt auch bei vielen Anhaengen klein.
+_pdf_laengen: dict[str, int] = {}
+_PDF_LAENGEN_MAX = 1000
+
+
+async def pdf_zeichen(att: dict) -> int:
+    """Wieviele Zeichen Text ein PDF-Anhang hat, 0 wenn er nicht lesbar ist."""
+    try:
+        key = _pdf_key(att)
+        if key not in _pdf_laengen:
+            seiten = await _pdf_seiten(att)
+            if len(_pdf_laengen) >= _PDF_LAENGEN_MAX:
+                _pdf_laengen.clear()
+            _pdf_laengen[key] = sum(len(s) for s in seiten)
+        return _pdf_laengen[key]
+    except (OSError, pdf_text.PdfFehler):
+        return 0
+
+
+async def pdf_block(att: dict, max_chars: int = MAX_TEXT_ATTACHMENT_BYTES) -> str:
     """PDF-Anhang als Text fuer Modelle ohne eigenes Lesewerkzeug.
 
-    Der Verlauf wird bei diesen Modellen in jedem Turn neu gebaut, deshalb steht
-    das Ergebnis im Cache. Wirft nie: Ein kaputter Anhang darf den Turn nicht kippen.
+    Wirft nie: Ein kaputter Anhang darf den Turn nicht kippen.
     """
     filename = att.get("filename") or "Datei"
-    path = Path(att.get("path") or "")
     try:
-        stat = path.stat()
-        key = f"anhang:{path}:{stat.st_mtime_ns}:{stat.st_size}"
-        seiten = pdf_text.aus_cache(key)
-        if seiten is None:
-            seiten = await pdf_text.seiten(str(path))
-            pdf_text.merken(key, seiten)
+        seiten = await _pdf_seiten(att)
     except OSError:
         return f"[PDF '{filename}' ist auf dem Server nicht mehr vorhanden.]"
     except pdf_text.PdfFehler as exc:
@@ -228,7 +258,7 @@ async def pdf_block(att: dict) -> str:
     if not pdf_text.hat_text(seiten):
         return (f"[PDF '{filename}' hat keinen lesbaren Text, es ist vermutlich ein Scan. "
                 f"Dieses Modell kann es nicht lesen, Claude kann es als Bild ansehen.]")
-    text, _, last = pdf_text.ausschnitt(seiten, None, MAX_TEXT_ATTACHMENT_BYTES)
+    text, _, last = pdf_text.ausschnitt(seiten, None, max_chars)
     rest = (f"\n[... gekuerzt, Seite {last + 1} bis {len(seiten)} fehlen ...]"
             if last < len(seiten) else "")
     return (f"--- Anhang: **{filename}** (PDF, {len(seiten)} Seiten, als Text) ---\n"

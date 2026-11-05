@@ -1,8 +1,11 @@
 """PDFs lesen: per Link fuer alle Modelle und als Anhang fuer Gemini und GPT."""
 import asyncio
+import gzip
 import os
 import shutil
 import tempfile
+import tracemalloc
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -51,10 +54,15 @@ def netz(monkeypatch):
     real_client = httpx.AsyncClient
     abrufe = []
 
-    def install(body: bytes, ctype: str = "application/pdf;charset=ISO-8859-1"):
+    def install(body: bytes, ctype: str = "application/pdf;charset=ISO-8859-1",
+                encoding: str | None = None):
+        kopf = {"content-type": ctype}
+        if encoding:
+            kopf["content-encoding"] = encoding
+
         def handler(req):
             abrufe.append(str(req.url))
-            return httpx.Response(200, content=body, headers={"content-type": ctype})
+            return httpx.Response(200, stream=httpx.ByteStream(body), headers=kopf)
         monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real_client(
             **kw, transport=httpx.MockTransport(handler)))
         return abrufe
@@ -118,6 +126,34 @@ def test_zu_grosses_pdf_wird_abgebrochen(netz, monkeypatch):
     netz(pdf_bytes("Text"))
     result = asyncio.run(web_tool.fetch(URL))
     assert not result["ok"] and "zu gross" in result["text"]
+
+
+def test_gepackte_antworten_werden_gelesen(netz):
+    netz(gzip.compress(pdf_bytes("Gepackter Volltext")), encoding="gzip")
+    assert "Gepackter Volltext" in asyncio.run(web_tool.fetch(URL))["text"]
+    netz(gzip.compress(b"<html>Normale Seite</html>"), ctype="text/html", encoding="gzip")
+    assert "Normale Seite" in asyncio.run(web_tool.fetch("https://example.org/"))["text"]
+
+
+@pytest.mark.parametrize("ctype,url", [
+    ("application/pdf", URL),
+    ("text/html", "https://example.org/"),
+])
+def test_packbombe_belegt_keinen_speicher(netz, monkeypatch, ctype, url):
+    monkeypatch.setattr(web_tool, "PDF_MAX_BYTES", 1_000_000)
+    netz(gzip.compress(b"%PDF-1.4\n" + b"A" * 80_000_000), ctype=ctype, encoding="gzip")
+    tracemalloc.start()
+    result = asyncio.run(web_tool.fetch(url))
+    _, spitze = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert spitze < 20_000_000
+    assert "A" * 100 not in result["text"] or "gekuerzt" in result["text"]
+
+
+def test_mehrfach_gepackte_antwort_wird_nicht_gelesen(netz):
+    netz(gzip.compress(gzip.compress(b"%PDF-1.4\n" + b"A" * 1000)), encoding="gzip, gzip")
+    result = asyncio.run(web_tool.fetch(URL))
+    assert not result["ok"] and "nicht geladen" in result["text"]
 
 
 def test_fehlendes_programm_bricht_nicht_den_turn(netz, monkeypatch):
@@ -204,8 +240,47 @@ def test_geloeschter_pdf_anhang_wird_gemeldet(tmp_path):
     assert "nicht mehr vorhanden" in _inhalt(att)
 
 
-def test_budget_rechnet_pdf_ein_ohne_die_platte_zu_lesen():
+def test_mehrere_pdfs_einer_nachricht_teilen_sich_die_obergrenze(tmp_path, monkeypatch):
+    pdf_text._cache.clear()
+    monkeypatch.setattr(attachments, "MAX_TEXT_ATTACHMENT_BYTES", 300)
+    atts = {f"a{i}": _anhang(tmp_path, pdf_bytes(f"Inhalt von Dokument {i} " * 3), f"d{i}.pdf")
+            for i in range(6)}
+    inhalt = asyncio.run(openai_engine._message_content(
+        {"content": "Frage"}, list(atts), atts, supports_vision=True))
+    assert "Dokument 0" in inhalt and "Platzgruenden" in inhalt and len(inhalt) < 1500
+
+
+def test_kompakte_pdfs_im_verlauf_halten_das_kontextbudget_ein(tmp_path, monkeypatch):
+    """Die Dateigroesse sagt nichts ueber die Textmenge, gezaehlt wird der echte Text."""
+    pdf_text._cache.clear()
+    text = pdf_bytes(*[f"Seite {i} mit einem ganz normalen Satz im Dokument" for i in range(40)])
+    atts, rows = {}, []
+    for i in range(12):
+        att = _anhang(tmp_path, text, f"d{i}.pdf")
+        att.update(id=f"a{i}", size_bytes=100)  # wie stark komprimiert
+        atts[att["id"]] = att
+        rows.append({"id": i, "role": "user", "content": f"Frage {i}", "attachment_ids": [att["id"]]})
+
+    async def nachrichten(_cid):
+        return rows
+
+    async def anhaenge(ids):
+        return [atts[a] for a in ids]
+
+    monkeypatch.setattr(openai_engine.db, "list_messages", nachrichten)
+    monkeypatch.setattr(openai_engine.db, "get_attachments", anhaenge)
+    modell = SimpleNamespace(context_length=4000, supports_vision=False)
+    budget = int(4000 * openai_engine.HISTORY_BUDGET_RATIO)
+    out = asyncio.run(openai_engine._build_messages("c", 11, "", modell, None))
+
+    gesamt = sum(len(m["content"]) for m in out)
+    assert gesamt // 4 <= budget + 600  # die neueste Nachricht bleibt immer ganz
+    assert "Frage 11" in out[-1]["content"] and "Seite 39" in out[-1]["content"]
+    assert "Seite 39" not in out[0]["content"] or len(out) == 1
+
+
+def test_budget_ohne_bekannte_laenge_zaehlt_die_obergrenze_ohne_die_platte_zu_lesen():
     att = {"filename": "a.pdf", "mime_type": "application/pdf", "path": "/gibt/es/nicht",
-           "size_bytes": 10_000_000}
+           "size_bytes": 100}
     tokens = openai_engine._rough_text_tokens({"content": ""}, {"a1": att}, ["a1"])
     assert tokens >= attachments.MAX_TEXT_ATTACHMENT_BYTES // 4

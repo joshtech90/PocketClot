@@ -103,8 +103,12 @@ async def _message_content(
     attach_ids: list[str],
     attachments_by_id: dict[str, dict],
     supports_vision: bool,
+    mit_pdf: bool = True,
 ):
     """Baut den Content einer Nachricht: Text inline, Bilder als data-URI.
+
+    PDF-Texte teilen sich je Nachricht `MAX_TEXT_ATTACHMENT_BYTES`, sonst sprengen
+    mehrere grosse PDFs in einer Nachricht das Kontextfenster.
 
     Rueckgabe ist entweder ein String (nur Text) oder die OpenAI-Multipart-Liste
     (Text plus Bilder).
@@ -112,6 +116,7 @@ async def _message_content(
     text_ids: list[str] = []
     image_atts: list[dict] = []
     notes: list[str] = []
+    pdf_rest = att_mod.MAX_TEXT_ATTACHMENT_BYTES
 
     for aid in attach_ids:
         att = attachments_by_id.get(aid)
@@ -125,7 +130,13 @@ async def _message_content(
         elif mime.startswith("image/"):
             image_atts.append(att)
         elif att_mod.is_pdf(filename, mime):
-            notes.append(await att_mod.pdf_block(att))
+            if not mit_pdf or pdf_rest <= 0:
+                notes.append(f"[PDF '{filename}' ist aus Platzgruenden nicht im Verlauf. "
+                             f"Wenn Du es brauchst, bitte den Nutzer, es erneut anzuhaengen.]")
+                continue
+            block = await att_mod.pdf_block(att, pdf_rest)
+            pdf_rest -= len(block)
+            notes.append(block)
         else:
             notes.append(
                 f"[Datei '{filename}' kann dieses Modell nicht oeffnen. "
@@ -168,15 +179,19 @@ async def _message_content(
 
 
 def _rough_text_tokens(row: dict, attachments_by_id: dict[str, dict],
-                       attach_ids: list[str]) -> int:
+                       attach_ids: list[str],
+                       pdf_zeichen: dict[str, int] | None = None) -> int:
     """Billige Vorab-Schaetzung fuer die Budget-Entscheidung.
 
     Wichtig: hier wird NICHTS von der Platte gelesen. Erst wenn feststeht,
     welche Nachrichten ueberhaupt im Kontext landen, werden deren Bilder
     geladen und base64-kodiert. Sonst wuerde ein langer Chat mit vielen Bildern
-    erst hunderte Megabyte in den Speicher ziehen und sie dann wegwerfen.
+    erst hunderte Megabyte in den Speicher ziehen und sie dann wegwerfen. Die
+    Textlaenge von PDFs kommt deshalb vorab als `pdf_zeichen`; fehlt sie, zaehlt
+    die Obergrenze.
     """
     total = len(row.get("content") or "") // 4 + 4
+    pdf_gesamt = 0
     for aid in attach_ids:
         att = attachments_by_id.get(aid)
         if not att:
@@ -187,11 +202,10 @@ def _rough_text_tokens(row: dict, attachments_by_id: dict[str, dict],
         elif att_mod.looks_like_text(att.get("filename") or "", mime):
             total += min(att.get("size_bytes") or 0, att_mod.MAX_TEXT_ATTACHMENT_BYTES) // 4
         elif att_mod.is_pdf(att.get("filename") or "", mime):
-            # Obergrenze: Wieviel Text im PDF steckt, zeigt erst das Auslesen.
-            total += min(att.get("size_bytes") or 0, att_mod.MAX_TEXT_ATTACHMENT_BYTES) // 4
+            pdf_gesamt += (pdf_zeichen or {}).get(aid, att_mod.MAX_TEXT_ATTACHMENT_BYTES)
         elif mime.startswith("image/"):
             total += IMAGE_TOKEN_ESTIMATE
-    return total
+    return total + min(pdf_gesamt, att_mod.MAX_TEXT_ATTACHMENT_BYTES) // 4
 
 
 async def _build_messages(
@@ -240,15 +254,20 @@ async def _build_messages(
     budget = int(min(ctx, settings.max_context_tokens) * HISTORY_BUDGET_RATIO)
     sys_tokens = len(system_prompt) // 4 + 4 if system_prompt else 0
 
-    est = [_rough_text_tokens(r, attachments_by_id, ids)
+    pdf_zeichen = {
+        aid: await att_mod.pdf_zeichen(att) for aid, att in attachments_by_id.items()
+        if att_mod.is_pdf(att.get("filename") or "", att.get("mime_type") or "")
+        and not att_mod.looks_like_text(att.get("filename") or "", att.get("mime_type") or "")
+    }
+    est = [_rough_text_tokens(r, attachments_by_id, ids, pdf_zeichen)
            for r, ids in zip(rows, per_row_ids)]
     first = 0
     while (len(rows) - first) > PROTECTED_TAIL and sys_tokens + sum(est[first:]) > budget:
         first += 1
     truncated = first > 0
 
-    # Reicht selbst der geschuetzte Rest nicht, sind meist Bilder schuld. Dann
-    # fliegen die Bilder der aelteren geschuetzten Nachrichten raus, statt das
+    # Reicht selbst der geschuetzte Rest nicht, sind meist Bilder oder PDFs schuld.
+    # Dann fliegen die aus den aelteren geschuetzten Nachrichten raus, statt das
     # Gateway in einen Kontext-Fehler laufen zu lassen.
     drop_images_before = -1
     if sys_tokens + sum(est[first:]) > budget:
@@ -266,6 +285,7 @@ async def _build_messages(
             content = await _message_content(
                 row, per_row_ids[idx], attachments_by_id,
                 model.supports_vision and idx > drop_images_before,
+                mit_pdf=idx > drop_images_before,
             )
             history.append({"role": "assistant", "content": content})
             continue
@@ -273,6 +293,7 @@ async def _build_messages(
         content = await _message_content(
             row, per_row_ids[idx], attachments_by_id,
             model.supports_vision and idx > drop_images_before,
+            mit_pdf=idx > drop_images_before,
         )
         if role == "system":
             # Eine System-Zeile mitten im Verlauf wuerde die Reihenfolge
