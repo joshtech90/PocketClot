@@ -100,12 +100,14 @@ def test_zu_grosses_entpacktes_paket_wird_abgelehnt(monkeypatch, tmp_path):
 
 
 def test_claude_kann_nach_erinnern_bilder_erzeugen_und_web_lesen(monkeypatch, tmp_path):
+    import re
+    from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock
     from mcp.shared.memory import create_connected_server_and_client_session
-    from pocket_claude import claude_engine, image_tool, web_tool
+    from pocket_claude import claude_engine, db, image_tool, web_tool
 
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
     k = secrets.token_bytes(32)
-    _konfig(monkeypatch, _paket(tmp_path, k))
-    bild = {"id": "bild-test", "filename": "bild.png"}
+    bild = {}
 
     async def zeichnen(user_id, args, defaults):
         assert "Kopfhoerer" in args["prompt"]
@@ -114,23 +116,55 @@ def test_claude_kann_nach_erinnern_bilder_erzeugen_und_web_lesen(monkeypatch, tm
     async def lesen(url, **kwargs):
         return {"ok": True, "text": "PDF mit Geschenkideen"}
 
+    async def query(*, prompt, options):
+        assert options.resume is None
+        assert "no-session-persistence" in options.extra_args
+        server = options.mcp_servers["pocket"]["instance"]
+        async with create_connected_server_and_client_session(server) as client:
+            async def call(name, args):
+                # Apply the real registered SDK hooks before each MCP/native tool.
+                full_name = name if name == "WebSearch" else "mcp__pocket__" + name
+                assert full_name in options.allowed_tools
+                for matcher in (options.hooks or {}).get("PreToolUse", []):
+                    if re.search(matcher.matcher, full_name):
+                        for hook in matcher.hooks:
+                            decision = await hook({"tool_name": full_name, "tool_input": args}, "t", None)
+                            assert decision.get("hookSpecificOutput", {}).get("permissionDecision") != "deny"
+                if name == "WebSearch":
+                    return None
+                return await client.call_tool(name, args)
+
+            erinnerung = await call("erinnern", {"anfrage": "Was wuenscht sich Anna?"})
+            assert not erinnerung.isError and "Kopfhoerer" in str(erinnerung)
+            await call("WebSearch", {"query": "Geschenkideen"})
+            antwort = await call("web_fetch", {"url": "https://example.org/ideen.pdf"})
+            assert not antwort.isError and "Geschenkideen" in str(antwort)
+            antwort = await call("generate_image", {"prompt": "Anna mit Kopfhoerern"})
+            assert not antwort.isError and "Bild erstellt" in str(antwort)
+        yield AssistantMessage(content=[TextBlock("Hier ist das Bild.")], model="test")
+        yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
+                            is_error=False, num_turns=1, session_id="nicht-speichern")
+
     monkeypatch.setattr(image_tool, "run", zeichnen)
     monkeypatch.setattr(web_tool, "fetch", lesen)
+    monkeypatch.setattr(claude_engine, "query", query)
 
     async def run():
-        gesammelt, events = [], asyncio.Queue()
-        server, _ = claude_engine._build_image_mcp_server(
-            "usr_freigegeben", None, gesammelt, events, mit_wissen=True,
-            wissen_schluessel=_b64(k), mit_web=True)
-        async with create_connected_server_and_client_session(server["instance"]) as client:
-            erinnerung = await client.call_tool("erinnern", {"anfrage": "Was wuenscht sich Anna?"})
-            assert not erinnerung.isError and "Kopfhoerer" in str(erinnerung)
-            antwort = await client.call_tool("web_fetch", {"url": "https://example.org/ideen.pdf"})
-            assert not antwort.isError and "Geschenkideen" in str(antwort)
-            antwort = await client.call_tool("generate_image", {"prompt": "Anna mit Kopfhoerern"})
-            assert not antwort.isError and "Bild erstellt" in str(antwort)
-            assert gesammelt == [bild]
-            assert events.get_nowait() == {"type": "image", "attachments": [bild]}
+        await db.init_db()
+        user = await db.create_user("gedaechtnistest", "test-password-123", must_change_password=False)
+        _konfig(monkeypatch, _paket(tmp_path, k), user["id"])
+        cid = await db.create_conversation(user_id=user["id"])
+        mid = await db.add_message(cid, role="user", content="Male Anna mit ihrem Geschenkwunsch")
+        path = tmp_path / "bild.png"
+        path.write_bytes(b"test-bild")
+        aid = await db.add_attachment("bild.png", "image/png", 9, path, user_id=user["id"])
+        bild.update(id=aid, filename="bild.png")
+        events = [e async for e in claude_engine.stream_reply(
+            cid, mid, user_id=user["id"], wissen_schluessel=_b64(k))]
+        assert not any(e["type"] == "error" for e in events), events
+        assert any(e["type"] == "image" and e["attachments"] == [bild] for e in events)
+        assert any(e["type"] == "done" for e in events)
+        assert (await db.get_conversation(cid))["claude_session_id"] is None
     asyncio.run(run())
 
 
