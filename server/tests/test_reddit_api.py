@@ -2,7 +2,6 @@
 import asyncio
 import json
 import os
-import re
 import tempfile
 
 import httpx
@@ -104,26 +103,19 @@ def test_redirect_does_not_leak_token(api):
     assert not asyncio.run(reddit_api.fetch("https://reddit.com/r/Android"))["ok"]
 
 
-def test_claude_fetch_uses_same_reader_and_memory_guard(api, monkeypatch):
+def test_claude_fetch_uses_same_reader(api, monkeypatch):
     from pocket_claude import claude_engine
     api(lambda req: httpx.Response(200, json={"access_token": "access-test", "expires_in": 3600})
         if req.url.path == "/api/v1/access_token" else httpx.Response(200, json=listing()))
-    state = {}
     server, names = claude_engine._build_image_mcp_server(
-        "usr_test", None, [], asyncio.Queue(), mit_bild=False, mit_web=True,
-        wissen_zustand=state)
+        "usr_test", None, [], asyncio.Queue(), mit_bild=False, mit_web=True)
     assert "mcp__pocket__web_fetch" in names
-    hooks = claude_engine._nach_erinnern_sperren(state)
-    assert re.search(hooks["PreToolUse"][0].matcher, "mcp__pocket__web_fetch")
-    # Exercise the actual registered SDK tool, including the defence in depth.
+    # Exercise the actual registered SDK tool.
     from mcp.shared.memory import create_connected_server_and_client_session
     async def run():
         async with create_connected_server_and_client_session(server["instance"]) as client:
             result = await client.call_tool("web_fetch", {"url": "https://reddit.com/r/Android"})
             assert not result.isError and "Battery life" in str(result)
-            state["erinnert"] = True
-            result = await client.call_tool("web_fetch", {"url": "https://reddit.com/r/Android"})
-            assert result.isError and "gesperrt" in str(result) and "Battery life" not in str(result)
     asyncio.run(run())
 
 

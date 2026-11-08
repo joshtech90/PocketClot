@@ -525,29 +525,6 @@ def werkzeuggrenze(allowed_tools: list[str]) -> dict:
             "disallowed_tools": [t for t in GEFAEHRLICHE_WERKZEUGE if t not in eingebaut]}
 
 
-def _nach_erinnern_sperren(zustand: dict) -> dict:
-    """PreToolUse-Hook: nach einer Gedaechtnisabfrage keine Webabrufe mehr in diesem Turn.
-
-    Akteninhalte sind Daten aus fremden Chats. Ein eingeschleuster Text duerfte
-    das Modell sonst dazu bringen, private Angaben per URL nach aussen zu tragen.
-    """
-    try:
-        from claude_agent_sdk import HookMatcher
-    except ImportError:
-        return {}
-
-    async def pruefen(eingabe, tool_use_id, kontext):  # noqa: ARG001
-        if zustand.get("erinnert"):
-            return {"hookSpecificOutput": {
-                "hookEventName": "PreToolUse", "permissionDecision": "deny",
-                "permissionDecisionReason": "Nach einer Abfrage des privaten Gedaechtnisses "
-                                            "sind Webabrufe und Bilder in dieser Antwort gesperrt."}}
-        return {}
-    # Auch die Bilderzeugung: ihr Prompt geht an einen weiteren Anbieter
-    return {"PreToolUse": [HookMatcher(matcher="WebFetch|WebSearch|mcp__pocket__web_fetch|mcp__pocket__generate_image",
-                                       hooks=[pruefen])]}
-
-
 def _pdf_url(url: str) -> bool:
     try:
         return httpx.URL(url).path.lower().endswith(".pdf")
@@ -594,7 +571,7 @@ def _reddit_nativ_sperren() -> dict:
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
                             collected: list[dict], events: "asyncio.Queue",
                             mit_bild: bool = True, mit_wissen: bool = False,
-                            wissen_zustand: dict | None = None, wissen_schluessel: str | None = None,
+                            wissen_schluessel: str | None = None,
                             mit_web: bool = False):
     """Registriert `generate_image` als In-Process-MCP-Werkzeug.
 
@@ -630,8 +607,6 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
 
     @tool(_wissen_tool.TOOL_NAME, _wissen_tool.TOOL_DESCRIPTION, _wissen_tool.PARAMETERS)
     async def _erinnern(args: dict) -> dict:
-        if wissen_zustand is not None:
-            wissen_zustand["erinnert"] = True
         result = await _wissen_tool.run(user_id, args or {}, wissen_schluessel)
         return {"content": [{"type": "text", "text": result.get("text") or ""}]}
 
@@ -653,10 +628,6 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
 
     @tool(_web_tool.FETCH_TOOL_NAME, beschreibung, _web_tool.FETCH_PARAMETERS)
     async def _web_fetch(args: dict) -> dict:
-        # Defence in depth: the shared memory hook also blocks this MCP tool.
-        if wissen_zustand is not None and wissen_zustand.get("erinnert"):
-            return {"content": [{"type": "text", "text": "Webabrufe sind nach einer "
-                                "Abfrage des privaten Gedaechtnisses gesperrt."}], "is_error": True}
         args = args or {}
         result = await _web_tool.fetch(str(args.get("url") or ""), pages=args.get("pages"),
                                        nur_pdf=True)
@@ -804,12 +775,11 @@ async def stream_reply(
         image_attachments: list[dict] = []
         image_events: asyncio.Queue = asyncio.Queue()
         mcp_servers: dict = {}
-        wissen_zustand: dict = {}
         from pocket_claude import reddit_api
         img_server, werkzeug_namen = _build_image_mcp_server(
             user_id, image_defaults, image_attachments, image_events,
             mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
-            wissen_zustand=wissen_zustand, wissen_schluessel=wissen_schluessel,
+            wissen_schluessel=wissen_schluessel,
             mit_web=bool(sk.get("web_fetch", True)),
         )
         if img_server is not None and werkzeug_namen:
@@ -926,7 +896,7 @@ async def stream_reply(
         )
         if mcp_servers:
             options_kwargs["mcp_servers"] = mcp_servers
-        hooks = _nach_erinnern_sperren(wissen_zustand) if mit_wissen else {}
+        hooks = {}
         if "mcp__pocket__web_fetch" in werkzeug_namen:
             hooks.setdefault("PreToolUse", []).extend(_pdf_nativ_sperren()["PreToolUse"])
             if reddit_api.configured():

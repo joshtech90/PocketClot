@@ -90,17 +90,6 @@ def test_werkzeuggrenze_sperrt_bash_ohne_freigabe():
     assert g["tools"] == [] and "Read" in g["disallowed_tools"]
 
 
-def test_hook_sperrt_webabruf_erst_nach_erinnern():
-    from pocket_claude import claude_engine
-    zustand = {}
-    hooks = claude_engine._nach_erinnern_sperren(zustand)
-    pruefen = hooks["PreToolUse"][0].hooks[0]
-    assert asyncio.run(pruefen({}, "x", None)) == {}
-    zustand["erinnert"] = True
-    out = asyncio.run(pruefen({}, "x", None))
-    assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
-
-
 def test_zu_grosses_entpacktes_paket_wird_abgelehnt(monkeypatch, tmp_path):
     k = secrets.token_bytes(32)
     monkeypatch.setattr(wissen_tool, "MAX_KLARTEXT", 1000)
@@ -110,10 +99,39 @@ def test_zu_grosses_entpacktes_paket_wird_abgelehnt(monkeypatch, tmp_path):
     assert not res["ok"]
 
 
-def test_hook_sperrt_auch_bilder():
-    from pocket_claude import claude_engine
-    hooks = claude_engine._nach_erinnern_sperren({})
-    assert "mcp__pocket__generate_image" in hooks["PreToolUse"][0].matcher
+def test_claude_kann_nach_erinnern_bilder_erzeugen_und_web_lesen(monkeypatch, tmp_path):
+    from mcp.shared.memory import create_connected_server_and_client_session
+    from pocket_claude import claude_engine, image_tool, web_tool
+
+    k = secrets.token_bytes(32)
+    _konfig(monkeypatch, _paket(tmp_path, k))
+    bild = {"id": "bild-test", "filename": "bild.png"}
+
+    async def zeichnen(user_id, args, defaults):
+        assert "Kopfhoerer" in args["prompt"]
+        return {"ok": True, "text": "Bild erstellt.", "attachments": [bild]}
+
+    async def lesen(url, **kwargs):
+        return {"ok": True, "text": "PDF mit Geschenkideen"}
+
+    monkeypatch.setattr(image_tool, "run", zeichnen)
+    monkeypatch.setattr(web_tool, "fetch", lesen)
+
+    async def run():
+        gesammelt, events = [], asyncio.Queue()
+        server, _ = claude_engine._build_image_mcp_server(
+            "usr_freigegeben", None, gesammelt, events, mit_wissen=True,
+            wissen_schluessel=_b64(k), mit_web=True)
+        async with create_connected_server_and_client_session(server["instance"]) as client:
+            erinnerung = await client.call_tool("erinnern", {"anfrage": "Was wuenscht sich Anna?"})
+            assert not erinnerung.isError and "Kopfhoerer" in str(erinnerung)
+            antwort = await client.call_tool("web_fetch", {"url": "https://example.org/ideen.pdf"})
+            assert not antwort.isError and "Geschenkideen" in str(antwort)
+            antwort = await client.call_tool("generate_image", {"prompt": "Anna mit Kopfhoerern"})
+            assert not antwort.isError and "Bild erstellt" in str(antwort)
+            assert gesammelt == [bild]
+            assert events.get_nowait() == {"type": "image", "attachments": [bild]}
+    asyncio.run(run())
 
 
 # ── Mehrere Konten, jedes mit eigenem Paket ─────────────────────────────────

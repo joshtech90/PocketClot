@@ -174,12 +174,10 @@ def test_interne_adresse_bleibt_gesperrt_auch_als_pdf():
     assert not result["ok"] and "privat" in result["text"]
 
 
-def test_claude_liest_pdf_ueber_eigenes_werkzeug_mit_gedaechtnis_sperre(netz):
+def test_claude_liest_pdf_ueber_eigenes_werkzeug(netz):
     netz(pdf_bytes("Erkrankungsalter Median"))
-    zustand = {}
     server, namen = claude_engine._build_image_mcp_server(
-        "usr_test", None, [], asyncio.Queue(), mit_bild=False, mit_web=True,
-        wissen_zustand=zustand)
+        "usr_test", None, [], asyncio.Queue(), mit_bild=False, mit_web=True)
     assert "mcp__pocket__web_fetch" in namen
     from mcp.shared.memory import create_connected_server_and_client_session
 
@@ -187,9 +185,6 @@ def test_claude_liest_pdf_ueber_eigenes_werkzeug_mit_gedaechtnis_sperre(netz):
         async with create_connected_server_and_client_session(server["instance"]) as client:
             result = await client.call_tool("web_fetch", {"url": URL})
             assert not result.isError and "Erkrankungsalter" in str(result)
-            zustand["erinnert"] = True
-            result = await client.call_tool("web_fetch", {"url": URL})
-            assert result.isError and "Erkrankungsalter" not in str(result)
     asyncio.run(run())
 
 
