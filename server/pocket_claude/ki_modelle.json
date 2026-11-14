@@ -53,6 +53,13 @@
         "gemini-3-flash"
       ]
     },
+    "gemini-hydrogen": {
+      "anbieter": "gemini",
+      "id": "gemini-4-hydrogen-xhigh",
+      "name": "Gemini 4 Hydrogen",
+      "hinweis": "Erster Versuch der Gemini-Worker (Joscha 14.11.2026), danach gemini-flash. Im Antigravity-Pool heute nur ueber drcliviaheinen. Familie entfernen schaltet den Vorrang ab.",
+      "abgeloest": []
+    },
     "pool-opus": {
       "anbieter": "antigravity",
       "id": "claude-opus-4-6-thinking",
