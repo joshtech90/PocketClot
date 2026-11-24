@@ -10,7 +10,10 @@ cd "$(dirname "$0")"
 
 REPO="$(pwd)"
 APP_DIR="$REPO/app"
-APK="$APP_DIR/app/build/outputs/apk/debug/app-debug.apk"
+# Release-APK mit dem registrierten Schluessel CN=joshtech90 (Joscha 24.11.2026).
+# Signierdaten: ~/.pocketclot-signing/ (Sicherung im privaten Repo claude-memory).
+APK="$APP_DIR/app/build/outputs/apk/release/app-release.apk"
+ERWARTET_SHA256="8a47f9f43ce8c4a3b072c2c86bf04f82a8c7919f8070eda55490316e9ee7d2db"
 
 echo "============================================="
 echo " PocketClot — Install on Phone"
@@ -47,7 +50,7 @@ fi
 if [ "$needs_build" = true ]; then
     echo "[1/3] Source newer than APK — running Gradle build…"
     cd "$APP_DIR"
-    ./gradlew :app:assembleDebug
+    ./gradlew :app:assembleRelease
     cd "$REPO"
 else
     echo "[1/3] APK up to date — skipping build."
@@ -59,6 +62,14 @@ if [ ! -f "$APK" ]; then
     exit 1
 fi
 echo "    APK: $APK ($(du -h "$APK" | cut -f1))"
+
+APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+if ! "$APKSIGNER" verify --print-certs "$APK" 2>/dev/null | grep -qi "SHA-256 digest: $ERWARTET_SHA256"; then
+    echo "✗ APK ist nicht mit dem registrierten Schluessel signiert (fehlt ~/.pocketclot-signing?)."
+    read -n 1 -s -r -p "Press any key to close…"
+    exit 1
+fi
+echo "    Signatur: joshtech90 (registriert)"
 
 echo
 echo "[2/3] Checking connected devices…"
@@ -74,7 +85,13 @@ echo "    $DEVICES device(s) connected"
 
 echo
 echo "[3/3] Installing…"
-adb install -r "$APK"
+if ! adb install -r "$APK"; then
+    echo "✗ Installation abgelehnt. Ist noch die alte Fassung mit anderem Schluessel drauf"
+    echo "  (bis v0.6.7 Debug-Schluessel), dann in der App Einstellungen exportieren,"
+    echo "  App deinstallieren und dieses Skript erneut starten."
+    read -n 1 -s -r -p "Press any key to close…"
+    exit 1
+fi
 
 # Read package name from the APK and launch the main activity
 PKG=$(aapt2 dump packagename "$APK" 2>/dev/null \
