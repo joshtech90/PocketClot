@@ -23,7 +23,7 @@ _TOOLS = (
         description=(
             "Suche öffentliche, aktive Angebote direkt auf Kleinanzeigen. Nutze dies "
             "für Kleinanzeigen-Suchen und um Vergleichsangebote für eine Anzeige zu finden. "
-            "Die Preise sind Angebotspreise. Verlinke passende Treffer."
+            "Die Preise sind Angebotspreise. Verlinke passende Treffer über ihr Feld url."
         ),
         parameters=kleinanzeigen_tool.SEARCH_PARAMETERS,
         skill="web_search",
@@ -35,8 +35,8 @@ _TOOLS = (
         description=(
             "Lies eine öffentliche Kleinanzeigen-Anzeige per Link oder Anzeigen-ID. "
             "Verwende dies für Kleinanzeigen-Anzeigenlinks und für Details zu Suchtreffern. "
-            "Berücksichtige den Status und verlinke die Anzeige. Fotolinks sind Quellen; "
-            "die Bilder wurden nicht angesehen."
+            "Berücksichtige den Status. Verlinke die Anzeige über url und Fotos bei Bedarf "
+            "über pictures. Die Bilder wurden nicht angesehen."
         ),
         parameters=kleinanzeigen_tool.DETAIL_PARAMETERS,
         skill="web_fetch",
@@ -51,5 +51,11 @@ def available(skills: Mapping[str, bool]) -> dict[str, ResearchTool]:
     return {tool.name: tool for tool in _TOOLS if skills.get(tool.skill, True) and tool.configured()}
 
 
+def web_fetch_tools() -> dict[str, ResearchTool]:
+    return {tool.name: tool for tool in _TOOLS
+            if tool.skill == "web_fetch" and tool.matches_url and tool.configured()}
+
+
 def for_url(url: str, tools: Mapping[str, ResearchTool]) -> ResearchTool | None:
-    return next((tool for tool in tools.values() if tool.matches_url and tool.matches_url(url)), None)
+    return next((tool for tool in tools.values()
+                 if tool.skill == "web_fetch" and tool.matches_url and tool.matches_url(url)), None)

@@ -458,7 +458,7 @@ async def _fetch_inner(url: str, pages: object = None, nur_pdf: bool = False) ->
         return _pdf_ergebnis(gelesen[0], gelesen[1], pages)
 
     current = url
-    url_tools = research_tools.available({"web_search": False})
+    url_tools = research_tools.web_fetch_tools()
     pdf_raw: bytes | None = None
     kein_pdf = ("Unter dieser Adresse liegt kein PDF. "
                 "Fuer normale Seiten WebFetch verwenden.")

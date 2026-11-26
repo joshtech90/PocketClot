@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import signal
 import stat
 import sys
 import tempfile
@@ -428,3 +429,29 @@ print("[]")
     assert res_one["ok"] and res_two["ok"]
     events = active_file.read_text().splitlines()
     assert events == ["START", "END", "START", "END"]
+
+
+def test_timeout_when_detached_child_keeps_stdout_open(tmp_path):
+    pid_file = tmp_path / "detached.pid"
+    cli = _write_fake_cli(tmp_path / "detach", f"""
+import os, time
+from pathlib import Path
+if os.fork() == 0:
+    os.setsid()
+    Path({str(pid_file)!r}).write_text(str(os.getpid()))
+    time.sleep(15)
+os._exit(0)
+""")
+
+    async def run():
+        with pytest.raises(cli_runner.CliError, match="zu lange"):
+            await asyncio.wait_for(cli_runner.read_json(
+                cli, [], state_dir=tmp_path / "state", timeout_seconds=1,
+            ), 5)
+
+    try:
+        asyncio.run(run())
+        assert pid_file.exists()
+    finally:
+        if pid_file.exists():
+            os.kill(int(pid_file.read_text()), signal.SIGKILL)

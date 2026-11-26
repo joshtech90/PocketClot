@@ -65,11 +65,15 @@ def _public_url(value: str, hosts: set[str]) -> SplitResult | None:
 
 def ad_id_from_url(url: str) -> str | None:
     parsed = _public_url(url.strip(), HOSTS)
-    if parsed and (match := AD_PATH.fullmatch(unquote(parsed.path))):
-        if unquote(parsed.path).split("/")[2] in {".", ".."}:
-            return None
-        return match.group(1) or match.group(2)
-    return None
+    if parsed is None:
+        return None
+    match = AD_PATH.fullmatch(parsed.path)
+    if match is None:
+        return None
+    slug = unquote(parsed.path.split("/")[2])
+    if slug in {".", ".."} or "/" in slug or "\\" in slug:
+        return None
+    return match.group(1) or match.group(2)
 
 
 def _text_arg(value: object, label: str, limit: int) -> str:
@@ -115,7 +119,7 @@ async def _read(command: list[str]) -> object:
     if executable is None:
         raise cli_runner.CliError("Kleinanzeigen ist auf dem Server nicht eingerichtet.")
     try:
-        await asyncio.wait_for(_cli_lock.acquire(), 10)
+        await asyncio.wait_for(_cli_lock.acquire(), cli_runner.DEFAULT_TIMEOUT_SECONDS)
     except (TimeoutError, asyncio.TimeoutError) as exc:
         raise cli_runner.CliError("Kleinanzeigen ist gerade ausgelastet. Bitte später erneut versuchen.") from exc
     try:

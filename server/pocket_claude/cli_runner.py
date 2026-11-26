@@ -9,6 +9,8 @@ import signal
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+DEFAULT_TIMEOUT_SECONDS = 20.0
+
 
 class CliError(Exception):
     def __init__(self, message: str, *, returncode: int | None = None):
@@ -29,7 +31,7 @@ async def read_json(
     *,
     state_dir: Path,
     environment: Mapping[str, str] | None = None,
-    timeout_seconds: float = 20.0,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     max_stdout_bytes: int = 256 * 1024,
 ) -> object:
     """Arguments and extra environment come from the provider adapter."""
@@ -63,6 +65,12 @@ async def read_json(
         await proc.wait()
         return bytes(output)
 
+    async def drain_and_reap() -> None:
+        assert proc.stdout is not None
+        while await proc.stdout.read(16 * 1024):
+            pass
+        await proc.wait()
+
     try:
         output = await asyncio.wait_for(read_output(), timeout_seconds)
     except (TimeoutError, asyncio.TimeoutError) as exc:
@@ -72,10 +80,12 @@ async def read_json(
         if proc.returncode is None or (proc.stdout is not None and not proc.stdout.at_eof()):
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(proc.pid, signal.SIGKILL)
-            if proc.stdout is not None:
-                while await proc.stdout.read(16 * 1024):
-                    pass
-            await proc.wait()
+            try:
+                await asyncio.wait_for(drain_and_reap(), 2)
+            except (TimeoutError, asyncio.TimeoutError):
+                # A detached descendant can hold stdout open. asyncio's
+                # Process exposes no public method to close its pipe reader.
+                proc._transport.close()
 
     if proc.returncode:
         raise CliError("Das Werkzeug hat die Abfrage abgebrochen.", returncode=proc.returncode)
