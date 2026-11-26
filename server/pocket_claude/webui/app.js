@@ -2701,7 +2701,7 @@ async function sendMessage(rawText, opts = {}) {
 function finishTurn(turn) {
   if (chatTurns.get(turn.cid) !== turn) return;
   chatTurns.delete(turn.cid);
-  if (turn.stopped && turn.text) {
+  if (!turn.answer && turn.stopped && turn.text) {
     turn.answer = turnAnswer(turn, -Date.now(), turn.text + '\n\n_' + t('generated_chat_aborted') + '_');
   }
   if (isOpenTurn(turn)) {
