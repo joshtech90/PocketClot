@@ -31,7 +31,7 @@ from typing import Any
 
 import httpx
 
-from pocket_claude import gateways, pdf_text, reddit_api
+from pocket_claude import gateways, pdf_text, reddit_api, research_tools
 
 log = logging.getLogger(__name__)
 
@@ -458,6 +458,7 @@ async def _fetch_inner(url: str, pages: object = None, nur_pdf: bool = False) ->
         return _pdf_ergebnis(gelesen[0], gelesen[1], pages)
 
     current = url
+    url_tools = research_tools.available({"web_search": False})
     pdf_raw: bytes | None = None
     kein_pdf = ("Unter dieser Adresse liegt kein PDF. "
                 "Fuer normale Seiten WebFetch verwenden.")
@@ -471,6 +472,9 @@ async def _fetch_inner(url: str, pages: object = None, nur_pdf: bool = False) ->
             parsed = httpx.URL(current)
             if parsed.scheme not in ("http", "https"):
                 raise _BlockedUrl("Nur http- und https-Adressen werden abgerufen.")
+            tool = research_tools.for_url(current, url_tools)
+            if tool is not None:
+                return await tool.run({"url": current})
             # Also dispatch after public redirects (e.g. Reddit share links).
             # The Reddit adapter validates routes and sends credentials only to
             # fixed API hosts, never to the supplied URL.

@@ -33,7 +33,7 @@ from typing import AsyncIterator
 import httpx
 
 from pocket_claude import attachments as att_mod
-from pocket_claude import db, gateways, usage, web_tool
+from pocket_claude import db, gateways, research_tools, usage, web_tool
 from pocket_claude.config import settings
 
 log = logging.getLogger(__name__)
@@ -535,6 +535,13 @@ async def stream_reply(
                 },
             })
         want_fetch = bool(sk.get("web_fetch", True))
+        research = research_tools.available(sk)
+        for tool in research.values():
+            tools.append({"type": "function", "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            }})
         if want_fetch:
             tools.append({
                 "type": "function",
@@ -799,6 +806,10 @@ async def stream_reply(
                         elif own_search and name == web_tool.SEARCH_TOOL_NAME:
                             res = await web_tool.search(
                                 gw, model_id, str(args.get("query") or ""))
+                            tool_text = res["text"]
+                            _collect_sources(res, web_sources)
+                        elif name in research:
+                            res = await research[name].run(args)
                             tool_text = res["text"]
                             _collect_sources(res, web_sources)
                         elif want_fetch and name == web_tool.FETCH_TOOL_NAME:

@@ -38,7 +38,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from pocket_claude import auth_modes, db, ki_modelle, usage
+from pocket_claude import auth_modes, db, ki_modelle, research_tools, usage
 from pocket_claude.attachments import (
     build_prompt_text as _build_prompt_text,
     has_binary_attachments as _has_binary_attachments,
@@ -566,24 +566,40 @@ def _reddit_nativ_sperren() -> dict:
     return {"PreToolUse": [HookMatcher(matcher="^WebFetch$", hooks=[pruefen])]}
 
 
-# ---------- Bild-Werkzeug fuer den Claude-Pfad ----------
+def _research_fetch_hook(research: dict[str, research_tools.ResearchTool]):
+    from claude_agent_sdk import HookMatcher
+
+    async def route(event, tool_use_id, context):
+        url = str((event.get("tool_input") or {}).get("url") or "")
+        tool = research_tools.for_url(url, research)
+        if tool is None:
+            return {}
+        return {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": "deny",
+            "permissionDecisionReason": f"Verwende mcp__pocket__{tool.name} für diese Adresse.",
+        }}
+
+    return HookMatcher(matcher="^WebFetch$", hooks=[route])
+
+
+# ---------- Werkzeuge fuer den Claude-Pfad ----------
 
 def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
                             collected: list[dict], events: "asyncio.Queue",
                             mit_bild: bool = True, mit_wissen: bool = False,
                             wissen_schluessel: str | None = None,
-                            mit_web: bool = False):
-    """Registriert `generate_image` als In-Process-MCP-Werkzeug.
+                            mit_web: bool = False,
+                            research: dict[str, research_tools.ResearchTool] | None = None):
+    """Registriert PocketClot-Werkzeuge im In-Process-MCP-Server.
 
     Die Claude-Agent-SDK kann Werkzeuge direkt im Server-Prozess ausfuehren, ohne
     dass ein externer MCP-Prozess noetig waere. Wir nutzen das, damit Claude
     dieselbe Bilderzeugung bekommt wie die Zusatz-Modelle (die es ueber ihr
     natives Function-Calling ansprechen).
 
-    Rueckgabe: (mcp_server, tool_name) oder (None, None), wenn die SDK das nicht
-    kann. Ein Fehler hier darf den Chat nie kippen.
+    Rueckgabe: (mcp_server, werkzeug_namen) oder (None, []).
     """
-    if user_id is None or not (mit_bild or mit_wissen or mit_web):
+    if user_id is None or not (mit_bild or mit_wissen or mit_web or research):
         return None, []
     try:
         from claude_agent_sdk import create_sdk_mcp_server, tool
@@ -644,6 +660,19 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
     if mit_wissen:
         werkzeuge.append(_erinnern)
         namen.append(f"mcp__pocket__{_wissen_tool.TOOL_NAME}")
+
+    def research_mcp(spec: research_tools.ResearchTool):
+        @tool(spec.name, spec.description, spec.parameters)
+        async def handler(args: dict) -> dict:
+            result = await spec.run(args or {})
+            return {"content": [{"type": "text", "text": result["text"]}],
+                    "is_error": not result["ok"]}
+
+        return handler
+
+    for spec in (research or {}).values():
+        werkzeuge.append(research_mcp(spec))
+        namen.append(f"mcp__pocket__{spec.name}")
     try:
         server = create_sdk_mcp_server(name="pocket", version="1.0.0", tools=werkzeuge)
     except Exception as exc:  # noqa: BLE001 - SDK-Version passt nicht, dann eben ohne
@@ -776,11 +805,13 @@ async def stream_reply(
         image_events: asyncio.Queue = asyncio.Queue()
         mcp_servers: dict = {}
         from pocket_claude import reddit_api
+        research = research_tools.available(sk)
         img_server, werkzeug_namen = _build_image_mcp_server(
             user_id, image_defaults, image_attachments, image_events,
             mit_bild=bool(sk.get("image_generation", True)), mit_wissen=mit_wissen,
             wissen_schluessel=wissen_schluessel,
             mit_web=bool(sk.get("web_fetch", True)),
+            research=research,
         )
         if img_server is not None and werkzeug_namen:
             mcp_servers["pocket"] = img_server
@@ -901,6 +932,8 @@ async def stream_reply(
             hooks.setdefault("PreToolUse", []).extend(_pdf_nativ_sperren()["PreToolUse"])
             if reddit_api.configured():
                 hooks["PreToolUse"].extend(_reddit_nativ_sperren()["PreToolUse"])
+            if any(spec.matches_url for spec in research.values()):
+                hooks["PreToolUse"].append(_research_fetch_hook(research))
         if hooks:
             options_kwargs["hooks"] = hooks
         if mit_wissen:

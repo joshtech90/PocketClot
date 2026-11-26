@@ -62,6 +62,8 @@ class Settings(BaseSettings):
 
     # Read-only Reddit OAuth credentials, in a private JSON file outside Git.
     reddit_credentials_file: str = ""
+    # Optional absolute path to a dedicated, account-free Kleinanzeigen CLI.
+    kleinanzeigen_cli_path: str = ""
 
     # Logging
     log_level: str = "INFO"
