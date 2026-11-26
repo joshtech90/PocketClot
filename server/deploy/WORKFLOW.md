@@ -62,6 +62,29 @@ If anything goes wrong, the script prints the last 20 log lines.
 ssh me@your-host 'sudo -n journalctl -u pocket-claude -f'
 ```
 
+### Optional Kleinanzeigen research tools
+
+Install a reviewed `kleinanzeigen-cli` build in a dedicated Python environment
+on the PocketClot server. The supported command contract is version 0.2.0 from
+upstream revision `dfb53f71ce9ab19d1e925fe55dc4d70cb5a730f0`.
+Set `KLEINANZEIGEN_CLI_PATH` in the server `.env` to the absolute path of the
+installed executable and restart PocketClot. The executable must be accessible
+to the service user. Leave the setting empty to disable the tools.
+
+PocketClot uses the CLI's public mobile-API search and ad detail commands with
+JSON output. Check both commands from the server before enabling the tools.
+PocketClot uses a dedicated state directory under `DATA_DIR`; keep this
+installation signed out of Kleinanzeigen. The chat can search, read listing
+details and return photo links. The existing Web search and Web fetch switches
+control search and ad details respectively.
+
+For another CLI, add a provider module that validates parameters, calls fixed
+read-only commands through `pocket_claude/cli_runner.py`, and converts their
+JSON to the chat tool result (`ok`, `text`, `sources`). Register its tools in
+`pocket_claude/research_tools.py`. Each registration declares its capability
+check and the existing web skill it follows. A details tool can also match the
+public URLs it handles. Both chat engines use the same registrations.
+
 ---
 
 ## App code update (daily)
