@@ -65,6 +65,7 @@ function legacyThemeMode() {
   return v === 'light' || v === 'dark' ? v : 'system';
 }
 
+const chatTurns = new Map();
 const state = {
   serverUrl: localStorage.getItem(LS.url)   || '',
   token:     localStorage.getItem(LS.token) || '',
@@ -112,15 +113,9 @@ const state = {
   skills: null,            // effektive Skills des offenen Chats
   skillsIsOverride: false,
 
-  isStreaming: false,
-  streamingText: '',
-  streamingThinking: '',
-  _streamAttachments: [],
-  abort: null,
-  turn: 0,                 // Kennzeichen des laufenden Turns (0 = keiner)
+  get isStreaming() { return chatTurns.has(this.cid); },
   chatLoading: false,      // Details des geoeffneten Chats werden noch geladen
   chatLoadFailed: false,
-  stoppedByUser: false,
 
   pending: [],             // Anhaenge im Eingabefeld
   imageMode: false,
@@ -457,9 +452,16 @@ function showPrompt({ title, text, placeholder = '', type = 'password', okLabel 
     els.promptText.classList.toggle('hidden', !text);
     // Geheimes als maskiertes Textfeld: bei type=password fragt der Browser nach
     // jeder PIN, ob er sie als Anmeldepasswort speichern soll.
-    const geheim = type === 'password';
+    const pin = type === 'pin';
+    const geheim = pin || type === 'password';
     els.promptInput.type = geheim ? 'text' : type;
     els.promptInput.classList.toggle('secret-field', geheim);
+    els.promptInput.inputMode = pin ? 'numeric' : '';
+    if (pin) els.promptInput.maxLength = 5;
+    else els.promptInput.removeAttribute('maxlength');
+    els.promptInput.oninput = pin ? () => {
+      els.promptInput.value = els.promptInput.value.replace(/\D/g, '').slice(0, 5);
+    } : null;
     els.promptInput.placeholder = placeholder;
     els.promptInput.value = value;
     els.promptOk.textContent = okLabel;
@@ -470,6 +472,8 @@ function showPrompt({ title, text, placeholder = '', type = 'password', okLabel 
       els.promptOk.onclick = null;
       els.promptCancel.onclick = null;
       els.promptInput.onkeydown = null;
+      els.promptInput.oninput = null;
+      els.promptInput.value = '';
       resolve(val);
     };
     els.promptOk.onclick = () => close(els.promptInput.value);
@@ -824,6 +828,8 @@ window.addEventListener('hashchange', () => {
 });
 
 function showLogin() {
+  for (const turn of chatTurns.values()) turn.controller.abort();
+  chatTurns.clear();
   $('login-url').value = state.serverUrl || location.origin;
   els.login.classList.remove('hidden');
   els.app.classList.add('hidden');
@@ -1042,6 +1048,9 @@ async function deleteChat(chat) {
   if (!ok) return;
   try {
     await api('DELETE', '/conversations/' + chat.id);
+    const turn = chatTurns.get(chat.id);
+    chatTurns.delete(chat.id);
+    turn?.controller.abort();
     const wasOpen = state.cid === chat.id;
     await refreshChatList();
     if (wasOpen) newChat();
@@ -1269,7 +1278,6 @@ async function openChat(cid, opts = {}) {
     closeSidebar();
     return;
   }
-  stopStreamLocal();
   if (window.PocketVoice) { try { window.PocketVoice.resetForChatSwitch(); } catch (_) {} }
   stopAudio();
   closeChatSearch();
@@ -1296,12 +1304,13 @@ async function openChat(cid, opts = {}) {
   else { els.messages.innerHTML = ''; els.chatView.classList.remove('is-empty'); }
   markActiveChat();
   closeSidebar();
+  const turn = chatTurns.get(cid);
   try {
     const detail = await api('GET', '/conversations/' + cid);
     if (loadGen !== _loadSeq || state.cid !== cid) return;   // inzwischen anderer Chat
     state.chatLoading = false;
     state.chatLoadFailed = false;
-    applyDetail(detail);
+    applyDetail(detail, turn);
     resetComposerFor(cid);
     if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
     else { renderMessages(); scrollToVeryBottom(); }
@@ -1320,14 +1329,12 @@ async function openChat(cid, opts = {}) {
 }
 let _loadSeq = 0;
 let _newChatSeq = 0;
-function applyDetail(detail) {
+function applyDetail(detail, turn) {
   state.title = detail.title;
   state.pinned = !!detail.pinned;
   state.chatLocked = !!detail.locked;
   state.messages = detail.messages || [];
-  state.streamingText = '';
-  state.streamingThinking = '';
-  state.isStreaming = false;
+  if (turn) mergeTurnMessages(turn);
   // Der Server weiss, was zuletzt in diesem Chat lief. Kennt er nichts, lief
   // ein Chat mit Nachrichten mit Claude (Bestandschats und ausdruecklich ""):
   // der darf nicht still zur Vorauswahl wechseln. Nur ein leerer Chat folgt ihr.
@@ -1352,7 +1359,6 @@ function applyDetail(detail) {
 
 async function newChat(opts = {}) {
   if (state.view !== 'chat') showChatView();
-  stopStreamLocal();
   if (window.PocketVoice) { try { window.PocketVoice.resetForChatSwitch(); } catch (_) {} }
   stopAudio();
   closeChatSearch();
@@ -1394,6 +1400,7 @@ async function newChat(opts = {}) {
     closeSidebar();
     loadChatSkills(c.id);
     if (!isMobile()) els.input.focus();
+    return c.id;
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) return showLogin();
     toast(t('toast_new_chat_failed', apiErrorText(e)), { error: true });
@@ -1401,10 +1408,14 @@ async function newChat(opts = {}) {
 }
 
 async function reloadChatMessages(cid) {
+  const loadGen = _loadSeq;
+  const turn = chatTurns.get(cid);
+  const lastMessage = state.messages.at(-1);
   try {
     const detail = await api('GET', `/conversations/${cid}`);
-    if (state.cid !== cid) return;
-    applyDetail(detail);
+    if (loadGen !== _loadSeq || state.cid !== cid || chatTurns.get(cid) !== turn
+        || state.messages.at(-1) !== lastMessage) return;
+    applyDetail(detail, turn);
     if (state.chatLocked && !state.unlockedCids.has(cid)) renderLockGate(cid);
     else renderMessages();
   } catch (_) { /* naechster Klick laedt neu */ }
@@ -1915,8 +1926,7 @@ function renderStreamingMessage() {
   return div;
 }
 function fillStreamingMessage(div) {
-  const text = state.streamingText;
-  const thinking = state.streamingThinking;
+  const { text, thinking, attachments } = chatTurns.get(state.cid);
   div.innerHTML = '';
   if (thinking) div.appendChild(thinkingEl(thinking, !text));
   if (!text) {
@@ -1931,7 +1941,7 @@ function fillStreamingMessage(div) {
     div.appendChild(c);
     div.insertAdjacentHTML('beforeend', '<div class="streaming-dots"><span></span><span></span><span></span></div>');
   }
-  if (state._streamAttachments.length) div.insertAdjacentHTML('beforeend', attachmentsToHtml(state._streamAttachments));
+  if (attachments.length) div.insertAdjacentHTML('beforeend', attachmentsToHtml(attachments));
   enhanceContent(div);
 }
 let _streamRaf = 0;
@@ -1940,6 +1950,7 @@ function updateStreaming() {
   if (_streamRaf) return;
   _streamRaf = requestAnimationFrame(() => {
     _streamRaf = 0;
+    if (!state.isStreaming || state.chatLoading || state.view !== 'chat' || isCurrentChatLocked()) return;
     let div = $('streaming-msg');
     if (!div) { renderMessages(); div = $('streaming-msg'); }
     if (div) fillStreamingMessage(div);
@@ -2023,7 +2034,7 @@ async function verifyPinDialog() {
   while (true) {
     const pin = await showPrompt({
       title: t('lock_gate_title'), text: t('lock_gate_hint'),
-      placeholder: t('chat_lock_pin'), type: 'password', okLabel: t('lock_gate_unlock'),
+      placeholder: t('chat_lock_pin'), type: 'pin', okLabel: t('lock_gate_unlock'),
     });
     if (pin === null) return false;
     const digits = (pin || '').replace(/\D/g, '');
@@ -2647,100 +2658,98 @@ async function sendMessage(rawText, opts = {}) {
   // Ein noch laufender Upload ginge sonst stumm verloren.
   if (state.pending.some((p) => p.uploading)) { toast(t('chat_wait_for_uploads')); return false; }
   if (state.cid && state.chatLocked && !state.unlockedCids.has(state.cid)) return false;
-  if (!state.cid) await newChat();
-  if (!state.cid) return false;
+  if (!state.cid && (await newChat()) !== state.cid) return false;
+  if (!state.cid || state.isStreaming) return false;
   closeChatSearch();
   const atts = uploaded.map((p) => ({ id: p.uploaded.id, filename: p.uploaded.filename, mime_type: p.uploaded.mime_type }));
-  state.messages.push({ id: -Date.now(), role: 'user', content, attachments: atts, created_at: new Date().toISOString() });
+  const turn = {
+    cid: state.cid,
+    controller: new AbortController(),
+    userMessage: { id: -Date.now(), role: 'user', content, attachments: atts, created_at: new Date().toISOString() },
+    savedUserId: null,
+    answer: null,
+    text: '',
+    thinking: '',
+    attachments: [],
+    stopped: false,
+    failed: false,
+  };
+  chatTurns.set(turn.cid, turn);
+  state.messages.push(turn.userMessage);
   for (const p of state.pending) if (p.previewUrl && p.previewUrl.startsWith('blob:')) URL.revokeObjectURL(p.previewUrl);
   state.pending = [];
   setImageMode(false);
   renderPending();
   if (!opts.keepInput) { els.input.value = ''; autoResize(); }
-  state.streamingText = '';
-  state.streamingThinking = '';
-  state._streamAttachments = [];
-  state.isStreaming = true;
-  state.stoppedByUser = false;
   updateComposerState();
   renderMessages();
   scrollToBottom(true);
-  state._sseTurnStart = performance.now();
-  state._sseGotDone = false;
-  state._sseGotError = false;
-  state._sseDeltaCount = 0;
-  const cidAtSubmit = state.cid;
-  // Jeder Turn hat ein eigenes Kennzeichen. Wird er durch einen Chatwechsel
-  // abgeloest, darf sein Aufraeumen den neuen Turn nicht mehr anfassen.
-  const turn = ++_turnSeq;
-  state.turn = turn;
   state.suppressTurnSpeech = false;
-  console.log('PC_SSE: submit START cid=%s content_len=%d image_mode=%s', cidAtSubmit, content.length, imageMode);
   try {
     await streamReply(content, atts.map((a) => a.id), imageMode, turn);
   } catch (err) {
-    console.log('PC_SSE: submit CATCH', err?.name, err?.message);
-    if (err.name !== 'AbortError' && state.turn === turn) {
+    if (err.name !== 'AbortError' && isOpenTurn(turn)) {
       toast(t('toast_reply_failed', apiErrorText(err)), { error: true });
     }
   } finally {
-    const dt = (performance.now() - state._sseTurnStart).toFixed(0);
-    console.log('PC_SSE: submit FINALLY cid=%s gotDone=%s gotError=%s deltas=%d elapsed=%sms',
-      cidAtSubmit, state._sseGotDone, state._sseGotError, state._sseDeltaCount, dt);
-    if (state.turn === turn) {
-      if (state.cid === cidAtSubmit && state.isStreaming && !state._sseGotDone && !state._sseGotError) {
-        if (state.stoppedByUser) finalizeStopped();
-        else {
-          // Stream zu, aber weder done noch Fehler: der Server hat die Antwort
-          // vermutlich gespeichert. Neu laden statt Punkte stehen zu lassen.
-          console.warn('PC_SSE: submit RESCUE — stream ended without done; reloading messages');
-          state.isStreaming = false;
-          state.streamingText = '';
-          reloadChatMessages(cidAtSubmit);
+    if (chatTurns.get(turn.cid) === turn) {
+      chatTurns.delete(turn.cid);
+      if (turn.stopped && turn.text) {
+        turn.answer = turnAnswer(turn, -Date.now(), turn.text + '\n\n_' + t('generated_chat_aborted') + '_');
+      }
+      if (isOpenTurn(turn)) {
+        mergeTurnMessages(turn);
+        const stick = distanceFromBottom() < 240;
+        renderMessages();
+        if (stick) scrollToBottom(true);
+        if (!turn.answer && !turn.failed && !turn.stopped) reloadChatMessages(turn.cid);
+        const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
+        if (state.view === 'chat' && !isCurrentChatLocked() && turn.answer?.id > 0) {
+          if (!state.suppressTurnSpeech && (voiceLoop || autoSpeakFor(turn.cid))) speak(turn.answer.id);
+          notifyDone(turn.answer);
         }
       }
-      state.isStreaming = false;
-      state.abort = null;
-      state.turn = 0;
-      updateComposerState();
+      refreshChatList();
     }
   }
-  refreshChatList();
   return true;
 }
 
-let _turnSeq = 0;
-function stopStreamLocal() {
-  if (state.abort) { try { state.abort.abort(); } catch {} state.abort = null; }
-  state.turn = 0;
-  state.isStreaming = false;
-  state.streamingText = '';
-  state.streamingThinking = '';
-  state._streamAttachments = [];
+function isOpenTurn(turn) {
+  return state.cid === turn.cid && !state.chatLoading && !state.chatLoadFailed;
 }
-/** Stoppen wie in der App: Verbindung kappen, bisherigen Text als
- *  abgebrochene Antwort stehen lassen. */
-function stopGenerating() {
-  if (!state.isStreaming) return;
-  state.stoppedByUser = true;
-  if (state.abort) { try { state.abort.abort(); } catch {} }
-}
-function finalizeStopped() {
-  const partial = state.streamingText;
-  if (partial) {
-    state.messages.push({
-      id: -Date.now(), role: 'assistant',
-      content: partial + '\n\n_' + t('generated_chat_aborted') + '_',
-      attachments: state._streamAttachments.slice(),
-      _thinking: state.streamingThinking,
-      created_at: new Date().toISOString(),
-    });
+
+// Ein GET beim Zurueckwechseln kann vor dem letzten Stream-Ereignis
+// entstanden sein. Bereits gespeicherte Nachrichten nur einmal anzeigen.
+function mergeTurnMessages(turn) {
+  const draftIndex = state.messages.indexOf(turn.userMessage);
+  const savedId = turn.savedUserId;
+  if (savedId && state.messages.some((m) => m.id === savedId && m !== turn.userMessage)) {
+    if (draftIndex >= 0) state.messages.splice(draftIndex, 1);
+  } else {
+    if (savedId) turn.userMessage.id = savedId;
+    if (draftIndex < 0) state.messages.push(turn.userMessage);
   }
-  state.isStreaming = false;
-  state.streamingText = '';
-  state.streamingThinking = '';
-  state._streamAttachments = [];
-  renderMessages();
+  if (turn.answer && !state.messages.some((m) => m.id === turn.answer.id)) state.messages.push(turn.answer);
+}
+
+function turnAnswer(turn, id, content, tokens = 0) {
+  return {
+    id,
+    role: 'assistant',
+    content,
+    attachments: turn.attachments,
+    _thinking: turn.thinking,
+    tokens,
+    created_at: new Date().toISOString(),
+  };
+}
+
+function stopGenerating() {
+  const turn = chatTurns.get(state.cid);
+  if (!turn) return;
+  turn.stopped = true;
+  turn.controller.abort();
 }
 
 // Gedaechtnis-Schluessel (wie in der App): je Konto ein Eintrag, gebunden an
@@ -2765,9 +2774,6 @@ function wissenVergessen() {
 }
 
 async function streamReply(content, attachmentIds, imageMode, turn) {
-  if (state.abort) { try { state.abort.abort(); } catch {} }
-  const ctrl = new AbortController();
-  state.abort = ctrl;
   const headers = {
     'Authorization': 'Bearer ' + state.token,
     'Content-Type': 'application/json',
@@ -2775,7 +2781,7 @@ async function streamReply(content, attachmentIds, imageMode, turn) {
   };
   const wissen = wissenSchluessel();
   if (wissen) headers['X-Wissen-Schluessel'] = wissen;
-  const resp = await fetch(state.serverUrl + '/conversations/' + state.cid + '/messages', {
+  const resp = await fetch(state.serverUrl + '/conversations/' + turn.cid + '/messages', {
     method: 'POST',
     headers,
     // Mit Schluessel keiner Weiterleitung folgen: der Browser wuerde den Header
@@ -2796,7 +2802,7 @@ async function streamReply(content, attachmentIds, imageMode, turn) {
       tts_rate: ttsRates().server,
       image_mode: !!imageMode,
     }),
-    signal: ctrl.signal,
+    signal: turn.controller.signal,
   });
   if (!resp.ok) {
     const txt = await resp.text().catch(() => '');
@@ -2822,14 +2828,12 @@ async function streamReply(content, attachmentIds, imageMode, turn) {
     while ((idx = buffer.indexOf('\n\n')) >= 0) {
       const raw = buffer.slice(0, idx);
       buffer = buffer.slice(idx + 2);
-      // Abgeloester Turn (Chatwechsel): nichts mehr in den neuen Chat schreiben.
-      if (state.turn !== turn) return;
-      handleSseEvent(raw);
+      handleSseEvent(raw, turn);
     }
   }
 }
 
-function handleSseEvent(raw) {
+function handleSseEvent(raw, turn) {
   let event = 'message';
   let data = '';
   for (const line of raw.split('\n')) {
@@ -2838,85 +2842,49 @@ function handleSseEvent(raw) {
   }
   let payload = {};
   if (data) { try { payload = JSON.parse(data); } catch {} }
-  if (event === 'delta') {
-    state._sseDeltaCount = (state._sseDeltaCount || 0) + 1;
-    if (state._sseDeltaCount <= 3 || state._sseDeltaCount % 25 === 0) {
-      console.log('PC_SSE: recv delta #%d len=%d', state._sseDeltaCount, (payload.text || '').length);
-    }
-  } else if (event !== 'thinking_delta') {
-    console.log('PC_SSE: recv event=%s payload=%o', event, payload);
-  }
+  const open = isOpenTurn(turn);
   switch (event) {
     case 'title': {
-      state.title = payload.title || state.title;
-      const chat = state.chats.find((c) => c.id === state.cid);
-      if (chat) chat.title = state.title;
-      const item = document.querySelector(`.chat-item[data-cid="${CSS.escape(state.cid || '')}"] .title`);
-      if (item) item.textContent = state.title;
-      updateTopbar();
+      if (!payload.title) break;
+      const chat = state.chats.find((c) => c.id === turn.cid);
+      if (chat) chat.title = payload.title;
+      const item = document.querySelector(`.chat-item[data-cid="${CSS.escape(turn.cid)}"] .title`);
+      if (item) item.textContent = payload.title;
+      if (open) { state.title = payload.title; updateTopbar(); }
       break;
     }
-    case 'user_saved': {
-      const lastUser = [...state.messages].reverse().find((m) => m.role === 'user' && m.id < 0);
-      if (lastUser) lastUser.id = payload.user_message_id;
+    case 'user_saved':
+      turn.savedUserId = payload.user_message_id;
+      if (open) mergeTurnMessages(turn);
+      // Neue Chats tauchen erst mit ihrer ersten gespeicherten Nachricht links auf.
+      if (!state._allCids.includes(turn.cid)) refreshChatList();
       break;
-    }
     case 'delta':
-      state.streamingText += payload.text || '';
-      updateStreaming();
+      turn.text += payload.text || '';
+      if (open) updateStreaming();
       break;
     case 'thinking_delta':
-      state.streamingThinking += payload.text || '';
-      updateStreaming();
+      turn.thinking += payload.text || '';
+      if (open) updateStreaming();
       break;
     case 'image':
-      // Das Modell hat mitten in der Antwort Bilder erzeugt: sofort zeigen.
       (payload.attachments || []).forEach((a) => {
-        if (a && a.id && !state._streamAttachments.some((x) => x.id === a.id)) state._streamAttachments.push(a);
+        if (a && a.id && !turn.attachments.some((x) => x.id === a.id)) turn.attachments.push(a);
       });
-      updateStreaming();
+      if (open) updateStreaming();
       break;
     case 'done': {
-      state._sseGotDone = true;
       const msgId = payload.assistant_message_id || payload.message_id;
-      state.messages.push({
-        id: msgId,
-        role: 'assistant',
-        content: state.streamingText,
-        attachments: state._streamAttachments.slice(),
-        _thinking: state.streamingThinking,
-        tokens: (payload.tokens_in || 0) + (payload.tokens_out || 0),
-        created_at: new Date().toISOString(),
-      });
-      state._streamAttachments = [];
-      state.streamingText = '';
-      state.streamingThinking = '';
-      state.isStreaming = false;
-      // Wer beim Mitlesen unten war, bleibt unten: das Neuzeichnen der fertigen
-      // Antwort aendert die Hoehe und wuerde den Schluss sonst verdecken.
-      const stick = distanceFromBottom() < 240;
-      renderMessages();
-      if (stick) scrollToBottom(true);
-      updateComposerState();
-      refreshChatList();
-      // Vorlesen: im Sprachgespraech immer, sonst nach Chat- bzw. Standardwahl.
-      const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
-      if (msgId && !state.suppressTurnSpeech && (voiceLoop || autoSpeakFor(state.cid))) speak(msgId);
-      notifyDone(state.messages[state.messages.length - 1]);
+      const tokens = (payload.tokens_in || 0) + (payload.tokens_out || 0);
+      turn.answer = turnAnswer(turn, msgId, turn.text, tokens);
       break;
     }
     case 'error':
-      state._sseGotError = true;
-      state._streamAttachments = [];
-      toast(t('toast_server_error', payload.message || ''), { error: true });
-      state.isStreaming = false;
-      state.streamingText = '';
-      state.streamingThinking = '';
-      renderMessages();
-      updateComposerState();
+      turn.failed = true;
+      if (open) toast(t('toast_server_error', payload.message || ''), { error: true });
       break;
     case 'compaction_started':
-      toast(t('toast_compacting'));
+      if (open) toast(t('toast_compacting'));
       break;
   }
 }
