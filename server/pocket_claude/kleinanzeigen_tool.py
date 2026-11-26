@@ -2,18 +2,22 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import SplitResult, unquote, urlsplit
 
-from pocket_claude import cli_runner
+from pocket_claude import cli_runner, listing_media
 from pocket_claude.config import settings
 
 log = logging.getLogger(__name__)
 
 MAX_RESULTS = 8
+MAX_LISTED_PHOTOS = 20
+MAX_PHOTOS_PER_TURN = 3
 SORT = {"newest": "date", "price": "price", "price_desc": "price-desc"}
 AD_ID = re.compile(r"[0-9]{1,20}")
 AD_PATH = re.compile(r"/s-anzeige/(?:([0-9]{1,20})|[^/]+/([0-9]{1,20})-[0-9]+-[0-9]+)/?")
@@ -37,12 +41,32 @@ SEARCH_PARAMETERS = {
 }
 DETAIL_PARAMETERS = {
     "type": "object",
-    "properties": {"url": {"type": "string", "description": "Kleinanzeigen-Link oder Anzeigen-ID."}},
+    "properties": {
+        "url": {"type": "string", "description": "Kleinanzeigen-Link oder Anzeigen-ID."},
+        "photo_numbers": {
+            "type": "array",
+            "description": "Nur für Bildanalyse: Fotonummern in Anzeigenreihenfolge (erstes Foto: [1]).",
+            "items": {"type": "integer", "minimum": 1, "maximum": MAX_LISTED_PHOTOS},
+            "minItems": 1,
+            "maxItems": MAX_PHOTOS_PER_TURN,
+            "uniqueItems": True,
+        },
+    },
     "required": ["url"],
 }
 
 # One PocketClot worker shares the CLI's persisted request pacing state.
 _cli_lock = asyncio.Lock()
+
+
+@dataclass
+class PhotoBudget:
+    remaining: int = MAX_PHOTOS_PER_TURN
+
+    def reserve(self, numbers: list[int]) -> list[int]:
+        selected = numbers[:self.remaining]
+        self.remaining -= len(selected)
+        return selected
 
 
 def configured() -> bool:
@@ -158,10 +182,6 @@ def _listing(raw: object, *, detail: bool) -> dict[str, Any] | None:
             _clip(key, 80): _clip(value, 160) for key, value in list(attrs.items())[:24]
             if isinstance(value, str)
         }
-    if detail and isinstance(pictures := raw.get("pictures"), list):
-        result["pictures"] = [url for url in pictures[:20] if isinstance(url, str)
-                              and len(url) <= 400 and url.startswith("https://")
-                              and _public_url(url, {PHOTO_HOST})]
     return result
 
 
@@ -194,7 +214,8 @@ async def search(args: dict) -> dict:
     return _result(listings, "Aktuelle Angebote auf Kleinanzeigen in Euro.")
 
 
-async def detail(args: dict) -> dict:
+async def detail(args: dict, *, photo_budget: PhotoBudget | None = None,
+                 supports_vision: bool = True) -> dict:
     value = args.get("url")
     if not isinstance(value, str):
         return _error("Bitte einen Kleinanzeigen-Link oder eine Anzeigen-ID angeben.")
@@ -202,6 +223,12 @@ async def detail(args: dict) -> dict:
     ad_id = value if AD_ID.fullmatch(value) else ad_id_from_url(value)
     if not ad_id:
         return _error("Bitte einen Kleinanzeigen-Link oder eine Anzeigen-ID angeben.")
+    numbers = args.get("photo_numbers", [])
+    if (not isinstance(numbers, list) or len(numbers) > MAX_PHOTOS_PER_TURN
+            or any(type(n) is not int or not 1 <= n <= MAX_LISTED_PHOTOS for n in numbers)
+            or len(set(numbers)) != len(numbers)):
+        return _error(f"Bitte höchstens {MAX_PHOTOS_PER_TURN} unterschiedliche Fotonummern "
+                      f"zwischen 1 und {MAX_LISTED_PHOTOS} angeben.")
     try:
         row = await _read(["ad", "--json", ad_id])
     except cli_runner.CliError as exc:
@@ -209,8 +236,36 @@ async def detail(args: dict) -> dict:
     item = _listing(row, detail=True)
     if not item or item["id"] != ad_id:
         return _error("Kleinanzeigen hat ungültige Anzeigendaten geliefert.")
+    pictures = {}
+    if isinstance(urls := row.get("pictures"), list):
+        pictures = {n: url for n, url in enumerate(urls[:MAX_LISTED_PHOTOS], 1)
+                    if isinstance(url, str) and len(url) <= 400 and url.startswith("https://")
+                    and _public_url(url, {PHOTO_HOST})}
+        item["pictures"] = list(pictures.values())
     label = {
         "GONE": "Die Anzeige wurde gelöscht oder ist abgelaufen.",
         "PAUSED": "Die Anzeige ist pausiert, möglicherweise reserviert.",
     }.get(item.get("status"), "Öffentliche Kleinanzeige.")
-    return _result([item], label, as_detail=True)
+    result = _result([item], label, as_detail=True)
+    if not numbers:
+        return result
+    if not supports_vision:
+        result["text"] += "\nDieses Modell kann die angeforderten Fotos nicht ansehen."
+        return result
+
+    available = [n for n in numbers if n in pictures]
+    selected = (photo_budget or PhotoBudget()).reserve(available)
+    raw_images = await asyncio.gather(*(listing_media.fetch_photo(pictures[n]) for n in selected))
+    images = [
+        {"label": f"Kleinanzeige {ad_id}, Foto {n}", "mime_type": "image/jpeg",
+         "data": base64.b64encode(raw).decode("ascii")}
+        for n, raw in zip(selected, raw_images) if raw is not None
+    ]
+    missing = [str(n) for n in numbers if n not in selected
+               or raw_images[selected.index(n)] is None]
+    if images:
+        result["images"] = images
+        result["text"] += "\nDie beigefügten Fotos sind mit ihrer Nummer in der Anzeige beschriftet."
+    if missing:
+        result["text"] += f"\nOhne Bilddaten geblieben (fehlt, Abruf fehlgeschlagen oder Fotolimit): {', '.join(missing)}."
+    return result
