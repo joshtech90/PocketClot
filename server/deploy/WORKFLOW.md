@@ -74,13 +74,20 @@ to the service user. Leave the setting empty to disable the tools.
 PocketClot uses the CLI's public mobile-API search and ad detail commands with
 JSON output. Check both commands from the server before enabling the tools.
 PocketClot uses a dedicated state directory under `DATA_DIR`; keep this
-installation signed out of Kleinanzeigen. The chat can search, read listing
-details and return photo links. The existing Web search and Web fetch switches
-control search and ad details respectively.
+installation signed out of Kleinanzeigen. The chat can search and read listing
+details. With Web fetch enabled, ask it to inspect the first photo or up to
+three numbered photos per reply. PocketClot retrieves the selected photos
+from Kleinanzeigen's photo CDN and sends image data to vision-capable models.
+Listing details remain available if a photo fails. Photos in persisted
+Claude sessions are part of the tool history and may use context on later
+replies. Gemini and GPT receive the photos during the current turn.
+Install the server requirements, including Pillow, before restarting.
 
 For another CLI, add a provider module that validates parameters, calls fixed
 read-only commands through `pocket_claude/cli_runner.py`, and converts their
-JSON to the chat tool result (`ok`, `text`, `sources`). Register its tools in
+JSON to the chat tool result (`ok`, `text`, `sources`). A tool that returns
+validated photos can also include `images` with a `label`, `mime_type` and
+base64-encoded `data` for each photo. Register its tools in
 `pocket_claude/research_tools.py`. Each registration declares its capability
 check and the existing web skill it follows. A details tool can also match the
 public URLs it handles. Both chat engines use the same registrations.

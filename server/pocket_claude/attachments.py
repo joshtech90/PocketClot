@@ -278,6 +278,10 @@ def _bildformat(head: bytes) -> str | None:
     return None
 
 
+def image_base64(raw: bytes) -> str:
+    return base64.b64encode(raw).decode("ascii")
+
+
 def inline_images(
     attach_ids: list[str], attachments_by_id: dict[str, dict]
 ) -> tuple[list[dict], set[str]]:
@@ -305,7 +309,7 @@ def inline_images(
             continue
         blocks.append({"type": "image", "source": {
             "type": "base64", "media_type": mime,
-            "data": base64.b64encode(raw).decode("ascii")}})
+            "data": image_base64(raw)}})
         ids.add(aid)
     return blocks, ids
 

@@ -665,7 +665,13 @@ def _build_image_mcp_server(user_id: str | None, image_defaults: dict | None,
         @tool(spec.name, spec.description, spec.parameters)
         async def handler(args: dict) -> dict:
             result = await spec.run(args or {})
-            return {"content": [{"type": "text", "text": result["text"]}],
+            content = [{"type": "text", "text": result["text"]}]
+            for image in result.get("images", []):
+                content.extend([
+                    {"type": "text", "text": image["label"]},
+                    {"type": "image", "mimeType": image["mime_type"], "data": image["data"]},
+                ])
+            return {"content": content,
                     "is_error": not result["ok"]}
 
         return handler

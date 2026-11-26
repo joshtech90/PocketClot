@@ -16,3 +16,5 @@ pyzipper>=0.3,<1.0
 claude-agent-sdk>=0.2.82,<1.0
 anthropic>=0.40,<1.0
 cryptography>=42
+# Decode and bound photos from the Kleinanzeigen CDN before sending to models.
+pillow>=12.3,<13.0

@@ -1,7 +1,8 @@
 """Read-only research tools shared by the chat engines."""
 
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import partial
 
 from pocket_claude import kleinanzeigen_tool
 
@@ -17,6 +18,24 @@ class ResearchTool:
     matches_url: Callable[[str], bool] | None = None
 
 
+_DETAIL = ResearchTool(
+    name="kleinanzeigen_detail",
+    description=(
+        "Lies eine öffentliche Kleinanzeigen-Anzeige per Link oder Anzeigen-ID. "
+        "Wenn der Nutzer Fotos ansehen oder auswerten lassen will, setze photo_numbers "
+        "auf die gewünschten Fotonummern (für das erste Foto [1], höchstens drei pro Antwort). "
+        "Das Werkzeug fügt die verfügbaren Fotos als Bilder bei. Beschreibe sichtbare Details "
+        "nur anhand dieser Bilder. Leite Maße, Material oder Produktmodelle nur ab, wenn sie "
+        "im Bild eindeutig erkennbar sind. Ohne photo_numbers bekommst du Text und Fotolinks. "
+        "Berücksichtige den Status und verlinke die Anzeige über url."
+    ),
+    parameters=kleinanzeigen_tool.DETAIL_PARAMETERS,
+    skill="web_fetch",
+    configured=kleinanzeigen_tool.configured,
+    run=kleinanzeigen_tool.detail,
+    matches_url=lambda url: kleinanzeigen_tool.ad_id_from_url(url) is not None,
+)
+
 _TOOLS = (
     ResearchTool(
         name="kleinanzeigen_search",
@@ -30,25 +49,18 @@ _TOOLS = (
         configured=kleinanzeigen_tool.configured,
         run=kleinanzeigen_tool.search,
     ),
-    ResearchTool(
-        name="kleinanzeigen_detail",
-        description=(
-            "Lies eine öffentliche Kleinanzeigen-Anzeige per Link oder Anzeigen-ID. "
-            "Verwende dies für Kleinanzeigen-Anzeigenlinks und für Details zu Suchtreffern. "
-            "Berücksichtige den Status. Verlinke die Anzeige über url und Fotos bei Bedarf "
-            "über pictures. Die Bilder wurden nicht angesehen."
-        ),
-        parameters=kleinanzeigen_tool.DETAIL_PARAMETERS,
-        skill="web_fetch",
-        configured=kleinanzeigen_tool.configured,
-        run=kleinanzeigen_tool.detail,
-        matches_url=lambda url: kleinanzeigen_tool.ad_id_from_url(url) is not None,
-    ),
+    _DETAIL,
 )
 
 
-def available(skills: Mapping[str, bool]) -> dict[str, ResearchTool]:
-    return {tool.name: tool for tool in _TOOLS if skills.get(tool.skill, True) and tool.configured()}
+def available(skills: Mapping[str, bool], *, supports_vision: bool = True) -> dict[str, ResearchTool]:
+    """Bind the tools and their photo budget to one chat turn."""
+    found = {tool.name: tool for tool in _TOOLS if skills.get(tool.skill, True) and tool.configured()}
+    if _DETAIL.name in found:
+        found[_DETAIL.name] = replace(_DETAIL, run=partial(
+            _DETAIL.run, photo_budget=kleinanzeigen_tool.PhotoBudget(), supports_vision=supports_vision,
+        ))
+    return found
 
 
 def web_fetch_tools() -> dict[str, ResearchTool]:
