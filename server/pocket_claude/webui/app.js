@@ -1330,7 +1330,7 @@ async function openChat(cid, opts = {}) {
 let _loadSeq = 0;
 let _newChatSeq = 0;
 function applyDetail(detail, turn) {
-  state.title = detail.title;
+  state.title = turn?.title || detail.title;
   state.pinned = !!detail.pinned;
   state.chatLocked = !!detail.locked;
   state.messages = detail.messages || [];
@@ -2666,6 +2666,7 @@ async function sendMessage(rawText, opts = {}) {
     cid: state.cid,
     controller: new AbortController(),
     userMessage: { id: -Date.now(), role: 'user', content, attachments: atts, created_at: new Date().toISOString() },
+    title: null,
     savedUserId: null,
     answer: null,
     text: '',
@@ -2688,31 +2689,34 @@ async function sendMessage(rawText, opts = {}) {
   try {
     await streamReply(content, atts.map((a) => a.id), imageMode, turn);
   } catch (err) {
-    if (err.name !== 'AbortError' && isOpenTurn(turn)) {
+    if (err.name !== 'AbortError' && chatTurns.get(turn.cid) === turn && isOpenTurn(turn)) {
       toast(t('toast_reply_failed', apiErrorText(err)), { error: true });
     }
   } finally {
-    if (chatTurns.get(turn.cid) === turn) {
-      chatTurns.delete(turn.cid);
-      if (turn.stopped && turn.text) {
-        turn.answer = turnAnswer(turn, -Date.now(), turn.text + '\n\n_' + t('generated_chat_aborted') + '_');
-      }
-      if (isOpenTurn(turn)) {
-        mergeTurnMessages(turn);
-        const stick = distanceFromBottom() < 240;
-        renderMessages();
-        if (stick) scrollToBottom(true);
-        if (!turn.answer && !turn.failed && !turn.stopped) reloadChatMessages(turn.cid);
-        const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
-        if (state.view === 'chat' && !isCurrentChatLocked() && turn.answer?.id > 0) {
-          if (!state.suppressTurnSpeech && (voiceLoop || autoSpeakFor(turn.cid))) speak(turn.answer.id);
-          notifyDone(turn.answer);
-        }
-      }
-      refreshChatList();
-    }
+    finishTurn(turn);
   }
   return true;
+}
+
+function finishTurn(turn) {
+  if (chatTurns.get(turn.cid) !== turn) return;
+  chatTurns.delete(turn.cid);
+  if (turn.stopped && turn.text) {
+    turn.answer = turnAnswer(turn, -Date.now(), turn.text + '\n\n_' + t('generated_chat_aborted') + '_');
+  }
+  if (isOpenTurn(turn)) {
+    mergeTurnMessages(turn);
+    const stick = distanceFromBottom() < 240;
+    renderMessages();
+    if (stick) scrollToBottom(true);
+    if (!turn.answer && !turn.failed && !turn.stopped) reloadChatMessages(turn.cid);
+    const voiceLoop = window.PocketVoice && window.PocketVoice.isAutoMode();
+    if (state.view === 'chat' && !isCurrentChatLocked() && turn.answer?.id > 0) {
+      if (!state.suppressTurnSpeech && (voiceLoop || autoSpeakFor(turn.cid))) speak(turn.answer.id);
+      notifyDone(turn.answer);
+    }
+  }
+  refreshChatList();
 }
 
 function isOpenTurn(turn) {
@@ -2828,7 +2832,7 @@ async function streamReply(content, attachmentIds, imageMode, turn) {
     while ((idx = buffer.indexOf('\n\n')) >= 0) {
       const raw = buffer.slice(0, idx);
       buffer = buffer.slice(idx + 2);
-      handleSseEvent(raw, turn);
+      if (chatTurns.get(turn.cid) === turn) handleSseEvent(raw, turn);
     }
   }
 }
@@ -2846,6 +2850,7 @@ function handleSseEvent(raw, turn) {
   switch (event) {
     case 'title': {
       if (!payload.title) break;
+      turn.title = payload.title;
       const chat = state.chats.find((c) => c.id === turn.cid);
       if (chat) chat.title = payload.title;
       const item = document.querySelector(`.chat-item[data-cid="${CSS.escape(turn.cid)}"] .title`);
@@ -2877,11 +2882,14 @@ function handleSseEvent(raw, turn) {
       const msgId = payload.assistant_message_id || payload.message_id;
       const tokens = (payload.tokens_in || 0) + (payload.tokens_out || 0);
       turn.answer = turnAnswer(turn, msgId, turn.text, tokens);
+      // Der Server kann nach der fertigen Antwort noch Vorlese-Audio vorbereiten.
+      finishTurn(turn);
       break;
     }
     case 'error':
       turn.failed = true;
       if (open) toast(t('toast_server_error', payload.message || ''), { error: true });
+      finishTurn(turn);
       break;
     case 'compaction_started':
       if (open) toast(t('toast_compacting'));
