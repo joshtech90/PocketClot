@@ -541,3 +541,9 @@ def test_existing_chat_send_and_model_selection_endpoints(monkeypatch):
             assert rewind.status_code == 400
 
     asyncio.run(run())
+
+
+def test_gateway_repr_never_contains_api_key():
+    gw = gateways.GatewayConfig(id="g", label="G", base_url="https://x/v1", api_key="geheim-123")
+    assert "geheim-123" not in repr(gw)
+    assert gw.api_key == "geheim-123"

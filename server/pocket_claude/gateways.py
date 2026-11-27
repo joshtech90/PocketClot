@@ -105,7 +105,7 @@ class GatewayConfig:
     id: str
     label: str
     base_url: str          # ohne Slash am Ende, inklusive /v1
-    api_key: str = ""
+    api_key: str = field(default="", repr=False)  # nie in Logs oder Ausgaben
     timeout: float = 120.0
     # Darf eine Denktiefe zusaetzlich zur Modell-Variante mitgeschickt werden?
     # Fuer alle bekannten Gateways ja; abschaltbar, falls eines daran erstickt.
