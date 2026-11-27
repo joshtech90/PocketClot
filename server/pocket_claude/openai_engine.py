@@ -26,13 +26,15 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
+from contextlib import aclosing
 from pathlib import Path
 from typing import AsyncIterator
 
 import httpx
 
 from pocket_claude import attachments as att_mod
-from pocket_claude import db, gateways, research_tools, usage, web_tool
+from pocket_claude import db, gateways, research_tools, system_prompts, tts, usage, web_tool
 from pocket_claude.config import settings
 
 log = logging.getLogger(__name__)
@@ -64,6 +66,21 @@ MAX_IMAGES_PER_TURN = 4
 # Inaktivitaets-Timeout: ein Gateway, das alle paar Sekunden ein Byte schickt,
 # koennte sonst ewig laufen und Verbindung plus Task blockieren.
 MAX_TURN_SECONDS = 900.0
+
+_SSE_ERROR_STATUSES = {
+    "UNAUTHENTICATED": 401, "PERMISSION_DENIED": 403, "NOT_FOUND": 404,
+    "RESOURCE_EXHAUSTED": 429, "INTERNAL": 500, "UNAVAILABLE": 503,
+    "DEADLINE_EXCEEDED": 504,
+}
+
+
+def _stream_error_status(error: object) -> int:
+    if not isinstance(error, dict):
+        return 0
+    code = str(error.get("code", ""))
+    if code.isascii() and code.isdecimal() and len(code) == 3:
+        return int(code)
+    return _SSE_ERROR_STATUSES.get(str(error.get("status")), 0)
 
 
 # ---------- Verlauf ----------
@@ -415,6 +432,38 @@ def _merge_tool_call_delta(acc: dict[int, dict], deltas: list) -> None:
 
 # ---------- Hauptfunktion ----------
 
+class _RetryableStartError(Exception):
+    """Ein Gateway-Fehler, bevor der Startversuch einen Token geliefert hat."""
+
+    def __init__(self, message: str, *, gateway_unreachable: bool = False):
+        super().__init__(message)
+        self.gateway_unreachable = gateway_unreachable
+
+
+def _retryable_status(status: int, body: str) -> bool:
+    if status in (401, 403):
+        from pocket_claude.image_engine import explain_block
+
+        low = body.lower()
+        return (explain_block(body) is None and not _effort_rejected(body)
+                and not any(marker in low for marker in (
+                    '"safety"', "blocked by safety", "prompt blocked", "moderation block",
+                )))
+    if status == 404:
+        return any(marker in body.lower() for marker in ("model_not_found", "unknown provider"))
+    return status == 429 or 500 <= status < 600
+
+
+# Fehler, die das ganze Gateway betreffen und nicht nur ein Modell: Anmeldung
+# am Gateway, Gateway-Filter oder Dienst dahinter nicht verfuegbar. Dann darf
+# der Ersatz nicht auf demselben Gateway liegen, sonst scheitert er genauso.
+_GATEWAY_DOWN_STATUSES = frozenset({401, 403, 502, 503, 504})
+
+# Hoechstens so viele Ersatzanlaeufe je Turn: ein anderes Gemini-Modell, dann
+# der letzte Ausweg. Mehr wuerde einen Ausfall nur in die Laenge ziehen.
+MAX_START_RETRIES = 2
+
+
 async def stream_reply(
     cid: str,
     user_message_id: int,
@@ -438,27 +487,87 @@ async def stream_reply(
     """
     log.info("PC_GW: stream_reply START cid=%s msg=%s model=%s effort=%s",
              cid, user_message_id, model_key, effort)
+    try:
+        models = await gateways.list_models(curated=False)
+        selected = gateways.select_turn_model(model_key, models)
+    except KeyError:
+        yield {"type": "error", "message": (
+            f"Das Modell '{model_key}' wird gerade nicht angeboten. "
+            "Bitte in den Einstellungen ein anderes waehlen."
+        )}
+        return
+    except Exception as exc:  # von Discovery darf keine Ausnahme den Stream verlassen
+        log.exception("PC_GW: Modellauswahl fehlgeschlagen cid=%s", cid)
+        yield {"type": "error", "message": f"{type(exc).__name__}: {exc}"}
+        return
+
+    wanted_effort = (effort or "").strip() or settings.extra_model_default_effort
+    failed_key = model_key
+    failed_keys: set[str] = set()
+    down_gateways: set[str] = set()
+    deadline = asyncio.get_running_loop().time() + MAX_TURN_SECONDS
+    for attempt in range(MAX_START_RETRIES + 1):
+        allow_retry = attempt < MAX_START_RETRIES
+        model = selected.model
+        if selected.reason != "exact":
+            log.warning("PC_GW: %s -> %s (%s)", failed_key, model.key, selected.reason)
+        notice = ""
+        if selected.reason == "last_resort":
+            # Satzzeichen in der Gateway-Bezeichnung duerfen beim Live-
+            # Vorlesen keinen Schnitt mitten im Hinweis ausloesen.
+            label = re.sub(r"[^\w .-]|_|\.(?!\d)", " ", model.label).strip()
+            label = label or model.family.upper()
+            notice = f"_{tts.GEMINI_UNAVAILABLE}{label} antwortet._\n\n"
+
+        try:
+            async with aclosing(_stream_attempt(
+                cid, user_message_id, model,
+                wanted_effort=wanted_effort, system_prompt=system_prompt, user_id=user_id,
+                extra_attachment_ids=extra_attachment_ids, allow_image_tool=allow_image_tool,
+                image_defaults=image_defaults, skills=skills, wissen_schluessel=wissen_schluessel,
+                image_wish=image_wish, deadline=deadline, notice=notice,
+                allow_retry=allow_retry and model.family == "gemini",
+            )) as events:
+                pending_notice = notice
+                async for event in events:
+                    if pending_notice and event["type"] in ("delta", "image", "done"):
+                        yield {"type": "delta", "text": pending_notice}
+                        pending_notice = ""
+                    yield event
+            return
+        except _RetryableStartError as exc:
+            log.warning("PC_GW: %s: %s", model.key, exc)
+            failed_keys.add(model.key)
+            if exc.gateway_unreachable:
+                down_gateways.add(model.gateway_id)
+            try:
+                alternatives = [m for m in models if m.key not in failed_keys
+                                and m.gateway_id not in down_gateways]
+                selected = gateways.select_turn_model(
+                    model.key, alternatives, failed_key=model.key,
+                )
+            except KeyError:
+                yield {"type": "error", "message": str(exc)}
+                return
+            failed_key = model.key
+
+
+async def _stream_attempt(
+    cid: str, user_message_id: int, model: gateways.ChatModel, *, wanted_effort: str,
+    system_prompt: str | None, user_id: str | None, extra_attachment_ids: list[str] | None,
+    allow_image_tool: bool, image_defaults: dict | None, skills: dict | None,
+    wissen_schluessel: str | None, image_wish: bool, deadline: float, notice: str,
+    allow_retry: bool,
+) -> AsyncIterator[dict]:
     # Beides ausserhalb des try, damit ein Fehler NACH einer Bilderzeugung die
     # Bilder nicht verwaisen laesst: sie sind dem Nutzer schon angezeigt worden
     # und liegen als Attachment auf der Platte.
     full_text_parts: list[str] = []
     image_attachments: list[dict] = []
     web_sources: list[dict] = []
+    can_retry = False
     try:
-        # Ungefiltert: die Kuratierung bestimmt nur, was im Picker steht.
-        # Ein Chat mit einem aelteren Modell muss weiterlaufen duerfen.
-        models = await gateways.list_models(curated=False)
-        # Ohne Wunsch vom Client gilt die Server-Vorgabe aus der .env.
-        wanted_effort = (effort or "").strip() or settings.extra_model_default_effort
-        try:
-            model, model_id, reasoning_effort = gateways.resolve(
-                model_key, wanted_effort, models)
-        except KeyError:
-            yield {"type": "error", "message": (
-                f"Das Modell '{model_key}' wird gerade nicht angeboten. "
-                f"Bitte in den Einstellungen ein anderes waehlen."
-            )}
-            return
+        _, model_id, reasoning_effort = gateways.resolve(model.key, wanted_effort, [model])
 
         gw = gateways.gateway_by_id(model.gateway_id)
         if gw is None:
@@ -468,8 +577,11 @@ async def stream_reply(
             )}
             return
 
+        prompt = system_prompts.adapt_for_model(
+            system_prompt, model_label=model.label, family=model.family,
+        )
         messages = await _build_messages(
-            cid, user_message_id, (system_prompt or "").strip(), model, extra_attachment_ids,
+            cid, user_message_id, (prompt or "").strip(), model, extra_attachment_ids,
         )
 
         # Werkzeuge zusammenstellen. Die Schalter sind dieselben wie bei
@@ -567,9 +679,8 @@ async def stream_reply(
         # Gateway sie nicht, wird sie einmalig fuer diesen Turn abgeschaltet,
         # statt jeden Anlauf an HTTP 400 scheitern zu lassen.
         search_disabled = False
-        deadline = asyncio.get_running_loop().time() + MAX_TURN_SECONDS
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        can_retry = allow_retry
+        async with gateways.http_client(gw, timeout) as client:
             # Bewusst eine while-Schleife statt `for ... in range(...)`: ein
             # Anlauf, den das Modell wegen einer nicht unterstuetzten Denktiefe
             # abgelehnt hat, soll keine Werkzeug-Runde verbrauchen.
@@ -637,6 +748,9 @@ async def stream_reply(
                             effort_retries += 1
                             continue
                         msg = _http_error_message(resp.status_code, body, gw, model_id)
+                        if can_retry and _retryable_status(resp.status_code, body):
+                            raise _RetryableStartError(msg, gateway_unreachable=(
+                                resp.status_code in _GATEWAY_DOWN_STATUSES))
                         log.warning("PC_GW: %s", msg)
                         yield {"type": "error", "message": msg}
                         return
@@ -667,6 +781,19 @@ async def stream_reply(
                             data_lines.append(line)
                             continue
 
+                        if isinstance(chunk, dict) and chunk.get("error"):
+                            error = chunk["error"]
+                            status = _stream_error_status(error)
+                            message = (_http_error_message(status, raw, gw, model_id) if status
+                                       else f"Gateway-Fehler im Stream: {str(error)[:400]}")
+                            if can_retry and _retryable_status(status, raw):
+                                raise _RetryableStartError(message, gateway_unreachable=(
+                                    status in _GATEWAY_DOWN_STATUSES))
+                            log.warning("PC_GW: %s", message)
+                            await _rescue_partial(cid, [notice, *full_text_parts], image_attachments)
+                            yield {"type": "error", "message": message}
+                            return
+
                         u = chunk.get("usage")
                         if isinstance(u, dict):
                             # Pro Runde EINMAL zaehlen, aber ueber die Runden
@@ -685,9 +812,12 @@ async def stream_reply(
                             continue
                         choice = choices[0]
                         delta = choice.get("delta") or {}
+                        if delta.get("refusal") or choice.get("finish_reason") == "content_filter":
+                            can_retry = False
 
                         think = _reasoning_text(delta)
                         if think:
+                            can_retry = False
                             thinking_open = True
                             yield {"type": "thinking_delta", "text": think}
 
@@ -698,6 +828,7 @@ async def stream_reply(
                                 p.get("text", "") for p in text if isinstance(p, dict)
                             )
                         if text:
+                            can_retry = False
                             if thinking_open:
                                 thinking_open = False
                                 yield {"type": "block_stop"}
@@ -713,6 +844,7 @@ async def stream_reply(
 
                         tc = delta.get("tool_calls")
                         if isinstance(tc, list) and tc:
+                            can_retry = False
                             _merge_tool_call_delta(tool_acc, tc)
 
                 _ = stream_done
@@ -789,7 +921,8 @@ async def stream_reply(
                                     wanted = 1
                                 capped["count"] = max(1, min(wanted, remaining))
                                 result = await image_tool.run(
-                                    user_id, capped, image_defaults or {},
+                                    user_id, capped, {**(image_defaults or {}),
+                                                      "family_hint": model.family},
                                 )
                                 atts = [a for a in (result.get("attachments") or [])
                                         if isinstance(a, dict) and a.get("id")]
@@ -887,7 +1020,7 @@ async def stream_reply(
         msg_id = await db.add_message(
             cid,
             role="assistant",
-            content=full_text,
+            content=(notice + full_text).strip(),
             tokens=context_total,
             attachment_ids=[a["id"] for a in image_attachments] or None,
         )
@@ -917,22 +1050,35 @@ async def stream_reply(
             "tokens_cached_write": 0,
         }
 
-    except httpx.ConnectError as exc:
+    except _RetryableStartError:
+        raise
+    except (httpx.NetworkError, httpx.RemoteProtocolError) as exc:
+        if isinstance(exc, gateways.GatewayTLSConfigError):
+            message = str(exc)
+        else:
+            message = "Das Gateway ist nicht erreichbar. Laeuft der Dienst auf dem Server?"
+        if can_retry:
+            raise _RetryableStartError(message, gateway_unreachable=isinstance(
+                exc, httpx.ConnectError)) from exc
         log.warning("PC_GW: Verbindung fehlgeschlagen: %s", exc)
-        await _rescue_partial(cid, full_text_parts, image_attachments)
-        yield {"type": "error", "message": (
-            "Das Gateway ist nicht erreichbar. Laeuft der Dienst auf dem Server?"
-        )}
-    except httpx.TimeoutException:
-        log.warning("PC_GW: Timeout cid=%s model=%s", cid, model_key)
-        await _rescue_partial(cid, full_text_parts, image_attachments)
-        yield {"type": "error", "message": (
+        await _rescue_partial(cid, [notice, *full_text_parts], image_attachments)
+        if not isinstance(exc, httpx.ConnectError):
+            message = f"{type(exc).__name__}: {exc}"
+        yield {"type": "error", "message": message}
+    except httpx.TimeoutException as exc:
+        message = (
             "Das Modell hat nicht rechtzeitig geantwortet. Versuch es nochmal "
             "oder waehle eine niedrigere Denktiefe."
-        )}
+        )
+        if can_retry:
+            raise _RetryableStartError(message, gateway_unreachable=isinstance(
+                exc, httpx.ConnectTimeout)) from exc
+        log.warning("PC_GW: Timeout cid=%s model=%s", cid, model.key)
+        await _rescue_partial(cid, [notice, *full_text_parts], image_attachments)
+        yield {"type": "error", "message": message}
     except Exception as exc:  # noqa: BLE001 - nach aussen darf nie etwas durchschlagen
         log.exception("PC_GW: unerwarteter Fehler cid=%s", cid)
-        await _rescue_partial(cid, full_text_parts, image_attachments)
+        await _rescue_partial(cid, [notice, *full_text_parts], image_attachments)
         yield {"type": "error", "message": f"{type(exc).__name__}: {exc}"}
 
 

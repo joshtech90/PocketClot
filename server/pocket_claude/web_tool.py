@@ -168,7 +168,8 @@ async def _search_inner(gw: gateways.GatewayConfig, model_id: str, query: str) -
     }
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(SEARCH_TIMEOUT, connect=10.0)) as cli:
+        timeout = httpx.Timeout(SEARCH_TIMEOUT, connect=10.0)
+        async with gateways.http_client(gw, timeout) as cli:
             r = await cli.post(url, headers=headers, json=body)
     except httpx.TimeoutException:
         return {"ok": False, "sources": [],

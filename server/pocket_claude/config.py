@@ -76,8 +76,7 @@ class Settings(BaseSettings):
     # Beide sprechen /v1/models und /v1/chat/completions.
     #
     # Variante 1 (empfohlen, beliebig viele Gateways), JSON-Liste:
-    #   EXTRA_MODEL_GATEWAYS='[{"id":"pool","label":"Paradies-Pool",
-    #     "base_url":"http://127.0.0.1:8317/v1","api_key":"...","timeout":120}]'
+    # Optionale TLS-, Familien- und Denktiefe-Felder siehe .env.example.
     #
     # Variante 2 (Kurzform fuer den Normalfall): die vier Felder darunter.
     # Zeigen beide URLs auf dasselbe Gateway, wird daraus automatisch eins.
@@ -91,6 +90,8 @@ class Settings(BaseSettings):
 
     # Denktiefe, mit der Zusatz-Modelle laufen, wenn der Client keine mitschickt.
     extra_model_default_effort: str = "high"
+    gemini_fallback_model: str = ""
+    extra_model_last_resort: str = "gpt-luna"
 
     # Kuratierung der Zusatz-Modelle. Ein Gateway meldet alles, was irgendein
     # eingeloggtes Konto kann, und das sind schnell ein Dutzend Varianten

@@ -376,7 +376,7 @@ async def get_conversation(cid: str = PathParam(...), user=Depends(require_user)
 
 
 async def _model_key_is_known(model_key: str) -> bool:
-    """Prueft einen Modell-Key, so wie es `send_message` auch tut.
+    """Prueft die ausdrueckliche Modellwahl in PATCH und Rewind.
 
     Leer heisst Claude-Standard und ist immer gueltig. Zusatz-Modelle werden
     UNGEFILTERT geprueft: ein Chat darf auf einem Modell weiterlaufen, das
@@ -596,10 +596,29 @@ async def list_chat_models(
             supports_vision=True, gateway_label="",
         ))
     if wanted and not any(m.key == wanted for m in gw_models):
-        extra = next((m for m in await gateways.list_models(curated=False)
-                      if m.key == wanted), None)
-        if extra is not None:
-            gw_models = [*gw_models, extra]
+        # Bei einem bestehenden Chat muss der angefragte Schluessel sichtbar
+        # bleiben. Android verwirft seine Auswahl sonst vor dem naechsten Turn.
+        # PATCH und Rewind pruefen weiterhin die tatsaechlich angebotenen Keys.
+        all_models = await gateways.list_models(curated=False)
+        try:
+            selected = gateways.select_turn_model(wanted, all_models)
+        except KeyError:
+            pass
+        else:
+            if selected.reason == "exact":
+                gw_models = [*gw_models, selected.model]
+            else:
+                base_id = wanted.split(":", 2)[2]
+                family = gateways.detect_family(base_id)
+                target = selected.model
+                gw_models.append(gateways.ChatModel(
+                    key=wanted, base_id=base_id, gateway_id="", gateway_label="",
+                    family=family,
+                    label=ki_modelle.pool_anzeigename(base_id) or gateways.make_label(base_id),
+                    efforts=target.efforts if family == target.family else [],
+                    default_effort=target.default_effort if family == target.family else "",
+                    supports_vision=target.supports_vision, context_length=target.context_length,
+                ))
 
     for gm in gw_models:
         models.append(ChatModelDto(
@@ -697,16 +716,23 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
     # Allowlist. Ohne die waere `SELECTABLE_MODELS` reine UI-Dekoration und ein
     # Client koennte beliebige Modell-Strings an die Claude-CLI durchreichen.
     # Der Bedrock-Pin bleibt unberuehrt, der kommt aus dem KV, nicht von hier.
-    # Ungefiltert pruefen: kuratiert wird nur der Picker. Sonst wuerde ein
-    # Bestandschat, dessen Modell inzwischen aus der Allowlist gefallen ist,
-    # beim naechsten Turn mit 400 abbrechen.
-    gateway_models = await gateways.list_models(curated=False) if use_gateway else []
-    gw_model = next((m for m in gateway_models if m.key == resolved_model), None)
-    if use_gateway and gw_model is None:
-        raise HTTPException(400, (
-            f"Das Modell '{resolved_model}' wird gerade nicht angeboten. "
-            f"Bitte in den Einstellungen ein anderes waehlen."
-        ))
+    # Beim Senden darf ein gespeicherter Schluessel weiterlaufen, auch wenn
+    # der Client ihn wie ueblich erneut mitsendet. Fuer eine neue Auswahl
+    # pruefen wir den Schluessel exakt.
+    persist_model = resolved_model != previous_model
+    if use_gateway:
+        gateway_models = await gateways.list_models(curated=False)
+        try:
+            selected = gateways.select_turn_model(resolved_model, gateway_models)
+            if selected.reason != "exact":
+                if persist_model and body.model is not None:
+                    raise KeyError(resolved_model)
+                persist_model = False
+        except KeyError:
+            raise HTTPException(400, (
+                f"Das Modell '{resolved_model}' wird gerade nicht angeboten. "
+                "Bitte in den Einstellungen ein anderes waehlen."
+            )) from None
     if resolved_model and not use_gateway:
         if not claude_engine.is_allowed_model(resolved_model):
             raise HTTPException(400, f"Unbekanntes Modell: {resolved_model!r}")
@@ -786,20 +812,7 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
         "provider": image_engine.canonical_provider(user_kv.get(_KV_IMAGE_PROVIDER)),
         # Die Bilder dieser Nachricht, falls das Modell sie bearbeiten soll.
         "attachment_ids": list(body.attachment_ids or []),
-        # Zeichnet nur ein Anbieter, weil das zweite Gateway fehlt, dann der
-        # des Modells, das gerade antwortet. Claude hat keinen eigenen, dort
-        # bleibt es bei Gemini.
-        "family_hint": (gw_model.family if gw_model is not None else ""),
     }
-
-    # Zusatz-Modelle bekommen den Prompt in einer angepassten Fassung: ohne den
-    # Anthropic-Produktblock und mit dem echten Modellnamen statt „Claude".
-    # Sonst behauptet Gemini oder GPT, Claude zu sein, und wir bezahlen jeden
-    # Turn ein paar tausend Tokens Produktwissen, das dort nichts nutzt.
-    if use_gateway and system_prompt and gw_model is not None:
-        system_prompt = system_prompts.adapt_for_model(
-            system_prompt, model_label=gw_model.label, family=gw_model.family,
-        )
 
     # Gem-Wissensdateien an jede Nachricht des Gem-Chats anhängen.
     extra_attachment_ids = (
@@ -839,7 +852,7 @@ async def send_message(cid: str, body: SendMessageRequest, request: Request,
             # Ab hier ist der Chat exklusiv. Erst jetzt wird geschrieben, damit
             # ein zweiter gleichzeitiger Turn nicht denselben Ausgangszustand
             # sieht und ihn anschliessend ueberschreibt.
-            if resolved_model != previous_model:
+            if persist_model:
                 await db.set_chat_model(cid, resolved_model, user_id=user["id"])
             if drop_session:
                 await db.set_claude_session_id(cid, None)

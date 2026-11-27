@@ -1,15 +1,16 @@
-"""Zusatz-Modelle: Gateway-Konfiguration, Discovery, Normalisierung, Effort.
+"""Zusatz-Modelle: Konfiguration, TLS, Discovery und Modellauflösung.
 
 PocketClaude spricht Claude ueber die Claude-Agent-SDK an (siehe
 `claude_engine.py`). Zusaetzlich lassen sich Gemini- und GPT-Modelle nutzen,
-die auf Paradies hinter OpenAI-kompatiblen Gateways haengen (CLIProxyAPI fuer
-die Google-Konten, CodexLB fuer die ChatGPT-Konten). Beide sprechen
-`GET /v1/models` und `POST /v1/chat/completions`.
+die hinter OpenAI-kompatiblen Gateways haengen. Die Gateways sprechen
+`GET /v1/models` und `POST /v1/chat/completions`. Gemini-Werkzeuge nutzen
+ausserdem den nativen `/v1beta`-Pfad desselben Gateways.
 
 Dieses Modul kennt nur die Modell-Landkarte:
   - welche Gateways konfiguriert sind (aus der .env),
   - welche Modelle sie aktuell anbieten (Discovery mit Cache),
-  - wie eine Modell-ID plus Denktiefe auf einen konkreten Aufruf abgebildet wird.
+  - wie Modellschluessel und Denktiefe auf einen konkreten Aufruf abgebildet werden,
+  - welches aktuell angebotene Modell einen gespeicherten Schluessel ersetzt.
 
 Das eigentliche Streaming macht `openai_engine.py`.
 
@@ -22,6 +23,7 @@ import fnmatch
 import json
 import logging
 import re
+import ssl
 import time
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -108,6 +110,32 @@ class GatewayConfig:
     # Darf eine Denktiefe zusaetzlich zur Modell-Variante mitgeschickt werden?
     # Fuer alle bekannten Gateways ja; abschaltbar, falls eines daran erstickt.
     send_effort: bool = True
+    ca_file: str = ""
+    families: tuple[str, ...] | None = None
+    efforts: tuple[str, ...] = ()
+
+    def offers(self, family: str) -> bool:
+        return self.families is None or family in self.families
+
+
+class GatewayTLSConfigError(httpx.ConnectError):
+    """Die konfigurierte TLS-Pruefung kann nicht verwendet werden."""
+
+
+def http_client(gw: GatewayConfig, timeout: httpx.Timeout | float) -> httpx.AsyncClient:
+    """Ein Client fuer alle Endpunkte eines Gateways, mit optional eigener CA."""
+    if not gw.ca_file:
+        return httpx.AsyncClient(timeout=timeout)
+    if not gw.base_url.lower().startswith("https://"):
+        raise GatewayTLSConfigError(f"Gateway '{gw.label}': ca_file erfordert HTTPS.")
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    try:
+        context.load_verify_locations(cafile=gw.ca_file)
+    except (OSError, ValueError) as exc:
+        raise GatewayTLSConfigError(
+            f"Gateway '{gw.label}': CA-Datei fehlt, ist unlesbar oder ungueltig."
+        ) from exc
+    return httpx.AsyncClient(timeout=timeout, verify=context, trust_env=False)
 
 
 @dataclass
@@ -162,7 +190,9 @@ def gateway_configs() -> list[GatewayConfig]:
 
     Vorrang hat `EXTRA_MODEL_GATEWAYS` (JSON-Liste). Ist das leer, werden die
     Kurzform-Variablen `GEMINI_GATEWAY_URL` / `GPT_GATEWAY_URL` genutzt; zeigen
-    beide auf dieselbe URL, entsteht nur EIN Gateway.
+    beide auf dieselbe URL, entsteht nur EIN Gateway. `families` begrenzt die
+    Modellfamilien, `efforts` ergaenzt fehlende Denktiefen und `ca_file` setzt
+    die TLS-Vertrauensbasis fuer dieses Gateway.
 
     Ein kaputtes JSON darf den Serverstart nie kippen: dann WARNING und
     leere Liste, die App zeigt schlicht nur Claude.
@@ -194,6 +224,11 @@ def gateway_configs() -> list[GatewayConfig]:
                 timeout = float(item.get("timeout") or 120.0)
             except (TypeError, ValueError):
                 timeout = 120.0
+            families = item.get("families")
+            if families is not None and not isinstance(families, list):
+                log.warning("PC_GW: %s: families muss eine Liste sein", gid)
+                continue
+            efforts = item.get("efforts")
             out.append(GatewayConfig(
                 id=gid,
                 label=str(item.get("label") or gid),
@@ -201,6 +236,11 @@ def gateway_configs() -> list[GatewayConfig]:
                 api_key=str(item.get("api_key") or "").strip(),
                 timeout=timeout,
                 send_effort=bool(item.get("send_effort", True)),
+                ca_file=str(item.get("ca_file") or "").strip(),
+                families=(None if families is None else tuple(
+                    f.strip().lower() for f in families if isinstance(f, str))),
+                efforts=tuple(e for e in EFFORT_ORDER if e in efforts)
+                if isinstance(efforts, list) else (),
             ))
         return out
 
@@ -364,7 +404,7 @@ def is_allowed(base_id: str, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatchcase(low, p) for p in patterns)
 
 
-def extract_image_models(payload: dict) -> list[str]:
+def extract_image_models(payload: dict, *, gw: GatewayConfig | None = None) -> list[str]:
     """Die reinen Bildmodelle aus einer /v1/models-Antwort, roh und ungruppiert.
 
     Erkennungsmerkmal ist `-image` im Namen bzw. eine Ausgabe-Modalitaet, die
@@ -385,7 +425,7 @@ def extract_image_models(payload: dict) -> list[str]:
         is_image = "-image" in mid.lower()
         if isinstance(mods, list) and "image" in mods:
             is_image = True
-        if is_image:
+        if is_image and (gw is None or gw.offers(detect_family(mid))):
             out.append(mid)
     return out
 
@@ -430,6 +470,8 @@ def normalize(gw: GatewayConfig, payload: dict) -> list[ChatModel]:
     models: list[ChatModel] = []
     for base_id, entries in groups.items():
         family = detect_family(base_id)
+        if not gw.offers(family):
+            continue
         label = ""
         for e in entries:
             name = _meta(e["item"]).get("display_name")
@@ -509,12 +551,12 @@ def normalize(gw: GatewayConfig, payload: dict) -> list[ChatModel]:
                 fallback_id=plain or variant_ids.get("high") or next(iter(variant_ids.values())),
             ))
         else:
+            efforts = list(gw.efforts)
             models.append(ChatModel(
                 **common,
-                efforts=[],
-                default_effort="",
-                effort_mode="none",
-                variant_ids={},
+                efforts=efforts,
+                default_effort=pick_default_effort(efforts),
+                effort_mode="reasoning_effort" if efforts else "none",
                 fallback_id=entries[0]["raw_id"],
             ))
 
@@ -525,9 +567,10 @@ def normalize(gw: GatewayConfig, payload: dict) -> list[ChatModel]:
 # ---------- Discovery ----------
 
 def _error_message(exc: Exception, gw: GatewayConfig) -> str:
+    if isinstance(exc, GatewayTLSConfigError):
+        return str(exc)
     if isinstance(exc, httpx.ConnectError):
-        return (f"Das Gateway '{gw.label}' ist nicht erreichbar ({gw.base_url}). "
-                f"Laeuft der Dienst auf Paradies?")
+        return f"Das Gateway '{gw.label}' ist nicht erreichbar ({exc})."
     if isinstance(exc, httpx.TimeoutException):
         return f"Das Gateway '{gw.label}' hat nicht rechtzeitig geantwortet."
     if isinstance(exc, httpx.HTTPStatusError):
@@ -548,11 +591,11 @@ def _error_message(exc: Exception, gw: GatewayConfig) -> str:
 async def _fetch(gw: GatewayConfig) -> tuple[list[ChatModel], list[str]]:
     headers = {"Authorization": f"Bearer {gw.api_key}"} if gw.api_key else {}
     timeout = httpx.Timeout(DISCOVERY_TIMEOUT, connect=5.0)
-    async with httpx.AsyncClient(timeout=timeout) as cli:
+    async with http_client(gw, timeout) as cli:
         r = await cli.get(f"{gw.base_url}/models", headers=headers)
         r.raise_for_status()
         payload = r.json()
-        return normalize(gw, payload), extract_image_models(payload)
+        return normalize(gw, payload), extract_image_models(payload, gw=gw)
 
 
 async def _refresh_one(gw: GatewayConfig, now: float, now_iso: str) -> _CacheEntry:
@@ -571,7 +614,7 @@ async def _refresh_one(gw: GatewayConfig, now: float, now_iso: str) -> _CacheEnt
                            checked_at=now_iso, image_models=images)
     except Exception as exc:  # noqa: BLE001 - jeder Fehler wird zur UI-Meldung
         msg = _error_message(exc, gw)
-        previous = _cache.get(gw.id)
+        previous = None if isinstance(exc, GatewayTLSConfigError) else _cache.get(gw.id)
         keep = previous.models if previous else []
         keep_img = previous.image_models if previous else []
         log.warning("PC_GW: %s nicht abrufbar (%d Modelle aus dem Cache bleiben): %s",
@@ -638,8 +681,8 @@ def _collect(gws: list[GatewayConfig], curated: bool = True) -> list[ChatModel]:
     out: list[ChatModel] = []
     for gw in gws:
         entry = _cache.get(gw.id)
-        if entry and entry.models:
-            out.extend(entry.models)
+        if entry:
+            out.extend(m for m in entry.models if gw.offers(m.family))
     out = [_without_unsupported(m) for m in out]
     if not curated:
         return out
@@ -658,8 +701,8 @@ def resolve(model_key: str, effort: str,
     """Loest Modell-Key plus Wunsch-Denktiefe auf.
 
     Gibt (ChatModel, konkrete Modell-ID fuers Gateway, reasoning_effort) zurueck.
-    `reasoning_effort` ist nur bei effort_mode="reasoning_effort" gesetzt.
-    Wirft KeyError, wenn das Modell nicht mehr angeboten wird.
+    Wirft KeyError, wenn der genaue Schluessel nicht angeboten wird. Fuer
+    Bestandschats waehlt `resolve_turn_model` bei Bedarf vorher einen Ersatz.
     """
     model = next((m for m in models if m.key == model_key), None)
     if model is None:
@@ -680,6 +723,77 @@ def resolve(model_key: str, effort: str,
         model_id = model.variant_ids.get(resolved, model.fallback_id)
         return model, model_id, (resolved if model.send_effort else None)
     return model, model.fallback_id, resolved
+
+
+MODEL_ALIASES = {"gemini-flash": "gemini-3.8-flash"}
+
+
+@dataclass(frozen=True)
+class ModelSelection:
+    model: ChatModel
+    reason: str = "exact"
+
+
+def resolve_turn_model(
+    model_key: str,
+    models: list[ChatModel],
+    *,
+    curated: list[ChatModel],
+    gemini_fallback: str = "",
+    last_resort: str = "gpt-luna",
+    failed_key: str | None = None,
+) -> ModelSelection:
+    """Waehlt das Modell fuer einen Bestandschat aus geordneten Gateway-Listen.
+
+    Nach einem echten Fehler beginnen wir bei der Gemini-Ersatzwahl. Ein
+    fehlgeschlagener Schluessel wird auch dort nicht erneut gewaehlt.
+    """
+    if failed_key is None:
+        exact = next((m for m in models if m.key == model_key), None)
+        if exact is not None:
+            return ModelSelection(exact)
+
+    prefix, _, tail = model_key.partition(":")
+    gateway_id, _, base_id = tail.partition(":")
+    if prefix != "gw" or not gateway_id or not base_id:
+        raise KeyError(model_key)
+
+    family = detect_family(base_id)
+    if failed_key is None:
+        same = next((m for m in models if m.base_id == base_id), None)
+        if same is not None:
+            return ModelSelection(same, "same_model")
+        canonical = MODEL_ALIASES.get(base_id, base_id)
+        alias = next((m for m in models if m.family == family and
+                      MODEL_ALIASES.get(m.base_id, m.base_id) == canonical), None)
+        if alias is not None:
+            return ModelSelection(alias, "alias")
+
+    if family == "gemini":
+        preferred = next((m for m in models if m.family == "gemini" and
+                          m.key != failed_key and m.base_id == gemini_fallback), None)
+        fallback = preferred or next((m for m in curated if m.family == "gemini" and
+                                      m.key != failed_key), None)
+        if fallback is not None:
+            return ModelSelection(fallback, "gemini_fallback")
+        last = next((m for m in models if m.family != "gemini" and
+                     m.base_id == last_resort), None)
+        if last is not None:
+            return ModelSelection(last, "last_resort")
+    raise KeyError(model_key)
+
+
+def select_turn_model(model_key: str, models: list[ChatModel], *,
+                      failed_key: str | None = None) -> ModelSelection:
+    """Wendet die Server-Konfiguration auf die Modellauflösung eines Turns an."""
+    from pocket_claude.config import settings
+
+    patterns = allowlist_patterns()
+    return resolve_turn_model(
+        model_key, models, curated=[m for m in models if is_allowed(m.base_id, patterns)],
+        gemini_fallback=settings.gemini_fallback_model.strip(),
+        last_resort=settings.extra_model_last_resort.strip(), failed_key=failed_key,
+    )
 
 
 def gateway_by_id(gateway_id: str) -> GatewayConfig | None:
@@ -729,37 +843,43 @@ def _without_unsupported(model: ChatModel) -> ChatModel:
     )
 
 
+def _legacy_image_priority(gateways: list[GatewayConfig]) -> bool:
+    return all(gw.families is None and not (gw.ca_file or gw.efforts) for gw in gateways)
+
+
 async def gpt_image_gateway() -> GatewayConfig | None:
     """Das Gateway, das Bilder ueber den OpenAI-Bildpfad erzeugen kann.
 
-    Zwei Erkennungsmerkmale, in dieser Rangfolge. CodexLB meldet seine
-    Denkstufen als Metadaten, fuehrt das Bildmodell aber in keiner
-    Modell-Liste. Der gemeinsame Pool auf Paradies (CLIProxyAPI mit
-    Codex-Konten) meldet keine Denkstufen, listet dafuer `GPT_IMAGE_MODEL`
-    direkt. Verlangt wird genau dieses Modell, nicht irgendein `gpt-image-*`:
-    es ist das, was danach fest angefordert wird.
+    CodexLB meldet seine Denkstufen als Metadaten, andere Gateways listen
+    `GPT_IMAGE_MODEL` direkt. Bei den erweiterten Gateway-Konfigurationen
+    entscheidet die Listenreihenfolge. Alte Konfigurationen behalten den
+    Vorrang fuer CodexLB, wenn beide Erkennungsmerkmale vorhanden sind.
     """
     gws = gateway_configs()
     if not gws:
         return None
     await list_models(force=False)
-    entries = [(gw, _cache.get(gw.id)) for gw in gws]
-    for gw, entry in entries:
-        if entry and any(m.native_web_search for m in entry.models):
+    first_listed = None
+    legacy_priority = _legacy_image_priority(gws)
+    for gw in gws:
+        entry = _cache.get(gw.id)
+        if not entry or not gw.offers("gpt"):
+            continue
+        if any(m.native_web_search for m in entry.models):
             return gw
-    for gw, entry in entries:
-        if entry and GPT_IMAGE_MODEL in entry.image_models:
-            return gw
-    return None
+        if GPT_IMAGE_MODEL in entry.image_models:
+            if not legacy_priority:
+                return gw
+            first_listed = first_listed or gw
+    return first_listed
 
 
 async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
     """Das Gateway und das Gemini-Bildmodell fuer den nativen Gemini-Pfad.
 
-    Ist `preferred` gesetzt und auf irgendeinem Gateway vorhanden, gewinnt
-    dieses. Sonst das erste Gateway, das ein Gemini-Bildmodell anbietet. Gibt None
-    zurueck, wenn kein Gateway eines hat: dann ist der Gemini-Weg fuer Bilder
-    schlicht nicht eingerichtet.
+    Die erweiterte Gateway-Liste bestimmt den Vorrang. Das Wunschmodell
+    gewinnt innerhalb des ersten passenden Gateways. Fuer alte Konfigurationen
+    wird ein Wunschmodell weiterhin gateway-uebergreifend gesucht.
 
     `gpt-image-*` faellt bewusst heraus, obwohl es `-image` im Namen traegt:
     der Pool listet es mit, `generateContent` lehnt es aber mit 503 ab. GPT
@@ -769,18 +889,19 @@ async def image_target(preferred: str = "") -> tuple[GatewayConfig, str] | None:
     if not gws:
         return None
     await list_models(force=False)
-    # Erst ueber ALLE Gateways nach dem Wunschmodell suchen: liegt es auf dem
-    # zweiten, haette sonst das erste mit irgendeinem Bildmodell gewonnen.
+    legacy_priority = _legacy_image_priority(gws)
     first: tuple[GatewayConfig, str] | None = None
     for gw in gws:
         entry = _cache.get(gw.id)
-        if not entry:
+        if not entry or not gw.offers("gemini"):
             continue
         gemini_models = [m for m in entry.image_models if detect_family(m) == "gemini"]
         if not gemini_models:
             continue
         if preferred and preferred in gemini_models:
             return gw, preferred
+        if not legacy_priority:
+            return gw, gemini_models[0]
         if first is None:
             first = (gw, gemini_models[0])
     return first

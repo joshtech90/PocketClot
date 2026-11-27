@@ -492,7 +492,7 @@ async def _generate_gemini(
         async with gate:
             try:
                 return idx, await _generate_one(
-                    url, headers, body, timeout, aspect_ratio, image_size,
+                    gw, url, headers, body, timeout, aspect_ratio, image_size,
                 )
             except ImageGenError as exc:
                 return idx, exc
@@ -575,7 +575,7 @@ async def _generate_gpt(
     async def _one(idx: int):
         async with gate:
             try:
-                return idx, await _gpt_one(url, headers, fields, refs, timeout)
+                return idx, await _gpt_one(gw, url, headers, fields, refs, timeout)
             except ImageGenError as exc:
                 return idx, exc
 
@@ -598,7 +598,7 @@ async def _generate_gpt(
     return images
 
 
-async def _gpt_one(url: str, headers: dict, fields: dict,
+async def _gpt_one(gw: gateways.GatewayConfig, url: str, headers: dict, fields: dict,
                    references: list[ReferenceImage],
                    timeout: float) -> tuple[str, bytes]:
     """Ein einzelner Bild-Aufruf gegen den OpenAI-Bildpfad.
@@ -607,7 +607,7 @@ async def _gpt_one(url: str, headers: dict, fields: dict,
     beiden Faellen dieselben, nur die Verpackung unterscheidet sich.
     """
     try:
-        async with httpx.AsyncClient(timeout=timeout) as cli:
+        async with gateways.http_client(gw, timeout) as cli:
             if references:
                 files = [
                     ("image", (f"vorlage{i}.{_ext_for(ref.mime_type)}",
@@ -776,6 +776,7 @@ def usable_references(
 
 
 async def _generate_one(
+    gw: gateways.GatewayConfig,
     url: str,
     headers: dict,
     body: dict,
@@ -787,7 +788,7 @@ async def _generate_one(
 
     async def _send(req_body: dict) -> httpx.Response:
         try:
-            async with httpx.AsyncClient(timeout=timeout) as cli:
+            async with gateways.http_client(gw, timeout) as cli:
                 return await cli.post(url, headers=headers, json=req_body)
         except httpx.TimeoutException as e:
             raise ImageGenError(

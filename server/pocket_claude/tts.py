@@ -207,10 +207,15 @@ _EMOJI_PATTERN = re.compile(
 )
 
 
+GEMINI_UNAVAILABLE = "Gemini ist gerade nicht erreichbar, "
+
+
 def _strip_for_tts(text: str) -> str:
     """Bereitet Markdown-haltigen Text für TTS auf."""
     if not text:
         return ""
+    # Das Live-Stueck kann schon direkt nach der Hinweiszeile enden.
+    text = re.sub(rf"^\s*_{re.escape(GEMINI_UNAVAILABLE)}[^\n_]+ antwortet\._(?:\n|$)", "", text)
     # Code-Blöcke entfernen (werden sonst als endlose Zeichenfolge vorgelesen)
     text = re.sub(r"```[\s\S]*?```", " ", text)
     # Quellen-Block, den openai_engine ans Ende haengt (vor dem Fett-Entfernen) ("**Quellen**" plus
